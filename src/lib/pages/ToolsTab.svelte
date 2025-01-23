@@ -51,14 +51,14 @@
 				ImageSrc={peepoScreenshotUrl}
 				CardTitle="PeepoDrumKit"
 				CardSubtitle="Official Latest"
-				CardText ="The official latest version by samyuu, for regular charts without the experimental features"
+				CardText ="The official latest version by samyuu, for regular charts without the experimental features."
 				/>
 			<ToolCard 
 				Url="https://drive.google.com/uc?export=download&id=1P6ctv-qmxwH99z2mOSI5V3bPv5Rjfs11"
 				ImageSrc={peepoScreenshotUrl}
 				CardTitle="PeepoDrumKit"
 				CardSubtitle="Unofficial Latest"
-				CardText ="The unofficial latest version continued by Komi, adding experimental features supported by OpenTaiko"
+				CardText ="The unofficial latest version continued by Komi, adding experimental features supported by OpenTaiko."
 				/>
 		</div>
 	{/if}
@@ -90,19 +90,18 @@
 			ImageSrc={peepoScreenshotUrl}
 			CardTitle="OpenTaiko soundtrack"
 			CardSubtitle="Song submission form"
-			CardText ="You can submit your songs here for the OpenTaiko soundtrack! Charts are usually made within 2 weeks if the song is accepted"
+			CardText ="You can submit your songs here for the OpenTaiko soundtrack! Charts are usually made within 2 weeks if the song is accepted."
 			/>
 		<ToolCard 
 			Url="https://forms.gle/1HbDtS7FtJDNfhUb7"
 			ImageSrc={peepoScreenshotUrl}
 			CardTitle="OpenTaiko soundtrack"
 			CardSubtitle="Song suggestion form"
-			CardText ="You can recommand artists here whose songs you thing would fit for OpenTaiko!"
+			CardText ="You can recommand artists here whose songs you think would fit for OpenTaiko!"
 			/>
 	</div>
 {/if}
 
 <style>
-
 
 </style>
