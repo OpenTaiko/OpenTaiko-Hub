@@ -218,7 +218,7 @@
 
         const tmpFolder = await path.join(res, "./tmp");
         const uuid = crypto.randomUUID();
-        const assetDownloadFolder = await path.join(tmpFolder, `${uuid}\\`);
+        const assetDownloadFolder = await path.join(tmpFolder, `${uuid}/`);
 
         fold_exists = await exists(assetDownloadFolder);
         if (!fold_exists)
@@ -230,8 +230,8 @@
         for (const filePath of assetFpath) {
             const localFileName = filePath.replace(/^[^\\]+\\/, '');
             const assetFileUrl = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/${subDir}/${filePath}`;
-            const dlPath = await path.join(assetDownloadFolder, localFileName);
-            const fileFold = await path.join(assetDownloadFolder, filePath.split('\\').length > 2 ? filePath.replace(/^[^\\]+\\/, '').replace(/\\[^\\]+$/, '') : '');
+            const dlPath = await path.join(assetDownloadFolder, localFileName.replace(/\\/g, '/'));
+            const fileFold = await path.join(assetDownloadFolder, (filePath.split('\\').length > 2 ? filePath.replace(/^[^\\]+\\/, '').replace(/\\[^\\]+$/, '') : '').replace(/\\/g, '/'));
 
             const fold_exists = await exists(fileFold);
             if (!fold_exists) {

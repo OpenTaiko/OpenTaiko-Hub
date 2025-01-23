@@ -243,7 +243,7 @@
 
         const tmpFolder = await path.join(res, "./tmp");
         const uuid = crypto.randomUUID();
-        const chartDownloadFolder = await path.join(tmpFolder, `${uuid}\\`);
+        const chartDownloadFolder = await path.join(tmpFolder, `${uuid}/`);
 
         fold_exists = await exists(chartDownloadFolder);
         if (!fold_exists)
@@ -287,7 +287,7 @@
         }));
 
         // Download box.def and default.png if missing
-        const genrePaths = songObj.tjaFolderPath.split('\\').slice(0, -1).map((_, i, arr) => arr.slice(0, i + 1).join('\\'));
+        const genrePaths = songObj.tjaFolderPath.split('\\').slice(0, -1).map((_, i, arr) => arr.slice(0, i + 1).join('/'));
 
         for (const genrePath of genrePaths) {
             const genreFullPath = await path.join(baseDirPath, genrePath);
