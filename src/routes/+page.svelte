@@ -4,6 +4,7 @@
     import { readTextFile, writeTextFile, mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
     import { resourceDir } from '@tauri-apps/api/path';
     import { fetch } from "@tauri-apps/plugin-http";
+    import { open } from '@tauri-apps/plugin-shell';
 
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, GetOS } = getContext('toast');
@@ -239,6 +240,16 @@
             buildDetails = "No valid OpenTaiko version found";
         }
     }
+
+    const OpenInExplorer = async () => {
+        try {
+            const res = await resourceDir();
+            const appPath = await path.join(res, "./OpenTaiko");
+            await open(appPath);
+        } catch (error) {
+            TriggerError('Error opening the folder:' + error);
+        }
+    }
   
     onMount(async () => {
         optk_OS = await GetOS();
@@ -311,6 +322,7 @@
                                     <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Download OpenTaiko</button>
                                 {:else if latestVersion !== optk_version && 'Loading...' !== latestVersion}
                                     <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Open in Explorer</button>
                                     <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Update OpenTaiko</button>
                                     {#if checkSkinCompatibility(latestVersion, optk_version) === false}
                                         <span class="text-red-500">(Updating will require a skin update)</span>
@@ -318,6 +330,7 @@
                                     
                                 {:else}
                                     <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Open in Explorer</button>
                                     <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-gray-700 hover:bg-gray-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-600 dark:hover:bg-gray-700">Redownload OpenTaiko</button>
                                 {/if}
                             {/if}

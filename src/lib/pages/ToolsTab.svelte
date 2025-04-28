@@ -54,7 +54,7 @@
 				CardText ="The official latest version by samyuu, for regular charts without the experimental features"
 				/>
 			<ToolCard 
-				Url="https://drive.google.com/uc?export=download&id=1P6ctv-qmxwH99z2mOSI5V3bPv5Rjfs11"
+				Url="https://github.com/0auBSQ/PeepoDrumKit/releases/latest"
 				ImageSrc={peepoScreenshotUrl}
 				CardTitle="PeepoDrumKit"
 				CardSubtitle="Unofficial Latest"
