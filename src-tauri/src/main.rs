@@ -2,12 +2,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::fs::File;
+use std::io::BufReader;
 use std::path::Path;
-use tokio::task;
-use tauri::{AppHandle, Emitter};
-use zip::ZipArchive;
-use std::io::{BufReader};
 use std::process::Command;
+use tauri::{AppHandle, Emitter};
+use tokio::task;
+use zip::ZipArchive;
 
 #[tauri::command]
 fn execute_external_app(os: String, path: String) -> Result<(), String> {
@@ -33,7 +33,7 @@ fn execute_external_app(os: String, path: String) -> Result<(), String> {
 #[tauri::command]
 async fn unzip_and_get_first_folder(
     zip_path: String,
-    app_handle: AppHandle
+    app_handle: AppHandle,
 ) -> Result<String, String> {
     let zip_path_clone = zip_path.clone();
 
@@ -53,7 +53,9 @@ async fn unzip_and_get_first_folder(
         let mut first_folder: Option<String> = None;
 
         for i in 0..archive.len() {
-            let mut file = archive.by_index(i).map_err(|err| format!("ERR: Failed to read file in archive: {}", err))?;
+            let mut file = archive
+                .by_index(i)
+                .map_err(|err| format!("ERR: Failed to read file in archive: {}", err))?;
             let file_name = file.name();
 
             let out_path = zip_parent_dir.join(file_name);
@@ -66,8 +68,9 @@ async fn unzip_and_get_first_folder(
                 }
             } else {
                 if let Some(parent) = out_path.parent() {
-                    std::fs::create_dir_all(parent)
-                        .map_err(|err| format!("ERR: Failed to create parent directory: {}", err))?;
+                    std::fs::create_dir_all(parent).map_err(|err| {
+                        format!("ERR: Failed to create parent directory: {}", err)
+                    })?;
                 }
 
                 let mut out_file = File::create(&out_path)
@@ -79,7 +82,8 @@ async fn unzip_and_get_first_folder(
             // Update progress after each file is extracted
             extracted_files += 1;
             let progress = (extracted_files as f64 / total_files as f64) * 100.0;
-            app_handle.emit("extract-progress", progress)
+            app_handle
+                .emit("extract-progress", progress)
                 .map_err(|err| format!("ERR: Failed to emit progress: {}", err))?;
         }
 
@@ -89,17 +93,18 @@ async fn unzip_and_get_first_folder(
     .map_err(|err| format!("ERR: Task failed: {}", err))?
 }
 
-
 fn main() {
-  tauri::Builder::default()
-    .plugin(tauri_plugin_http::init())
-    .plugin(tauri_plugin_upload::init())
-    .plugin(tauri_plugin_fs::init())
-    .plugin(tauri_plugin_os::init())
-    .plugin(tauri_plugin_shell::init())
-    .invoke_handler(tauri::generate_handler![unzip_and_get_first_folder, execute_external_app])
-    .run(tauri::generate_context!())
-    .expect("error while running tauri application");
+    tauri::Builder::default()
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_upload::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_shell::init())
+        .invoke_handler(tauri::generate_handler![
+            unzip_and_get_first_folder,
+            execute_external_app
+        ])
+        .run(tauri::generate_context!())
+        .expect("error while running tauri application");
 }
-
-

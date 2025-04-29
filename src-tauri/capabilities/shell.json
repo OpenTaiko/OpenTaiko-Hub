@@ -4,6 +4,14 @@
     "local": true,
     "windows": ["main"],
     "permissions": [
+      {
+        "identifier": "opener:allow-open-path",
+        "allow": [
+          {
+            "path": "**/*"
+          }
+        ]
+      },
       "shell:allow-open",
       "shell:default"
     ]

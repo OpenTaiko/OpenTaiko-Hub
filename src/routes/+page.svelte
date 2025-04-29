@@ -4,7 +4,7 @@
     import { readTextFile, writeTextFile, mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
     import { resourceDir } from '@tauri-apps/api/path';
     import { fetch } from "@tauri-apps/plugin-http";
-    import { open } from '@tauri-apps/plugin-shell';
+    import { openPath } from '@tauri-apps/plugin-opener';
 
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, GetOS } = getContext('toast');
@@ -245,7 +245,7 @@
         try {
             const res = await resourceDir();
             const appPath = await path.join(res, "./OpenTaiko");
-            await open(appPath);
+            await openPath(appPath);
         } catch (error) {
             TriggerError('Error opening the folder:' + error);
         }
