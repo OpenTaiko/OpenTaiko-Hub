@@ -179,7 +179,7 @@
             // Move unzipped files to OpenTaiko folder
             progress = undefined;
 
-            const source_folder = folderName;
+            const source_folder = folderName.replace(/\\/g, '/');
             await copyAllFilesRecursive(source_folder, optk_folder);
             
 

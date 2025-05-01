@@ -235,7 +235,7 @@
         const res = await GetRootPath();
         const baseDir = './OpenTaiko/Songs';
         const baseDirPath = await path.join(res, baseDir);
-        const localPath = `${baseDir}/${(currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath}`;
+        const localPath = `${baseDir}/${(currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath}`.replace(/\\/g, '/');
         const tjaFullPath = await path.join(res, localPath);
 
         let fold_exists = await exists(tjaFullPath);
@@ -256,7 +256,7 @@
         for (const filePath of songObj.tjaFilesPath) {
             const localFileName = filePath.split("\\").pop();
             const tjaFileUrl = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${filePath}`;
-            const dlPath = await path.join(chartDownloadFolder, localFileName);
+            const dlPath = await path.join(chartDownloadFolder, localFileName.replace(/\\/g, '/'));
 
             
             const success = await backoffDownload(
@@ -279,8 +279,8 @@
 
         songDLProgress[songObj.uniqueId] = 0;
         await Promise.all(fileNames.map(async (fn, idx) => {
-            const strPath = await path.join(chartDownloadFolder, fn);
-            const destPath = await path.join(tjaFullPath, fn);
+            const strPath = await path.join(chartDownloadFolder, fn.replace(/\\/g, '/'));
+            const destPath = await path.join(tjaFullPath, fn.replace(/\\/g, '/'));
 
             await copyFile(strPath, destPath);
             songDLProgress[songObj.uniqueId] = (idx + 1) * (100 / fileNames.length);
