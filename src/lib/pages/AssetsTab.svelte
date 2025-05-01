@@ -3,11 +3,12 @@
     import { onMount } from 'svelte';
     import { ProgressBar, TabGroup, Tab } from '@skeletonlabs/skeleton';
     import { readTextFile, mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
-    import { resourceDir, cacheDir, join } from '@tauri-apps/api/path';
     import { fetch } from "@tauri-apps/plugin-http";
     import { path } from '@tauri-apps/api';
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext('toast');
+
+    import { GetRootPath } from "../utils/path.js";
 
 
     import AssetStatusCell from '$lib/components/AssetStatusCell.svelte';
@@ -80,7 +81,7 @@
     }
 
     const crawlAsset = async (baseDir, assetType) => {
-        const res = await resourceDir();
+        const res = await GetRootPath();
         const targetFile = {
             "Skins": "SkinConfig.ini",
             "Characters": "CharaConfig.txt",
@@ -184,7 +185,7 @@
     }
 
     const DownloadAsset = async (assetObj, currentObj, assetType, assetNb = undefined, assetTotal = undefined) => {
-        const res = await resourceDir();
+        const res = await GetRootPath();
 
         const targetFile = {
             "Skins": "SkinConfig.ini",

@@ -2,12 +2,13 @@
     import { onMount } from 'svelte';
     import { AppRail, AppRailTile, AppRailAnchor, ProgressBar } from '@skeletonlabs/skeleton';
     import { readTextFile, writeTextFile, mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
-    import { resourceDir } from '@tauri-apps/api/path';
     import { fetch } from "@tauri-apps/plugin-http";
     import { openPath } from '@tauri-apps/plugin-opener';
 
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, GetOS } = getContext('toast');
+
+    import { GetRootPath } from "../lib/utils/path.js";
 
     // Pages
     import SongsTab from '$lib/pages/SongsTab.svelte';
@@ -41,7 +42,7 @@
     const LaunchOpenTaiko = async () => {
         try {
             const os = optk_OS;
-            const res = await resourceDir();
+            const res = await GetRootPath();
             const appPath = await path.join(res, "./OpenTaiko/OpenTaiko");
             await invoke('execute_external_app', { os, path: appPath });
         } catch (error) {
@@ -128,7 +129,7 @@
             downloadBusy = true;
 
             // Download the latest OpenTaiko release
-            const res = await resourceDir();
+            const res = await GetRootPath();
             const base = await path.join(res, "./tmp");
             const dled = await path.join(base, "/OpenTaiko.zip");
             
@@ -227,7 +228,7 @@
             buildDetailsNotFound = false;
             buildDetails = 'Loading...';
             const filePath = './OpenTaiko/version.json';
-            const res = await resourceDir();
+            const res = await GetRootPath();
             const versionFilePath = await path.join(res,filePath)
             const fileContent = await readTextFile(versionFilePath);
             const jsonData = JSON.parse(fileContent);
@@ -243,7 +244,7 @@
 
     const OpenInExplorer = async () => {
         try {
-            const res = await resourceDir();
+            const res = await GetRootPath();
             const appPath = await path.join(res, "./OpenTaiko");
             await openPath(appPath);
         } catch (error) {

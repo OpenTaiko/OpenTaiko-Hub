@@ -3,7 +3,6 @@
     import { onMount } from 'svelte';
     import { ProgressBar } from '@skeletonlabs/skeleton';
     import { readFile, readTextFile, mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
-    import { resourceDir } from '@tauri-apps/api/path';
     import { fetch } from "@tauri-apps/plugin-http";
     import { download } from "@tauri-apps/plugin-upload";
     import { path } from '@tauri-apps/api';
@@ -11,6 +10,8 @@
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext('toast');
 
     import { md5 } from 'js-md5';
+
+    import { GetRootPath } from "../utils/path.js";
 
     // Song management
     import AudioPlayer from '$lib/components/AudioPlayer.svelte';
@@ -43,7 +44,7 @@
     }
     
     const crawlSongs = async () => {
-        const res = await resourceDir();
+        const res = await GetRootPath();
         const baseDir = './OpenTaiko/Songs';
         scanning = true;
         
@@ -231,7 +232,7 @@
         songDLProgress[songObj.uniqueId] = 0;
         //console.log(songDLProgress);
 
-        const res = await resourceDir();
+        const res = await GetRootPath();
         const baseDir = './OpenTaiko/Songs';
         const baseDirPath = await path.join(res, baseDir);
         const localPath = `${baseDir}/${(currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath}`;
