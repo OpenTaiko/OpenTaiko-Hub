@@ -258,8 +258,8 @@
 
         assetDLProgress[assetType][assetRelpath] = 0;
         await Promise.all(fileNames.map(async (fn, idx) => {
-            const strPath = await path.join(assetDownloadFolder, fn);
-            const destPath = (assetType === "Skins") ? await path.join(assetFullPath, fn) : await path.join(baseDirPath, fn);
+            const strPath = (await path.join(assetDownloadFolder, fn)).replace(/\\/g, '/');
+            const destPath = ((assetType === "Skins") ? await path.join(assetFullPath, fn) : await path.join(baseDirPath, fn)).replace(/\\/g, '/');
             const fileFold = await path.dirname(destPath);
 
             fold_exists = await exists(fileFold);
