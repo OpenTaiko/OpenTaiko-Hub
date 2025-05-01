@@ -9,6 +9,20 @@ use tauri::{AppHandle, Emitter};
 use tokio::task;
 use zip::ZipArchive;
 
+use std::env;
+use std::path::{PathBuf};
+
+fn get_appimage_path() -> Option<PathBuf> {
+    // Check if the environment variable `APPIMAGE` exists, which indicates the app is running as an AppImage
+    if let Ok(exe_path) = env::current_exe() {
+        if exe_path.to_string_lossy().ends_with(".AppImage") {
+            return Some(exe_path.parent().unwrap_or(Path::new("/")).to_path_buf());
+        }
+    }
+    None
+}
+
+
 #[tauri::command]
 fn execute_external_app(os: String, path: String) -> Result<(), String> {
     let full_path = if os == "Win" {
@@ -95,6 +109,17 @@ async fn unzip_and_get_first_folder(
 
 fn main() {
     tauri::Builder::default()
+        .setup(|app| {
+            // Check if the app is running from an AppImage
+            if let Some(app_image_path) = get_appimage_path() {
+                let appimage_resources = app_image_path.join("OpenTaiko-Hub");
+                if appimage_resources.exists() {
+                    // Set the resource directory to the correct AppImage location
+                    std::env::set_var("TAURI_RESOURCE_DIR", appimage_resources.to_str().unwrap());
+                }
+            }
+            Ok(())
+        })
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
         .plugin(tauri_plugin_upload::init())
