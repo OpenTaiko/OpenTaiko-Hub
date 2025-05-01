@@ -57,7 +57,7 @@ jobs:
               tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
               releaseName: 'OpenTaiko Hub v__VERSION__'
               releaseBody: |
-                Note: The Linux builds are experimental, tested only on Ubuntu 22.04 for now.
+                Linux builds are considered functional from 0.1.5, please update if your version is older.
               releaseDraft: false
-              prerelease: true
+              prerelease: false
               args: ${{ matrix.args }}
