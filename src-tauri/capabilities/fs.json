@@ -4,24 +4,30 @@
     "local": true,
     "windows": ["main"],
     "permissions": [
-        {
-            "identifier": "fs:default",
-            "allow": [
-              { "path": "**/*"}
-            ]
-          },
-          {
-            "identifier": "fs:allow-copy-file",
-            "allow": [
-              { "path": "**/*"}
-            ]
-          },
-          {
-            "identifier": "fs:write-all",
-            "allow": [
-              { "path": "**/*"}
-            ]
-          },
+      {
+        "identifier": "fs:default",
+        "allow": [
+          { "path": "**/*" },
+          { "path": "**/.*" },
+          { "path": "**/.*/**" }
+        ]
+      },
+      {
+        "identifier": "fs:allow-copy-file",
+        "allow": [
+          { "path": "**/*" },
+          { "path": "**/.*" },
+          { "path": "**/.*/**" }
+        ]
+      },
+      {
+        "identifier": "fs:write-all",
+        "allow": [
+          { "path": "**/*" },
+          { "path": "**/.*" },
+          { "path": "**/.*/**" }
+        ]
+      },
       "fs:default",
       "fs:allow-copy-file",
       "fs:write-all",
