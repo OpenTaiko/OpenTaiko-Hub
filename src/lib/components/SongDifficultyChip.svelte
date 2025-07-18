@@ -38,7 +38,7 @@ $: Maker = ["Easy", "Normal", "Hard", "Oni", "Edit", "Tower"].includes(Difficult
     <span class="badge bg-{ChipColor}-100 text-{ChipColor}-800 levelchip" title={Maker}>{Prefix}{~~Level}</span>
     {#if HoFRank !== undefined}
         <br /><br />
-        <a href="https://docs.google.com/spreadsheets/d/18R9ASCOxKpu_2up24uvUsJZ3lPPHT2DxNidWdwQUf0A/edit?usp=sharing" target="_blank" title="OpenTaiko Hall of Fame Rank #{HoFRank}"><i class="fa-solid fa-crown {HoFCrownColorClass}"></i> <small>{HoFRank}</small></a>
+        <a href="https://opentaiko.github.io/hof" target="_blank" title="OpenTaiko Hall of Fame Rank #{HoFRank}"><i class="fa-solid fa-crown {HoFCrownColorClass}"></i> <small>{HoFRank}</small></a>
     {/if}
 {/if}
 

@@ -15,6 +15,7 @@
     import AssetsTab from '$lib/pages/AssetsTab.svelte';
     import InformationTab from '$lib/pages/InformationTab.svelte';
     import ToolsTab from '$lib/pages/ToolsTab.svelte';
+    import SaWTab from '$lib/pages/SaWTab.svelte';
 
     // Logo
     import optkLogoUrl from '$lib/optk.png';
@@ -269,32 +270,33 @@
                 <AppRailAnchor href="/" >(icon)</AppRailAnchor>
             </svelte:fragment> -->
             <!-- --- -->
-            <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Update or launch OpenTaiko">
+            <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Download, update, or launch OpenTaiko.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-download"></i></svelte:fragment>
-                <span>OpenTaiko version</span>
+                <span>OpenTaiko Version</span>
             </AppRailTile>
-            <AppRailTile bind:group={currentTile} name="tile-2" value={1} title="Update your OpenTaiko songs and download the latest ones">
+            <AppRailTile bind:group={currentTile} name="tile-2" value={1} title="Update your OpenTaiko songs and download the latest ones.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-music"></i></svelte:fragment>
                 <span>Songlist</span>
             </AppRailTile>
-            <AppRailTile bind:group={currentTile} name="tile-3" value={2} title="Get the newest OpenTaiko skins and related assets">
+            <AppRailTile bind:group={currentTile} name="tile-3" value={2} title="Get the newest OpenTaiko skins and related assets.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-pen-ruler"></i></svelte:fragment>
                 <span>Skins</span>
             </AppRailTile>
-            <AppRailTile bind:group={currentTile} name="tile-5" value={4} title="Tools that can improve your OpenTaiko experience">
+            <AppRailTile bind:group={currentTile} name="tile-4" value={4} title="Tools that can improve your OpenTaiko experience.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-screwdriver-wrench"></i></svelte:fragment>
                 <span>Tools</span>
             </AppRailTile>
             <!-- Trail -->
             <svelte:fragment slot="trail">
-                <AppRailTile bind:group={currentTile} name="tile-4" value={3} title="To consult the changelogs, the documentation, or for troubleshooting">
+                <AppRailTile bind:group={currentTile} name="tile-5" value={3} title="To consult the changelogs, the documentation, or for troubleshooting.">
                     <svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
                     <span>Information</span>
                 </AppRailTile>
-                <AppRailAnchor href="https://discord.gg/aA8scTvZ6B" target="_blank" title="Official Discord">
-					<i class="fa-brands fa-discord text-2xl"></i>
-				</AppRailAnchor>
-				<AppRailAnchor href="https://github.com/0auBSQ/OpenTaiko" target="_blank" title="GitHub">
+                <AppRailTile bind:group={currentTile} name="tile-6" value={5} title="Check out OpenTaiko's socials and websites!">
+                    <svelte:fragment slot="lead"><i class="fa-solid fa-globe"></i></svelte:fragment>
+                    <span>Socials and Websites</span>
+                </AppRailTile>
+				<AppRailAnchor href="https://github.com/OpenTaiko/OpenTaiko-Hub" target="_blank" title="View the OpenTaiko Hub source code.">
 					<i class="fa-brands fa-github text-2xl"></i>
 				</AppRailAnchor>
 			</svelte:fragment>
@@ -383,6 +385,11 @@
         <!-- Tools -->
         {#if currentTile === 4}
             <ToolsTab />
+        {/if}
+
+        <!-- Tools -->
+        {#if currentTile === 5}
+            <SaWTab />
         {/if}
       </main>
     </div>

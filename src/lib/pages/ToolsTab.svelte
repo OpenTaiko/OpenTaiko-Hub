@@ -10,6 +10,7 @@
     import peepoScreenshotUrl from '$lib/peepo.png';
     import arrowScreenshotUrl from '$lib/arrow.png';
     import tjatoolsScreenshotUrl from '$lib/tjatools.png';
+	import subeditScreenshotUrl from '$lib/subedit.png';
 
     let currentTool = 0;
 	let optk_OS = "Win";
@@ -51,18 +52,18 @@
 				ImageSrc={peepoScreenshotUrl}
 				CardTitle="PeepoDrumKit"
 				CardSubtitle="Official Latest"
-				CardText ="The official latest version by samyuu, for regular charts without the experimental features"
+				CardText ="The official latest version by samyuu, for regular charts without the experimental features."
 				/>
 			<ToolCard 
 				Url="https://github.com/0auBSQ/PeepoDrumKit/releases/latest"
 				ImageSrc={peepoScreenshotUrl}
 				CardTitle="PeepoDrumKit"
 				CardSubtitle="Unofficial Latest"
-				CardText ="The unofficial latest version continued by Komi, adding experimental features supported by OpenTaiko"
+				CardText ="The unofficial latest version continued by Komi, adding experimental features supported by OpenTaiko."
 				/>
 		</div>
 	{/if}
-	<h2>Additional ressources:</h2>
+	<h2>Additional resources:</h2>
 	<div class="w-full text-token grid grid-cols-1 md:grid-cols-2 gap-4">
 		<ToolCard 
 			Url="https://whmhammer.github.io/tja-tools/"
@@ -79,6 +80,13 @@
 			CardSubtitle="Official Latest"
 			CardText ="The recommended tool to sync your charts trouble free!"
 			/>
+		<ToolCard 
+			Url="https://github.com/SubtitleEdit/subtitleedit"
+			ImageSrc={subeditScreenshotUrl}
+			CardTitle="Subtitle Edit"
+			CardSubtitle="Official Latest"
+			CardText ="The recommended tool to make VTT files for your charts!"
+			/>
 		{/if}
 	</div>
 {/if}
@@ -90,14 +98,14 @@
 			ImageSrc={peepoScreenshotUrl}
 			CardTitle="OpenTaiko soundtrack"
 			CardSubtitle="Song submission form"
-			CardText ="You can submit your songs here for the OpenTaiko soundtrack! Charts are usually made within 2 weeks if the song is accepted"
+			CardText ="You can submit your songs here for the OpenTaiko soundtrack! Charts are usually made within 2 weeks if the song is accepted."
 			/>
 		<ToolCard 
 			Url="https://forms.gle/1HbDtS7FtJDNfhUb7"
 			ImageSrc={peepoScreenshotUrl}
 			CardTitle="OpenTaiko soundtrack"
 			CardSubtitle="Song suggestion form"
-			CardText ="You can recommand artists here whose songs you thing would fit for OpenTaiko!"
+			CardText ="You can recommand artists here whose songs you think would fit for OpenTaiko!"
 			/>
 	</div>
 {/if}
