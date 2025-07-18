@@ -29,7 +29,7 @@
         display: flex;
         align-items:center;
     }
-    ul.a {
+    ul {
         list-style-type: circle;
     }
     img.optkkun {
