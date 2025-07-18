@@ -25,7 +25,7 @@
 </div>
 
 <style>
-    .container{
+    .container {
         display: flex;
         align-items:center;
     }
