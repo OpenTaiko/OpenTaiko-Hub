@@ -5,10 +5,14 @@ You can update your OpenTaiko Hub version directly from the releases tab:
 
 ## [0.1.6] - 2025-07-?? (Alpha)
 
-- [Feat] Added the "Socials and Websites" tab.
-- [Feat] Added Subtitle Edit to the "Charting" tab under "Tools".
+- [Feat] Added the "Secret" tab. (Maybe go take a look...)
+- [Feat] Added the "Links" tab.
+- [Feat] Added the "Lyrics" tab under "Tools".
+- [Feat] Added Subtitle Edit to the "Lyrics" tab under "Tools".
+- [Feat] Added contributor credits for the OpenTaiko Hub to the "Credits" tab under "Information".
 - [Chore] Changed the GitHub link to go to the OpenTaiko Hub's repository.
-- [Chore] Moved the Discord link to the "Socials and Websites" tab.
+- [Chore] Moved the main OpenTaiko repository link to the "Links" tab.
+- [Chore] Moved the Discord link to the "Links" tab.
 - [Chore] Updated the HoF crowns to link to https://opentaiko.github.io/.
 - [Chore] Fixed some typos.
 
