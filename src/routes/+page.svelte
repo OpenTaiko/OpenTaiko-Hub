@@ -15,8 +15,8 @@
     import AssetsTab from '$lib/pages/AssetsTab.svelte';
     import InformationTab from '$lib/pages/InformationTab.svelte';
     import ToolsTab from '$lib/pages/ToolsTab.svelte';
-    import SaWTab from '$lib/pages/LinksTab.svelte';
     import SecretTab from '$lib/pages/SecretTab.svelte';
+    import LinksTab from '$lib/pages/LinksTab.svelte';
 
     // Logo
     import optkLogoUrl from '$lib/optk.png';
@@ -399,7 +399,7 @@
 
         <!-- Socials and Websites -->
         {#if currentTile === 6}
-            <SaWTab />
+            <LinksTab />
         {/if}
       </main>    
     </div>
