@@ -18,6 +18,9 @@
     import SecretTab from '$lib/pages/SecretTab.svelte';
     import LinksTab from '$lib/pages/LinksTab.svelte';
 
+    // Components
+    import HubVersionCheck from '$lib/components/HubVersionCheck.svelte';
+
     // Logo
     import optkLogoUrl from '$lib/optk.png';
 
@@ -313,11 +316,10 @@
         {#if currentTile === 0}
             <img src={optkLogoUrl} alt="Logo" class="mx-auto" />
             
-
             <section class="card w-full">
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                        <span>Current version: </span>
+                        <span>Current OpenTaiko version:</span>
                         {#if buildDetails === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
                         {:else}
@@ -345,12 +347,10 @@
                         {/if}
                     </div>
                 </div>
-            </section>
-
-            <section class="card w-full">
+                
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                        <span>Latest version: </span>
+                        <span>Latest OpenTaiko version: </span>
                         {#if latestVersionErrorFound === true}
                             <span class="text-red-500">Fetch Error</span>
                             <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700">Retry</button>
@@ -360,10 +360,11 @@
                             <span>{latestVersion}</span>
                             <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Reload</button>
                         {/if}
-                        
                     </div>
                 </div>
             </section>
+
+            <HubVersionCheck />
 
             <p>Current OS: {optk_OS}</p>
             <p>Be sure to download a skin (Skins tab) and songs (Songlist tab) before first starting the game!</p>
