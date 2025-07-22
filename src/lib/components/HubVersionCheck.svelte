@@ -32,7 +32,7 @@
                 UpdateHubButton.style.display = 'block';
                 
                 console.log("Hub version is out of date, or newer than the current version on GitHub.");
-                TriggerSuccess('Your installation of the OpenTaiko Hub is out of date.<br>Please click the "Update OpenTaiko Hub" button.');
+                TriggerSuccess('Your OpenTaiko Hub installation is out of date.<br>Please click the "Update OpenTaiko Hub" button.');
             }
         } catch (err) {
             latestVersionErrorFound = true;
@@ -50,7 +50,7 @@
 <section id="UpdateHubButton" class="card w-full updatebutton">
     <div class="p-4 space-y-4">
         <div class="flex gap-4">
-            Your installation of the OpenTaiko Hub is out of date;
+            Your OpenTaiko Hub installation is out of date;
             <button type="button" on:click={UpdateHub} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Update OpenTaiko Hub</button>
         </div>
     </div>
