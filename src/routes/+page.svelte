@@ -21,8 +21,9 @@
     // Components
     import HubVersionCheck from '$lib/components/HubVersionCheck.svelte';
 
-    // Logo
+    // Images
     import optkLogoUrl from '$lib/optk.png';
+    import arrowUrl from '$lib/messagearrow.png';
 
     import { path } from '@tauri-apps/api';
     import { invoke } from '@tauri-apps/api/core';
@@ -31,7 +32,6 @@
     // Navigation
     let currentTile = 0;
     
-
     // OpTk Version
     const repoOwner = '0AuBSQ';//'OpenTaiko'; 
     const repoName = 'OpenTaiko';//OpenTaiko-Dev-Mirror'; 
@@ -87,7 +87,7 @@
 
             return asset.browser_download_url; //browser_download_url;
         } catch (err) {
-            TriggerError(`Failed to fetch latest release: ${err}`);
+            TriggerError(`Failed to fetch latest OpenTaiko release: ${err}`);
             return null;
         }
     }
@@ -224,7 +224,7 @@
             latestVersion = data.tag_name; // Latest tag version number
         } catch (err) {
             latestVersionErrorFound = true;
-            TriggerError(`Failed to fetch latest release: ${err}`);
+            TriggerError(`Failed to fetch latest OpenTaiko release: ${err}`);
         }
     }
 
@@ -294,7 +294,7 @@
                 <svelte:fragment slot="lead"><i class="fa-solid fa-question"></i></svelte:fragment>
                 <span>Secrets</span>
             </AppRailTile>
-            <hr> <!-- Trail -->
+            <!-- Trail -->
             <svelte:fragment slot="trail">
                 <AppRailTile bind:group={currentTile} name="tile-6" value={5} title="To consult the changelogs, the documentation, or for troubleshooting.">
                     <svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
@@ -315,16 +315,16 @@
         <!-- OpenTaiko Version Page -->
         {#if currentTile === 0}
             <img src={optkLogoUrl} alt="Logo" class="mx-auto" />
-            
+
             <section class="card w-full">
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                        <span>Current OpenTaiko version:</span>
+                        <span><b>Current OpenTaiko version:</b></span>
                         {#if buildDetails === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
                         {:else}
                             {#if downloadBusy === true}
-                                <ProgressBar bind:value={progress} max={100} />
+                                <div class="progressbar"><ProgressBar bind:value={progress} max={100} /></div>
                             {:else}
                                 <span>{buildDetails}</span>
                                 <button type="button" on:click={TryFetchingCurrentVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Reload</button>
@@ -350,7 +350,7 @@
                 
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                        <span>Latest OpenTaiko version: </span>
+                        <span><b>Latest OpenTaiko version:</b></span>
                         {#if latestVersionErrorFound === true}
                             <span class="text-red-500">Fetch Error</span>
                             <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700">Retry</button>
@@ -364,10 +364,18 @@
                 </div>
             </section>
 
-            <HubVersionCheck />
+            <div class="download-message">
+                <img src={arrowUrl} alt="" class="arrow">
+                <section class="card w-full">
+                    <div class="p-4 space-y-4">
+                        <div class="flex gap-4">
+                        <p><b>Be sure to download a skin <span class="darktext"><i>(Skins tab)</i></span> and songs <span class="darktext"><i>(Songlist tab)</i></span> before first starting the game!</b><br><b>Current OS:</b> {optk_OS}</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
 
-            <p>Current OS: {optk_OS}</p>
-            <p>Be sure to download a skin (Skins tab) and songs (Songlist tab) before first starting the game!</p>
+            <HubVersionCheck />
         {/if}
 
         <!-- Songs -->
@@ -407,14 +415,15 @@
 </div>
 
 <style>
-    main {
-        overflow-y: auto;
+    main {overflow-y: auto;}
+    .darktext {color: #6275b6;}
+    .arrow {margin-left: 10px;}
+    .download-message {
+        position: relative;
+        top: -10px;
     }
-    hr {
-        width: 90%;
-        margin-top: 29px;
-        margin-left: auto;
-        margin-right: auto;
-        border-width: 1px;
+    .progressbar {
+        margin-top: 9px;
+        width: 78.5%;
     }
 </style>

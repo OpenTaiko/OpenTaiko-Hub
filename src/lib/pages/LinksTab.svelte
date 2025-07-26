@@ -37,6 +37,6 @@
     img.optkkun {
         display: block;
         margin-left: auto;
-        margin-right: 60px;
+        margin-right: auto;
     }
 </style>

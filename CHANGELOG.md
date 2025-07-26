@@ -5,6 +5,7 @@ You can update your OpenTaiko Hub version directly from the releases tab:
 
 ## [0.1.6] - 2025-07-?? (Alpha)
 
+- [Feat] Added the current version number to the OpenTaiko Hub.
 - [Feat] Added a update system for the OpenTaiko Hub.
 - [Feat] Added the "Secret" tab. (Maybe go take a look...)
 - [Feat] Added the "Links" tab.
@@ -15,7 +16,7 @@ You can update your OpenTaiko Hub version directly from the releases tab:
 - [Chore] Moved the main OpenTaiko repository link to the "Links" tab.
 - [Chore] Moved the Discord link to the "Links" tab.
 - [Chore] Updated the HoF crowns to link to https://opentaiko.github.io/.
-- [Chore] Some small UI changes.
+- [Chore] Some UI changes.
 - [Chore] Fixed some typos.
 
 ## [0.1.5] - 2025-05-02 (Alpha)
