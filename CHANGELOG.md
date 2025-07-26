@@ -19,7 +19,6 @@ You can update your OpenTaiko Hub version directly from the releases tab:
 - [Chore] Updated the HoF crowns to link to https://opentaiko.github.io/.
 - [Chore] Fixed some typos.
 
-
 ## [0.1.5] - 2025-05-02 (Alpha)
 
 - [Fix] AppImage should now be fully functional on Linux
