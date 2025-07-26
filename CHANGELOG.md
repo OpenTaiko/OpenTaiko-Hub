@@ -12,12 +12,13 @@ You can update your OpenTaiko Hub version directly from the releases tab:
 - [Feat] Added the "Lyrics" tab under "Tools".
 - [Feat] Added Subtitle Edit to the "Lyrics" tab under "Tools".
 - [Feat] Added contributor credits for the OpenTaiko Hub to the "Credits" tab under "Information".
+- [Enhancement] Some UI changes.
 - [Chore] Changed the GitHub link to go to the OpenTaiko Hub's repository.
 - [Chore] Moved the main OpenTaiko repository link to the "Links" tab.
 - [Chore] Moved the Discord link to the "Links" tab.
 - [Chore] Updated the HoF crowns to link to https://opentaiko.github.io/.
-- [Chore] Some UI changes.
 - [Chore] Fixed some typos.
+
 
 ## [0.1.5] - 2025-05-02 (Alpha)
 
