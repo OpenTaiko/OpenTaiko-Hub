@@ -15,9 +15,15 @@
     import AssetsTab from '$lib/pages/AssetsTab.svelte';
     import InformationTab from '$lib/pages/InformationTab.svelte';
     import ToolsTab from '$lib/pages/ToolsTab.svelte';
+    import SecretTab from '$lib/pages/SecretTab.svelte';
+    import LinksTab from '$lib/pages/LinksTab.svelte';
 
-    // Logo
+    // Components
+    import HubVersionCheck from '$lib/components/HubVersionCheck.svelte';
+
+    // Images
     import optkLogoUrl from '$lib/optk.png';
+    import arrowUrl from '$lib/messagearrow.png';
 
     import { path } from '@tauri-apps/api';
     import { invoke } from '@tauri-apps/api/core';
@@ -26,7 +32,6 @@
     // Navigation
     let currentTile = 0;
     
-
     // OpTk Version
     const repoOwner = '0AuBSQ';//'OpenTaiko'; 
     const repoName = 'OpenTaiko';//OpenTaiko-Dev-Mirror'; 
@@ -82,7 +87,7 @@
 
             return asset.browser_download_url; //browser_download_url;
         } catch (err) {
-            TriggerError(`Failed to fetch latest release: ${err}`);
+            TriggerError(`Failed to fetch latest OpenTaiko release: ${err}`);
             return null;
         }
     }
@@ -219,7 +224,7 @@
             latestVersion = data.tag_name; // Latest tag version number
         } catch (err) {
             latestVersionErrorFound = true;
-            TriggerError(`Failed to fetch latest release: ${err}`);
+            TriggerError(`Failed to fetch latest OpenTaiko release: ${err}`);
         }
     }
 
@@ -269,32 +274,37 @@
                 <AppRailAnchor href="/" >(icon)</AppRailAnchor>
             </svelte:fragment> -->
             <!-- --- -->
-            <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Update or launch OpenTaiko">
+            <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Download, update, or launch OpenTaiko.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-download"></i></svelte:fragment>
-                <span>OpenTaiko version</span>
+                <span>OpenTaiko Version</span>
             </AppRailTile>
-            <AppRailTile bind:group={currentTile} name="tile-2" value={1} title="Update your OpenTaiko songs and download the latest ones">
+            <AppRailTile bind:group={currentTile} name="tile-2" value={1} title="Update your OpenTaiko songs and download the latest ones.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-music"></i></svelte:fragment>
                 <span>Songlist</span>
             </AppRailTile>
-            <AppRailTile bind:group={currentTile} name="tile-3" value={2} title="Get the newest OpenTaiko skins and related assets">
+            <AppRailTile bind:group={currentTile} name="tile-3" value={2} title="Get the newest OpenTaiko skins and related assets.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-pen-ruler"></i></svelte:fragment>
                 <span>Skins</span>
             </AppRailTile>
-            <AppRailTile bind:group={currentTile} name="tile-5" value={4} title="Tools that can improve your OpenTaiko experience">
+            <AppRailTile bind:group={currentTile} name="tile-4" value={3} title="Tools that can improve your OpenTaiko experience.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-screwdriver-wrench"></i></svelte:fragment>
                 <span>Tools</span>
             </AppRailTile>
+            <AppRailTile bind:group={currentTile} name="tile-5" value={4} title="???">
+                <svelte:fragment slot="lead"><i class="fa-solid fa-question"></i></svelte:fragment>
+                <span>Secrets</span>
+            </AppRailTile>
             <!-- Trail -->
             <svelte:fragment slot="trail">
-                <AppRailTile bind:group={currentTile} name="tile-4" value={3} title="To consult the changelogs, the documentation, or for troubleshooting">
+                <AppRailTile bind:group={currentTile} name="tile-6" value={5} title="To consult the changelogs, the documentation, or for troubleshooting.">
                     <svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
                     <span>Information</span>
                 </AppRailTile>
-                <AppRailAnchor href="https://discord.gg/aA8scTvZ6B" target="_blank" title="Official Discord">
-					<i class="fa-brands fa-discord text-2xl"></i>
-				</AppRailAnchor>
-				<AppRailAnchor href="https://github.com/0auBSQ/OpenTaiko" target="_blank" title="GitHub">
+                <AppRailTile bind:group={currentTile} name="tile-7" value={6} title="Check out OpenTaiko's socials and websites!">
+                    <svelte:fragment slot="lead"><i class="fa-solid fa-globe"></i></svelte:fragment>
+                    <span>Links</span>
+                </AppRailTile>
+				<AppRailAnchor href="https://github.com/OpenTaiko/OpenTaiko-Hub" target="_blank" title="View the OpenTaiko Hub source code.">
 					<i class="fa-brands fa-github text-2xl"></i>
 				</AppRailAnchor>
 			</svelte:fragment>
@@ -305,17 +315,16 @@
         <!-- OpenTaiko Version Page -->
         {#if currentTile === 0}
             <img src={optkLogoUrl} alt="Logo" class="mx-auto" />
-            
 
             <section class="card w-full">
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                        <span>Current version: </span>
+                        <span><b>Current OpenTaiko version:</b></span>
                         {#if buildDetails === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
                         {:else}
                             {#if downloadBusy === true}
-                                <ProgressBar bind:value={progress} max={100} />
+                                <div class="progressbar"><ProgressBar bind:value={progress} max={100} /></div>
                             {:else}
                                 <span>{buildDetails}</span>
                                 <button type="button" on:click={TryFetchingCurrentVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Reload</button>
@@ -338,12 +347,10 @@
                         {/if}
                     </div>
                 </div>
-            </section>
-
-            <section class="card w-full">
+                
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                        <span>Latest version: </span>
+                        <span><b>Latest OpenTaiko version:</b></span>
                         {#if latestVersionErrorFound === true}
                             <span class="text-red-500">Fetch Error</span>
                             <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700">Retry</button>
@@ -353,13 +360,22 @@
                             <span>{latestVersion}</span>
                             <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Reload</button>
                         {/if}
-                        
                     </div>
                 </div>
             </section>
 
-            <p>Current OS: {optk_OS}</p>
-            <p>Be sure to download a skin (Skins tab) and songs (Songlist tab) before first starting the game!</p>
+            <div class="download-message">
+                <img src={arrowUrl} alt="" class="arrow">
+                <section class="card w-full">
+                    <div class="p-4 space-y-4">
+                        <div class="flex gap-4">
+                        <p><b>Be sure to download a skin <span class="darktext"><i>(Skins tab)</i></span> and songs <span class="darktext"><i>(Songlist tab)</i></span> before first starting the game!</b><br><b>Current OS:</b> {optk_OS}</p>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <HubVersionCheck />
         {/if}
 
         <!-- Songs -->
@@ -374,22 +390,40 @@
                 bind:optk_version
             />
         </div>
+        
+        <!-- Tools -->
+        {#if currentTile === 3}
+            <ToolsTab />
+        {/if}
+
+        <!-- ??? -->
+        {#if currentTile === 4}
+            <SecretTab />
+        {/if}
 
         <!-- Information -->
-        {#if currentTile === 3}
+        {#if currentTile === 5}
             <InformationTab />
         {/if}
 
-        <!-- Tools -->
-        {#if currentTile === 4}
-            <ToolsTab />
+        <!-- Socials and Websites -->
+        {#if currentTile === 6}
+            <LinksTab />
         {/if}
-      </main>
+      </main>    
     </div>
 </div>
 
 <style>
-    main {
-        overflow-y: auto;
+    main {overflow-y: auto;}
+    .darktext {color: #6275b6;}
+    .arrow {margin-left: 10px;}
+    .download-message {
+        position: relative;
+        top: -10px;
+    }
+    .progressbar {
+        margin-top: 9px;
+        width: 78.5%;
     }
 </style>

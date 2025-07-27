@@ -1,10 +1,16 @@
 # Credits
 
-## OpenTaiko 
+## OpenTaiko
 
 All credits on the OpenTaiko repository:
 
 https://github.com/0auBSQ/OpenTaiko/blob/main/README.md
+
+## OpenTaiko Hub
+
+All credits on the OpenTaiko Hub repository:
+
+https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md
 
 ## OpenTaiko Soundtrack
 
