@@ -339,7 +339,7 @@
 					{#if assetCountProgressBar["Skins"] !== null}
 					<ProgressBar bind:value={assetCountProgressBar["Skins"]} max={100} />
 					{:else}
-					<button type="button" on:click={() => DownloadDisplayedAssets("Skins")} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Bulk download</button>
+					<button type="button" on:click={() => DownloadDisplayedAssets("Skins")} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green">Bulk download</button>
 					{/if}
 					{/if}
 					<!-- Characters -->
@@ -347,7 +347,7 @@
 					{#if assetCountProgressBar["Characters"] !== null}
 					<ProgressBar bind:value={assetCountProgressBar["Characters"]} max={100} />
 					{:else}
-					<button type="button" on:click={() => DownloadDisplayedAssets("Characters")} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Bulk download</button>
+					<button type="button" on:click={() => DownloadDisplayedAssets("Characters")} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green">Bulk download</button>
 					{/if}
 					{/if}
 					<!-- Puchicharas -->
@@ -355,7 +355,7 @@
 					{#if assetCountProgressBar["Puchicharas"] !== null}
 					<ProgressBar bind:value={assetCountProgressBar["Puchicharas"]} max={100} />
 					{:else}
-					<button type="button" on:click={() => DownloadDisplayedAssets("Puchicharas")} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Bulk download</button>
+					<button type="button" on:click={() => DownloadDisplayedAssets("Puchicharas")} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green">Bulk download</button>
 					{/if}
 					{/if}
 				</th>

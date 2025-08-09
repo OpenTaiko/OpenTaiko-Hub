@@ -6,7 +6,7 @@
     const { TriggerError, TriggerSuccess } = getContext('toast');
 
     // Version Number
-    const VersionHub = "v0.1.6";
+    const VersionHub = "v0.1.7";
 
     // Check version number
     const repoOwner = 'OpenTaiko';//'OpenTaiko'; 
@@ -27,7 +27,6 @@
             
             if (VersionHub == latestVersion) {
                 console.log("Hub version is up to date!");
-
             } 
             else if (VersionHub != latestVersion) {
                 console.log("Hub version is out of date, or newer than the current version on GitHub.");
@@ -53,13 +52,13 @@
             {#if latestVersionErrorFound === true}
                 <span>Failed to check for updates.</span>
                 <span class="text-red-500">Fetch Error</span>
-                <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700">Retry</button>
+                <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700 button-red">Retry</button>
             {:else if latestVersion === "Loading..."}
                 <span>Checking for updates...</span>
                 <div class="placeholder animate-pulse flex-1" />
             {:else if VersionHub != latestVersion}
                 <span><b>Your OpenTaiko Hub installation is out of date.</b></span>
-                <button type="button" on:click={UpdateHub} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Update OpenTaiko Hub to {latestVersion.slice(1)}</button>
+                <button type="button" on:click={UpdateHub} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green">Update OpenTaiko Hub to {latestVersion.slice(1)}</button>
             {:else}
                 <span><b>Your OpenTaiko Hub installation is up to date!</b></span>
             {/if}
@@ -71,9 +70,9 @@
 
 <style>
     .hubversionnumber {
+        font-weight: bold;
         position: fixed;
         bottom: 10px;
         right: 15px;
-        color: #798dd6
     }
 </style>

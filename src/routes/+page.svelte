@@ -1,4 +1,13 @@
 <script>
+    // Custom themes
+    import '$lib/themes/hubdefault.postcss';
+    //import '$lib/themes/basicdark.postcss';
+    //import '$lib/themes/basiclight.postcss';
+    //import '$lib/themes/highcontrast.postcss';
+    //import '$lib/themes/deceiver.postcss';
+    //import '$lib/themes/gleamingsky.postcss';
+    //import '$lib/themes/888.postcss';
+    
     import { onMount } from 'svelte';
     import { AppRail, AppRailTile, AppRailAnchor, ProgressBar } from '@skeletonlabs/skeleton';
     import { readTextFile, writeTextFile, mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
@@ -7,6 +16,7 @@
 
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, GetOS } = getContext('toast');
+    import { LightSwitch } from '@skeletonlabs/skeleton';
 
     import { GetRootPath } from "../lib/utils/path.js";
 
@@ -23,7 +33,6 @@
 
     // Images
     import optkLogoUrl from '$lib/optk.png';
-    import arrowUrl from '$lib/messagearrow.png';
 
     import { path } from '@tauri-apps/api';
     import { invoke } from '@tauri-apps/api/core';
@@ -43,6 +52,11 @@
     let latestVersionErrorFound = false;
     let progress = 0;
     let downloadBusy = false;
+
+    // Themes
+    function changeTheme() {
+        console.log("text goes here");
+    }
 
     const LaunchOpenTaiko = async () => {
         try {
@@ -274,9 +288,15 @@
                 <AppRailAnchor href="/" >(icon)</AppRailAnchor>
             </svelte:fragment> -->
             <!-- --- -->
+            <!--
             <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Download, update, or launch OpenTaiko.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-download"></i></svelte:fragment>
                 <span>OpenTaiko Version</span>
+            </AppRailTile>
+            -->
+            <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Manage OpenTaiko and the OpenTaiko Hub.">
+                <svelte:fragment slot="lead"><i class="fa-solid fa-home"></i></svelte:fragment>
+                <span>Home</span>
             </AppRailTile>
             <AppRailTile bind:group={currentTile} name="tile-2" value={1} title="Update your OpenTaiko songs and download the latest ones.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-music"></i></svelte:fragment>
@@ -304,12 +324,15 @@
                     <svelte:fragment slot="lead"><i class="fa-solid fa-globe"></i></svelte:fragment>
                     <span>Links</span>
                 </AppRailTile>
-				<AppRailAnchor href="https://github.com/OpenTaiko/OpenTaiko-Hub" target="_blank" title="View the OpenTaiko Hub source code.">
-					<i class="fa-brands fa-github text-2xl"></i>
+				<AppRailAnchor href="https://github.com/OpenTaiko/OpenTaiko-Hub" target="_blank" title="View the OpenTaiko Hub source code." class="sidebaricon">
+					<i class="fa-brands fa-github text-2xl text-black dark:text-white"></i>
 				</AppRailAnchor>
 			</svelte:fragment>
         </AppRail>
       </aside>
+      <!-- Footer 
+      <div class="footer"><p>Footer</p></div>
+      -->
       <!-- Main Content -->
       <main class="h-screen space-y-4 p-4">
         <!-- OpenTaiko Version Page -->
@@ -319,7 +342,7 @@
             <section class="card w-full">
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                        <span><b>Current OpenTaiko version:</b></span>
+                        <span class="nowrap"><b>Current OpenTaiko version:</b></span>
                         {#if buildDetails === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
                         {:else}
@@ -327,21 +350,21 @@
                                 <div class="progressbar"><ProgressBar bind:value={progress} max={100} /></div>
                             {:else}
                                 <span>{buildDetails}</span>
-                                <button type="button" on:click={TryFetchingCurrentVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Reload</button>
+                                <button type="button" on:click={TryFetchingCurrentVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Reload</button>
                                 {#if buildDetailsNotFound === true}
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Download OpenTaiko</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green">Download OpenTaiko</button>
                                 {:else if latestVersion !== optk_version && 'Loading...' !== latestVersion}
-                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Launch OpenTaiko</button>
-                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Open in Explorer</button>
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Update OpenTaiko</button>
+                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Open in Explorer</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green">Update OpenTaiko</button>
                                     {#if checkSkinCompatibility(latestVersion, optk_version) === false}
                                         <span class="text-red-500">(Updating will require a skin update)</span>
                                     {/if}
                                     
                                 {:else}
-                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Launch OpenTaiko</button>
-                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Open in Explorer</button>
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-gray-700 hover:bg-gray-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-600 dark:hover:bg-gray-700">Redownload OpenTaiko</button>
+                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Open in Explorer</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-gray-700 hover:bg-gray-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-600 dark:hover:bg-gray-700 button-gray">Redownload OpenTaiko</button>
                                 {/if}
                             {/if}
                         {/if}
@@ -350,32 +373,41 @@
                 
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                        <span><b>Latest OpenTaiko version:</b></span>
+                        <span class="nowrap"><b>Latest OpenTaiko version:</b></span>
                         {#if latestVersionErrorFound === true}
                             <span class="text-red-500">Fetch Error</span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700">Retry</button>
+                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700 button-red">Retry</button>
                         {:else if latestVersion === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
                         {:else}
                             <span>{latestVersion}</span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Reload</button>
+                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Reload</button>
                         {/if}
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="p-4 space-y-4">
+                    <div class="flex gap-4">
+                    <p><b>Be sure to download a skin <span class="smalltext"><i>(Skins tab)</i></span> and songs <span class="smalltext"><i>(Songlist tab)</i></span> before first starting the game!</b><br><b>Current OS:</b> {optk_OS}</p>
                     </div>
                 </div>
             </section>
 
-            <div class="download-message">
-                <img src={arrowUrl} alt="" class="arrow">
-                <section class="card w-full">
-                    <div class="p-4 space-y-4">
-                        <div class="flex gap-4">
-                        <p><b>Be sure to download a skin <span class="darktext"><i>(Skins tab)</i></span> and songs <span class="darktext"><i>(Songlist tab)</i></span> before first starting the game!</b><br><b>Current OS:</b> {optk_OS}</p>
-                        </div>
-                    </div>
-                </section>
-            </div>
-
             <HubVersionCheck />
+            <LightSwitch />
+
+            <label for="themes" class="themetext">Themes:</label>
+            <select name="themes" id="themes" class="text-white bg-gray-900 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-900 themebutton">
+                <div class="dropdown">
+                    <option value="theme1">Default</option>
+                    <option value="theme2">Other</option>
+                    <option value="theme3">idk</option>
+                </div>
+            </select>
+
+
         {/if}
 
         <!-- Songs -->
@@ -396,7 +428,7 @@
             <ToolsTab />
         {/if}
 
-        <!-- ??? -->
+        <!-- Secrets -->
         {#if currentTile === 4}
             <SecretTab />
         {/if}
@@ -406,7 +438,7 @@
             <InformationTab />
         {/if}
 
-        <!-- Socials and Websites -->
+        <!-- Links -->
         {#if currentTile === 6}
             <LinksTab />
         {/if}
@@ -416,14 +448,23 @@
 
 <style>
     main {overflow-y: auto;}
-    .darktext {color: #6275b6;}
-    .arrow {margin-left: 10px;}
-    .download-message {
-        position: relative;
-        top: -10px;
-    }
+    .nowrap {white-space: nowrap;}
+    .smalltext {font-size: 12px;}
     .progressbar {
         margin-top: 9px;
-        width: 78.5%;
+        width: 100%;
+    }
+    .themebutton {
+        text-align-last: center;
+        position: fixed;
+        bottom: 10px;
+        left: 90px;
+        z-index: 3;
+    }
+    .themetext {
+        position: fixed;
+        bottom: 40px;
+        left: 90px;
+        z-index: 3;
     }
 </style>

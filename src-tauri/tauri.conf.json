@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "OpenTaiko Hub",
   "identifier": "com.opentaiko.hub",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
@@ -58,8 +58,7 @@
         "height": 700,
         "resizable": false,
         "title": "OpenTaiko Hub",
-        "width": 1200,
-        "theme": "Dark"
+        "width": 1200
       }
     ]
   }
