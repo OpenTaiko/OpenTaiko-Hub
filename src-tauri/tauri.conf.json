@@ -55,10 +55,12 @@
     "windows": [
       {
         "fullscreen": false,
-        "height": 700,
-        "resizable": false,
+        "resizable": true,
         "title": "OpenTaiko Hub",
-        "width": 1200
+        "width": 1200,
+        "height": 700,
+        "minWidth": 1102,
+        "minHeight": 648
       }
     ]
   }

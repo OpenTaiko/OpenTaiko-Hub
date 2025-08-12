@@ -121,7 +121,7 @@
         color: #000000;
         background-color: #000000;
         position: absolute;
-        top: 20px; bottom: 36px; left: 116px; right: 36px;
+        top: 20px; bottom: 36px; left: 109px; right: 36px;
         border-width: 3px;
         border-color: #1f1f1f;
         border-radius: 2px;

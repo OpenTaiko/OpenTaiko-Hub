@@ -1,13 +1,4 @@
 <script>
-    // Custom themes
-    import '$lib/themes/hubdefault.postcss';
-    //import '$lib/themes/basicdark.postcss';
-    //import '$lib/themes/basiclight.postcss';
-    //import '$lib/themes/highcontrast.postcss';
-    //import '$lib/themes/deceiver.postcss';
-    //import '$lib/themes/gleamingsky.postcss';
-    //import '$lib/themes/888.postcss';
-    
     import { onMount } from 'svelte';
     import { AppRail, AppRailTile, AppRailAnchor, ProgressBar } from '@skeletonlabs/skeleton';
     import { readTextFile, writeTextFile, mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
@@ -16,7 +7,6 @@
 
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, GetOS } = getContext('toast');
-    import { LightSwitch } from '@skeletonlabs/skeleton';
 
     import { GetRootPath } from "../lib/utils/path.js";
 
@@ -38,6 +28,28 @@
     import { invoke } from '@tauri-apps/api/core';
     import { listen } from '@tauri-apps/api/event';
 
+    // Themes
+    import { LightSwitch } from '@skeletonlabs/skeleton';
+
+    function themeChanger() {
+        const themeselect = document.getElementById("themeselect");
+        const value = themeselect.value;
+        
+        const themetarget = document.getElementById('themetarget');
+        const themedata = themetarget.getAttribute('data-theme');
+
+        if (themedata == value) {
+            TriggerWarning("Selected theme is the same as current theme.");
+        } 
+        else {
+            TriggerSuccess("old theme: " + themedata + " selected theme: " + value);
+            
+            document.body.dataset.theme = value;
+            
+            console.log("theme has been changed")
+        }
+    }
+
     // Navigation
     let currentTile = 0;
     
@@ -52,11 +64,6 @@
     let latestVersionErrorFound = false;
     let progress = 0;
     let downloadBusy = false;
-
-    // Themes
-    function changeTheme() {
-        console.log("text goes here");
-    }
 
     const LaunchOpenTaiko = async () => {
         try {
@@ -283,7 +290,7 @@
     <div class="grid grid-cols-1 md:grid-cols-[auto_1fr]">
       <!-- Left Sidebar. -->
       <aside class="bg-yellow-500">
-        <AppRail height="h-full">
+        <AppRail height="h-full w-[72px]">
             <!-- <svelte:fragment slot="lead">
                 <AppRailAnchor href="/" >(icon)</AppRailAnchor>
             </svelte:fragment> -->
@@ -324,6 +331,10 @@
                     <svelte:fragment slot="lead"><i class="fa-solid fa-globe"></i></svelte:fragment>
                     <span>Links</span>
                 </AppRailTile>
+                <AppRailTile bind:group={currentTile} name="tile-8" value={7} title="Change the theme of the OpenTaiko Hub.">
+                    <svelte:fragment slot="lead"><i class="fa-solid fa-palette"></i></svelte:fragment>
+                    <span>Themes</span>
+                </AppRailTile>
 				<AppRailAnchor href="https://github.com/OpenTaiko/OpenTaiko-Hub" target="_blank" title="View the OpenTaiko Hub source code." class="sidebaricon">
 					<i class="fa-brands fa-github text-2xl text-black dark:text-white"></i>
 				</AppRailAnchor>
@@ -350,21 +361,21 @@
                                 <div class="progressbar"><ProgressBar bind:value={progress} max={100} /></div>
                             {:else}
                                 <span>{buildDetails}</span>
-                                <button type="button" on:click={TryFetchingCurrentVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Reload</button>
+                                <button type="button" on:click={TryFetchingCurrentVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-rotate"></i> Reload</button>
                                 {#if buildDetailsNotFound === true}
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green">Download OpenTaiko</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green"><i class="fa-solid fa-download"></i> Download OpenTaiko</button>
                                 {:else if latestVersion !== optk_version && 'Loading...' !== latestVersion}
-                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Launch OpenTaiko</button>
-                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Open in Explorer</button>
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green">Update OpenTaiko</button>
+                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-rocket"></i> Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-folder-open"></i> Open in Explorer</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green"><i class="fa-solid fa-download"></i> Update OpenTaiko</button>
                                     {#if checkSkinCompatibility(latestVersion, optk_version) === false}
                                         <span class="text-red-500">(Updating will require a skin update)</span>
                                     {/if}
                                     
                                 {:else}
-                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Launch OpenTaiko</button>
-                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Open in Explorer</button>
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-gray-700 hover:bg-gray-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-600 dark:hover:bg-gray-700 button-gray">Redownload OpenTaiko</button>
+                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-rocket"></i> Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-folder-open"></i> Open in Explorer</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-gray-700 hover:bg-gray-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-600 dark:hover:bg-gray-700 button-gray"><i class="fa-solid fa-download"></i> Redownload OpenTaiko</button>
                                 {/if}
                             {/if}
                         {/if}
@@ -375,13 +386,13 @@
                     <div class="flex gap-4">
                         <span class="nowrap"><b>Latest OpenTaiko version:</b></span>
                         {#if latestVersionErrorFound === true}
-                            <span class="text-red-500">Fetch Error</span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700 button-red">Retry</button>
+                            <span><b>Fetch Error</b></span>
+                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700 button-red"><i class="fa-solid fa-triangle-exclamation"></i> Retry</button>
                         {:else if latestVersion === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
                         {:else}
                             <span>{latestVersion}</span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue">Reload</button>
+                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-rotate"></i> Reload</button>
                         {/if}
                     </div>
                 </div>
@@ -396,17 +407,6 @@
             </section>
 
             <HubVersionCheck />
-            <LightSwitch />
-
-            <label for="themes" class="themetext">Themes:</label>
-            <select name="themes" id="themes" class="text-white bg-gray-900 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-900 themebutton">
-                <div class="dropdown">
-                    <option value="theme1">Default</option>
-                    <option value="theme2">Other</option>
-                    <option value="theme3">idk</option>
-                </div>
-            </select>
-
 
         {/if}
 
@@ -442,29 +442,74 @@
         {#if currentTile === 6}
             <LinksTab />
         {/if}
+
+        <!-- Themes -->
+        {#if currentTile === 7}
+            <section class="card w-full">
+                <div class="p-4 space-y-4">
+                
+                    <label for="themes">Select a theme.</label>
+                    <div class="themecontent gap-2">
+                        <select name="themes" id="themeselect" size="10" class="select w-full max-w-[300px] selecttheme" on:change={themeChanger}>
+                            <optgroup label="OpenTaiko Hub themes:">
+                                <option value="hubdefault">Default</option>
+                                <option value="dashy">888</option>
+                                <option value="deceiver">Deceiver</option>
+                                <option value="onyx">Onyx</option>
+                            </optgroup>
+
+                            <optgroup label="Skeleton preset themes:">
+                                <option value="skeleton">Legacy</option>
+                                <option value="wintry">Wintry</option>
+                                <option value="modern">Modern</option>
+                                <option value="rocket">Rocket</option>
+                                <option value="seafoam">Seafoam</option>
+                                <option value="vintage">Vintage</option>
+                                <option value="sahara">Sahara</option>
+                                <option value="hamlindigo">Hamlindigo</option>
+                                <option value="gold-nouveau">Gold Nouveau</option>
+                                <option value="crimson">Crimson</option>
+                            </optgroup>
+                        </select>
+
+                       <div class="card w-full p-4 border-2 border-surface-300 dark:border-surface-600">
+                            <h1>Information</h1>
+
+                       </div>
+
+                        <div class="grid grid-cols-1 grid-rows-7 gap-4 w-[120px]">
+                            <span class="badge p-2 border-2 border-surface-300 dark:border-surface-600">Surface</span>
+                            <span class="badge p-2 variant-filled-primary">Primary</span>
+                            <span class="badge p-2 variant-filled-secondary">Secondary</span>
+                            <span class="badge p-2 variant-filled-tertiary">Tertiary</span>
+                            <span class="badge p-2 variant-filled-success">Success</span>
+                            <span class="badge p-2 variant-filled-warning">Warning</span>
+                            <span class="badge p-2 variant-filled-error">Error</span>
+                        </div>
+                    </div>
+                    
+                    <div class="themecontent"><LightSwitch /> <p class="pl-2">Toggle light/dark mode.</p></div>
+                    
+                </div>
+            </section>
+        {/if}
       </main>    
     </div>
 </div>
 
 <style>
+    /* Main CSS */
     main {overflow-y: auto;}
     .nowrap {white-space: nowrap;}
     .smalltext {font-size: 12px;}
+    
+    /* Theme page CSS */
+    option {text-align: center;}
+    .themecontent {display: flex}
+
+    /* Other CSS */
     .progressbar {
         margin-top: 9px;
         width: 100%;
-    }
-    .themebutton {
-        text-align-last: center;
-        position: fixed;
-        bottom: 10px;
-        left: 90px;
-        z-index: 3;
-    }
-    .themetext {
-        position: fixed;
-        bottom: 40px;
-        left: 90px;
-        z-index: 3;
     }
 </style>
