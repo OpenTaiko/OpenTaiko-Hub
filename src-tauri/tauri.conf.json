@@ -38,7 +38,11 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": [],
+      "resources": { 
+        "settings/theme.json": "settings/theme.json",
+        "settings/thememode.json": "settings/thememode.json",
+        "settings/**/*": "settings/"
+      },
       "shortDescription": "",
       "targets": ["nsis","deb","appimage"],
       "windows": {

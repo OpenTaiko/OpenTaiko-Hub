@@ -47,10 +47,12 @@
 <!-- Charting -->
 {#if currentTab === 0}
 	<div class="content">
-		<h2 class="paddingnotop">Charting tutorial by ugyuu:</h2>
+		<h1>Charting</h1>
+		
+		<h2>Charting tutorial by ugyuu:</h2>
 		<lite-youtube width="100%" videoid="U0i-z-tpxY8" playlabel="Play: Keynote (Google I/O '18)"></lite-youtube>
 		{#if optk_OS === "Win"}
-			<h2 class="padding">Download PeepoDrumKit:</h2>
+			<h2>Download PeepoDrumKit:</h2>
 			<div class="w-full text-token grid grid-cols-1 md:grid-cols-2 gap-4">
 				<ToolCard 
 					Url="https://drive.google.com/uc?export=download&id=1TQuvKo1tBZrXZIMlUMJ3-1vU1jfsxI2H"
@@ -68,7 +70,7 @@
 					/>
 			</div>
 		{/if}
-		<h2 class="padding">Additional resources:</h2>
+		<h2>Additional resources:</h2>
 		<div class="w-full text-token grid grid-cols-1 md:grid-cols-2 gap-4">
 			<ToolCard 
 				Url="https://whmhammer.github.io/tja-tools/"
@@ -91,6 +93,7 @@
 {/if}
 {#if currentTab === 1}
 	<div class="content">
+		<h1>Lyrics</h1>
 		<div class="w-full text-token grid grid-cols-1 md:grid-cols-2 gap-4">
 			<ToolCard 
 				Url="https://github.com/SubtitleEdit/subtitleedit"
@@ -105,6 +108,7 @@
 <!-- Submit your content -->
 {#if currentTab === 2}
 	<div class="content">
+		<h1>Submit your content!</h1>
 		<div class="w-full text-token grid grid-cols-1 md:grid-cols-2 gap-4">
 			<ToolCard 
 				Url="https://forms.gle/WXNUwjJyLdJoeRSM6"
@@ -125,11 +129,6 @@
 {/if}
 
 <style>
-.padding {padding: 8px;}
-.paddingnotop {padding: 0px 8px 8px 8px;}
-.content {
-    @apply bg-surface-100-800-token;
-    @apply card w-full;
-    padding: 1rem;
-}
+	h2 {@apply mt-2;}
+	.content {@apply card w-full bg-surface-100-800-token p-4;}
 </style>

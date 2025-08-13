@@ -3,7 +3,7 @@
     import { fetch } from "@tauri-apps/plugin-http";
 
     import { getContext } from 'svelte';
-    const { TriggerError, TriggerSuccess } = getContext('toast');
+    const { TriggerError, TriggerWarning } = getContext('toast');
 
     // Version Number
     const VersionHub = "v0.1.7";
@@ -30,7 +30,7 @@
             } 
             else if (VersionHub != latestVersion) {
                 console.log("Hub version is out of date, or newer than the current version on GitHub.");
-                TriggerSuccess('Your OpenTaiko Hub installation is out of date.<br>Please click the "Update OpenTaiko Hub" button.'); 
+                TriggerWarning('Your OpenTaiko Hub installation is out of date.<br>Please click the "Update OpenTaiko Hub" button.'); 
             }
         } catch (err) {
             latestVersionErrorFound = true;

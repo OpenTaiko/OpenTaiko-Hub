@@ -4,6 +4,7 @@
     "local": true,
     "windows": ["main"],
     "permissions": [
-      "os:default"
+      "os:default",
+      "core:app:allow-set-app-theme"
     ]
   }

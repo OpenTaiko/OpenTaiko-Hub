@@ -31,11 +31,7 @@
         display: flex;
         align-items:center;
     }
-    .content {
-        @apply bg-surface-100-800-token;
-        @apply card w-full;
-        padding: 1rem;
-    }
+    .content {@apply card w-full bg-surface-100-800-token p-4;}
     ul {
         list-style-type: circle;
     }

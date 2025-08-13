@@ -3,25 +3,15 @@
 @import "tailwindcss/utilities";
 
 @layer base {
-    h1 {
-        @apply text-2xl;
-    }
-    h2 {
-        @apply text-xl;
-    }
-    h3 {
-        @apply text-lg;
-    }
-    ul {
-        @apply list-disc list-inside ml-5;
-    }
-    ol {
-        @apply list-decimal list-inside ml-5;
-    }
-    li {
-        @apply mb-2;
-    }
+    h1 {@apply text-2xl mb-2;}
+    h2 {@apply text-xl mb-2;}
+    h3 {@apply text-lg mb-2;}
+    ul {@apply list-disc list-inside ml-5;}
+    ol {@apply list-decimal list-inside ml-5;}
+    li {@apply mb-2;}
 }
+
+
 
 [data-theme='hubdefault'] { 
     a {@apply text-red-400 !important;}
@@ -98,7 +88,7 @@
 }
 
 [data-theme='deceiver'] { 
-    a {@apply text-gray-700 !important;}
+    a {@apply text-red-500 !important;}
 
     /* Song preview */
     button.play {background-color: rgb(255, 39, 39) !important;}
