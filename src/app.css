@@ -9,6 +9,7 @@
     ul {@apply list-disc list-inside ml-5;}
     ol {@apply list-decimal list-inside ml-5;}
     li {@apply mb-2;}
+    a {@apply underline;}
 }
 
 

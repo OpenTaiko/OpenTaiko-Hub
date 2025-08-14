@@ -3,4 +3,4 @@ Launcher, updater and asset manager for OpenTaiko (Beta release for the 26th Oct
 
 ## Credits
 
-> * [BeaniCraft/All of the changes in the 0.1.6 update](https://github.com/BeaniCraft)
+> * [BeaniCraft/The 0.1.6 and 0.1.7 updates](https://github.com/BeaniCraft)

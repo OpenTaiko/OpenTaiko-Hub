@@ -32,15 +32,17 @@
     import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
     import { setTheme } from '@tauri-apps/api/app';
 
-    let currentTheme = 'hubdefault';
-    let themeDetails = 'Loading...';
-    let themeSettingsNotFound = false;
-    let themeModeSettingsNotFound = false;
+    const hidehtml = document.getElementById("hidehtml");
 
     document.addEventListener("DOMContentLoaded", function() {
         TryFetchingCurrentTheme();
         TryFetchingCurrentThemeMode();
     });
+   
+    let currentTheme = 'hubdefault';
+    let themeDetails = 'Loading...';
+    let themeSettingsNotFound = false;
+    let themeModeSettingsNotFound = false;
 
     const TryFetchingCurrentTheme = async () => {
         try {
@@ -55,19 +57,19 @@
         } catch (err) {
             themeSettingsNotFound = true;
             currentTheme = 'hubdefault';
-            themeDetails = "The theme.json file doesn't exist or is corrupted!<br>(Theme functionality won't work without this file.)<br>Please reinstall the hub to fix this.";
+            themeDetails = "theme.json doesn't exist";
+            TriggerError("The theme.json file doesn't exist or is corrupted!<br>Please reinstall the OpenTaiko Hub to fix this.");
         }
 
-        document.body.dataset.theme = currentTheme
+        document.body.dataset.theme = currentTheme;
     }
 
     const ThemeChanger = async () => {
         const themeselect = document.getElementById("themeselect");
         const themevalue = themeselect.value;
-        
         const themetarget = document.getElementById('themetarget');
         const themedata = themetarget.getAttribute('data-theme');
-
+        
         if (themedata == themevalue) {
             TriggerWarning("Selected theme is the same as current theme.");
         } 
@@ -99,11 +101,12 @@
             const fileContentMode = await readTextFile(modeFilePath);
             const jsonDataMode = JSON.parse(fileContentMode);
             currentThemeMode = jsonDataMode.thememode;
-            themeModeDetails = `${currentTheme}`;
+            themeModeDetails = `${currentThemeMode}`;
         } catch (err) {
             themeModeSettingsNotFound = true;
             currentThemeMode = 'dark';
-            themeModeDetails = "The thememode.json file doesn't exist or is corrupted!<br>(Theme functionality won't work without this file.)<br>Please reinstall the hub to fix this.";
+            themeModeDetails = "thememode.json doesn't exist";
+            TriggerError("The thememode.json file doesn't exist or is corrupted!<br>Please reinstall the OpenTaiko Hub to fix this.");
         }
 
         if (currentThemeMode === "dark") {
@@ -130,9 +133,6 @@
             console.log("mode has been changed to light")
         }
     }
-
-
-
 
     // Navigation
     let currentTile = 0;
@@ -361,13 +361,15 @@
             TriggerError('Error opening the folder:' + error);
         }
     }
-  
+
     onMount(async () => {
         optk_OS = await GetOS();
         await TryFetchingCurrentTheme();
         await TryFetchingCurrentThemeMode();
         await TryFetchingCurrentVersion();
         await TryFetchingLatestVersion();
+
+        themetarget.setAttribute("style", "");
     });
 </script>
 
@@ -487,7 +489,7 @@
                 
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                    <p><b>Be sure to download a skin <span class="smalltext"><i>(Skins tab)</i></span> and songs <span class="smalltext"><i>(Songlist tab)</i></span> before first starting the game!</b><br><b>Current OS:</b> {optk_OS}</p>
+                    <p><b>Be sure to download a skin <span class="smalltext"><i>("Skins" tab)</i></span> and songs <span class="smalltext"><i>("Songlist" tab)</i></span> before first starting the game!</b><br><b>Current OS:</b> {optk_OS}</p>
                     </div>
                 </div>
             </section>
@@ -533,7 +535,6 @@
         {#if currentTile === 7}
             <section class="card w-full">
                 <div class="p-4 space-y-4">
-                
                     <h1>Select a theme.</h1>
                     <div class="flex gap-2">
                         <!-- value={currentTheme} on:change={themeChanger} on:click={TryFetchingCurrentTheme} -->
@@ -565,15 +566,19 @@
                             
                             <hr class="m-4">
                             
-                            <h1>Menu guide:</h1>
+                            <h1>Menu guide</h1>
                             <p><i class="fa-solid fa-arrow-left"></i> <b>On this side there's the theme selector, and light/dark mode selector.</b></p>
                             <p class="alignright"><b>And on this side there's the color preview.</b> <i class="fa-solid fa-arrow-right"></i></p>
                             
                             <hr class="m-4">
 
-                            <h1>What are the "Skeleton preset themes"?</h1>
-                            <p>The "Skeleton preset themes" are themes provided by Skeleton.<br>One of the core parts of the OpenTaiko Hub UI.</p>
+                            <h1>Theme credits</h1>
+                            <p>The "OpenTaiko Hub themes" are themes made for the OpenTaiko Hub. 
+                            <br>Credits for them can be found in the "Information" tab under "Credits".</p>
+                            <br><p>The Skeleton preset themes are themes provided by <a href="https://www.skeleton.dev/" target='_blank' class='text-blue-600'>Skeleton UI.</a> <span class="smalltext"><i>(Specifically Skeleton v2.)</i></span>
+                            <br><p>You can find info about the provided Skeleton themes <a href="https://www.skeleton.dev/" target='_blank' class='text-blue-600'>here.</a></p>
                             
+
                        </div>
 
                         <div class="grid grid-cols-1 grid-rows-7 gap-4 w-[120px]">
