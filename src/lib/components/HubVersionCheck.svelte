@@ -51,8 +51,8 @@
         <div class="flex gap-4">
             {#if latestVersionErrorFound === true}
                 <span>Failed to check for updates.</span>
-                <span class="text-red-500">Fetch Error</span>
-                <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700 button-red"><i class="fa-solid fa-triangle-exclamation"></i>Retry</button>
+                <span class="fetch-error"><b>Fetch Error</b></span>
+                <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700 button-red"><i class="fa-solid fa-triangle-exclamation"></i> Retry</button>
             {:else if latestVersion === "Loading..."}
                 <span>Checking for updates...</span>
                 <div class="placeholder animate-pulse flex-1" />

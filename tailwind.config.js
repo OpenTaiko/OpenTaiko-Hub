@@ -2,6 +2,7 @@ import { hubdefault } from './hubdefault'
 import { dashy } from './dashy'
 import { deceiver } from './deceiver'
 import { onyx } from './onyx'
+import { pearl } from './pearl'
 
 // @ts-check
 import { join } from 'path';
@@ -35,7 +36,7 @@ export default {
 	plugins: [
 		skeleton({
             themes: { preset: [ "skeleton", "crimson", "gold-nouveau", "hamlindigo", "modern", "rocket", "sahara", "seafoam", "vintage", "wintry" ],
-                custom: [ hubdefault, dashy, deceiver, onyx ]
+                custom: [ hubdefault, dashy, deceiver, onyx, pearl ]
             }
         })
 	]

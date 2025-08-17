@@ -383,12 +383,6 @@
                 <AppRailAnchor href="/" >(icon)</AppRailAnchor>
             </svelte:fragment> -->
             <!-- --- -->
-            <!--
-            <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Download, update, or launch OpenTaiko.">
-                <svelte:fragment slot="lead"><i class="fa-solid fa-download"></i></svelte:fragment>
-                <span>OpenTaiko Version</span>
-            </AppRailTile>
-            -->
             <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Manage OpenTaiko and the OpenTaiko Hub.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-home"></i></svelte:fragment>
                 <span>Home</span>
@@ -421,7 +415,7 @@
                 </AppRailTile>
                 <AppRailTile bind:group={currentTile} name="tile-8" value={7} title="Change the theme of the OpenTaiko Hub.">
                     <svelte:fragment slot="lead"><i class="fa-solid fa-palette"></i></svelte:fragment>
-                    <span>Themes</span>
+                    <span>OpTk Hub Themes</span>
                 </AppRailTile>
 				<AppRailAnchor href="https://github.com/OpenTaiko/OpenTaiko-Hub" target="_blank" title="View the OpenTaiko Hub source code." class="sidebaricon">
 					<i class="fa-brands fa-github text-2xl text-black dark:text-white"></i>
@@ -474,7 +468,7 @@
                     <div class="flex gap-4">
                         <span class="nowrap"><b>Latest OpenTaiko version:</b></span>
                         {#if latestVersionErrorFound === true}
-                            <span><b>Fetch Error</b></span>
+                            <span class="fetch-error"><b>Fetch Error</b></span>
                             <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700 button-red"><i class="fa-solid fa-triangle-exclamation"></i> Retry</button>
                         {:else if latestVersion === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
@@ -531,19 +525,20 @@
             <LinksTab />
         {/if}
 
-        <!-- Themes -->
+        <!-- OpTk Hub Themes -->
         {#if currentTile === 7}
             <section class="card w-full">
                 <div class="p-4 space-y-4">
                     <h1>Select a theme.</h1>
                     <div class="flex gap-2">
                         <!-- value={currentTheme} on:change={themeChanger} on:click={TryFetchingCurrentTheme} -->
-                        <select id="themeselect" size="10" class="select w-full max-w-[250px]" value={currentTheme} on:change={ThemeChanger} on:click={TryFetchingCurrentTheme}>
+                        <select id="themeselect" size="12" class="select w-full max-w-[265px]" value={currentTheme} on:change={ThemeChanger} on:click={TryFetchingCurrentTheme}>
                             <optgroup label="OpenTaiko Hub themes:">
                                 <option value="hubdefault">Default</option>
                                 <option value="dashy">888</option>
                                 <option value="deceiver">Deceiver</option>
                                 <option value="onyx">Onyx</option>
+                                <option value="pearl">Pearl</option>
                             </optgroup>
 
                             <optgroup label="Skeleton preset themes:">
@@ -561,7 +556,7 @@
                         </select>
 
                        <div class="card w-full p-4 border-2 border-surface-300 dark:border-surface-600">
-                            <h1>Welcome to the Themes tab!</h1>
+                            <h1>Welcome to the OpenTaiko Hub Themes tab!</h1>
                             <p>This tab has a decent amount of content in it, so here's a guide to everything here.</p>
                             
                             <hr class="m-4">
@@ -576,7 +571,7 @@
                             <p>The "OpenTaiko Hub themes" are themes made for the OpenTaiko Hub. 
                             <br>Credits for them can be found in the "Information" tab under "Credits".</p>
                             <br><p>The Skeleton preset themes are themes provided by <a href="https://www.skeleton.dev/" target='_blank' class='text-blue-600'>Skeleton UI.</a> <span class="smalltext"><i>(Specifically Skeleton v2.)</i></span>
-                            <br><p>You can find info about the provided Skeleton themes <a href="https://www.skeleton.dev/" target='_blank' class='text-blue-600'>here.</a></p>
+                            <br>You can find info about the provided Skeleton themes <a href="https://www.skeleton.dev/" target='_blank' class='text-blue-600'>here.</a></p>
                             
 
                        </div>
@@ -596,11 +591,11 @@
                     <RadioGroup>
                         <RadioItem bind:group={currentThemeMode} on:change={ThemeModeChanger} name="justify" value={"dark"}><i class="fa-solid fa-moon"></i></RadioItem>
                         <RadioItem bind:group={currentThemeMode} on:change={ThemeModeChanger} name="justify" value={"light"}><i class="fa-solid fa-sun"></i></RadioItem>
-                            
+                        
                         {#if currentThemeMode === "dark"}
-                            <p class="flex items-center px-2">Dark mode</p>
+                            <p class="flex items-center px-2">Current Mode: Dark</p>
                         {:else if currentThemeMode === "light"}
-                            <p class="flex items-center px-2">Light mode</p>
+                            <p class="flex items-center px-2">Current Mode: Light</p>
                         {/if}
                     </RadioGroup>
 

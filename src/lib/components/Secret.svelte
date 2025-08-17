@@ -1,5 +1,5 @@
 <script>
-    import Button from '$lib/components/Button.svelte';
+    import SecretButton from '$lib/components/SecretButton.svelte';
 
     const setColor = () => {
         document.getElementById("secret").style.backgroundColor = "white"
@@ -45,7 +45,7 @@
             <input type="text" id="secret" name="secret">
         </form>
     <div style="width:fit-content;margin:auto;">
-            <Button
+            <SecretButton
                 color1={'white'}
                 color2={'white'}
                 textColor={'black'}

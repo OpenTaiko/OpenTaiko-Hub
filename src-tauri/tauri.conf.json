@@ -58,12 +58,12 @@
     "withGlobalTauri": true,
     "windows": [
       {
+        "title": "OpenTaiko Hub",
         "fullscreen": false,
         "resizable": true,
-        "title": "OpenTaiko Hub",
         "width": 1200,
         "height": 700,
-        "minWidth": 1102,
+        "minWidth": 1130,
         "minHeight": 648
       }
     ]
