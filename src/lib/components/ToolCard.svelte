@@ -8,7 +8,7 @@ export let CardText = "";
 
 </script>
 
-<a class="card bg-initial card-hover overflow-hidden" href={Url} target="_blank">
+<a class="card bg-initial card-hover overflow-hidden no-underline" href={Url} target="_blank">
     <header>
         <img src={ImageSrc} class="bg-black/50 w-full aspect-[21/9]" alt="Post">
     </header> 

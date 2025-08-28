@@ -46,9 +46,7 @@
 </TabGroup>
 <!-- Charting -->
 {#if currentTab === 0}
-	<div class="content">
-		<h1>Charting</h1>
-		
+	<div class="content">		
 		<h2>Charting tutorial by ugyuu:</h2>
 		<lite-youtube width="100%" videoid="U0i-z-tpxY8" playlabel="Play: Keynote (Google I/O '18)"></lite-youtube>
 		{#if optk_OS === "Win"}
@@ -93,7 +91,6 @@
 {/if}
 {#if currentTab === 1}
 	<div class="content">
-		<h1>Lyrics</h1>
 		<div class="w-full text-token grid grid-cols-1 md:grid-cols-2 gap-4">
 			<ToolCard 
 				Url="https://github.com/SubtitleEdit/subtitleedit"
@@ -108,7 +105,6 @@
 <!-- Submit your content -->
 {#if currentTab === 2}
 	<div class="content">
-		<h1>Submit your content!</h1>
 		<div class="w-full text-token grid grid-cols-1 md:grid-cols-2 gap-4">
 			<ToolCard 
 				Url="https://forms.gle/WXNUwjJyLdJoeRSM6"

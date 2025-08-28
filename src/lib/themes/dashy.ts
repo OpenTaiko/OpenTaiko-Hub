@@ -84,8 +84,8 @@ export const dashy: CustomThemeConfig = {
 		"--color-surface-400": "218 218 218",
 		"--color-surface-500": "202 202 202",
 		"--color-surface-600": "182 182 182",
-		"--color-surface-700": "152 152 152",
-		"--color-surface-800": "121 121 121",
-		"--color-surface-900": "99 99 99"
+		"--color-surface-700": "102 102 102",
+		"--color-surface-800": "32 32 32",
+		"--color-surface-900": "18 18 18",
 	}
 }

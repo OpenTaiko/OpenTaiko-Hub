@@ -30,9 +30,7 @@
 
     // Themes
     import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
-    import { setTheme } from '@tauri-apps/api/app';
-
-    const hidehtml = document.getElementById("hidehtml");
+    import { setModeCurrent } from '@skeletonlabs/skeleton';
 
     document.addEventListener("DOMContentLoaded", function() {
         TryFetchingCurrentTheme();
@@ -58,7 +56,7 @@
             themeSettingsNotFound = true;
             currentTheme = 'hubdefault';
             themeDetails = "theme.json doesn't exist";
-            TriggerError("The theme.json file doesn't exist or is corrupted!<br>Please reinstall the OpenTaiko Hub to fix this.");
+            TriggerError("The theme.json file (or the settings folder) doesn't exist or is corrupted!<br>Please reinstall the OpenTaiko Hub to fix this.");
         }
 
         document.body.dataset.theme = currentTheme;
@@ -106,15 +104,15 @@
             themeModeSettingsNotFound = true;
             currentThemeMode = 'dark';
             themeModeDetails = "thememode.json doesn't exist";
-            TriggerError("The thememode.json file doesn't exist or is corrupted!<br>Please reinstall the OpenTaiko Hub to fix this.");
+            TriggerError("The thememode.json file (or the settings folder) doesn't exist or is corrupted!<br>Please reinstall the OpenTaiko Hub to fix this.");
         }
 
         if (currentThemeMode === "dark") {
-            await setTheme("dark");
+            setModeCurrent(false);
             console.log("mode has been changed to dark")
         }
         else if (currentThemeMode === "light") {
-            await setTheme("light");
+            setModeCurrent(true);
             console.log("mode has been changed to light")
         }
     }
@@ -123,13 +121,13 @@
         if (currentThemeMode === "dark") {
             await writeTextFile(thememode_settings, JSON.stringify(json_modedark));
 
-            await setTheme("dark");
+            setModeCurrent(false);
             console.log("mode has been changed to dark")
         }
         else if (currentThemeMode === "light") {
             await writeTextFile(thememode_settings, JSON.stringify(json_modelight));
             
-            await setTheme("light");
+            setModeCurrent(true);
             console.log("mode has been changed to light")
         }
     }
@@ -535,6 +533,7 @@
                         <select id="themeselect" size="12" class="select w-full max-w-[265px]" value={currentTheme} on:change={ThemeChanger} on:click={TryFetchingCurrentTheme}>
                             <optgroup label="OpenTaiko Hub themes:">
                                 <option value="hubdefault">Default</option>
+                                <option value="gleamingsky">Gleaming Sky</option>
                                 <option value="dashy">888</option>
                                 <option value="deceiver">Deceiver</option>
                                 <option value="onyx">Onyx</option>
@@ -571,8 +570,12 @@
                             <p>The "OpenTaiko Hub themes" are themes made for the OpenTaiko Hub. 
                             <br>Credits for them can be found in the "Information" tab under "Credits".</p>
                             <br><p>The Skeleton preset themes are themes provided by <a href="https://www.skeleton.dev/" target='_blank' class='text-blue-600'>Skeleton UI.</a> <span class="smalltext"><i>(Specifically Skeleton v2.)</i></span>
-                            <br>You can find info about the provided Skeleton themes <a href="https://www.skeleton.dev/" target='_blank' class='text-blue-600'>here.</a></p>
-                            
+                            <br>You can find info about the provided Skeleton themes <a href="https://www.skeleton.dev/docs/design/themes" target='_blank' class='text-blue-600'>here.</a></p>
+
+                            <button type="button" class="button-blue font-medium rounded-lg text-sm px-3 py-1">blue</button>
+                            <button type="button" class="button-green font-medium rounded-lg text-sm px-3 py-1">green</button>
+                            <button type="button" class="button-gray font-medium rounded-lg text-sm px-3 py-1">gray</button>
+                            <button type="button" class="button-red font-medium rounded-lg text-sm px-3 py-1">red</button>
 
                        </div>
 
@@ -613,7 +616,6 @@
     main {overflow-y: auto;}
     .alignright {text-align: right;}
     .nowrap {white-space: nowrap;}
-    .smalltext {font-size: 12px;}
     
     /* Theme page CSS */
     option {text-align: center;}

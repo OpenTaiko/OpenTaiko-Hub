@@ -21,19 +21,18 @@
         <ul>
             <h2>Websites</h2>
             <li><a href="https://opentaiko.github.io/" target='_blank' class='text-blue-600'>Official OpenTaiko Website <i class="fa-solid fa-arrow-up-right-from-square"></i></a><br></li>
+            <li><a href="https://opentaiko.blogspot.com/" target='_blank' class='text-blue-600'>Official OpenTaiko Blog <i class="fa-solid fa-arrow-up-right-from-square"></i></a><br></li>
             <li><a href="https://opentaiko.wiki.gg/" target='_blank' class='text-blue-600'>Official OpenTaiko Wiki <i class="fa-solid fa-arrow-up-right-from-square"></i></a><br></li>
         </ul>
     </div>
 </div>
 
 <style>
+    ul {list-style-type: circle;}
+    .content {@apply card w-full bg-surface-100-800-token p-4;}
     .container {
         display: flex;
         align-items:center;
-    }
-    .content {@apply card w-full bg-surface-100-800-token p-4;}
-    ul {
-        list-style-type: circle;
     }
     img.optkkun {
         display: block;

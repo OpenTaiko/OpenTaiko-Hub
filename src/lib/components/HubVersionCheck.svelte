@@ -1,12 +1,19 @@
 <script>
     import { onMount } from 'svelte';
+    import { getVersion } from '@tauri-apps/api/app';
     import { fetch } from "@tauri-apps/plugin-http";
 
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning } = getContext('toast');
 
     // Version Number
-    const VersionHub = "v0.1.7";
+    let VersionHub = "Loading..."
+
+    async function getHubVersion() {
+        const appVersion = await getVersion();
+        VersionHub = "v" + appVersion;
+        console.log(VersionHub);
+    }
 
     // Check version number
     const repoOwner = 'OpenTaiko';//'OpenTaiko'; 
@@ -41,6 +48,7 @@
     const UpdateHub = async () => {window.open("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest");} 
     
     onMount(async () => {
+        getHubVersion()
         await TryFetchingLatestVersion();
     });
 </script>
@@ -66,7 +74,7 @@
     </div>
 </section>
 
-<div class="card p-4 hubversionnumber">OpenTaiko Hub ({VersionHub.slice(1)})</div>
+<div class="card p-4 hubversionnumber">OpenTaiko Hub ({VersionHub})</div>
 
 <style>
     .hubversionnumber {
