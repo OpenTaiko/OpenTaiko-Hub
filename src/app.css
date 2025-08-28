@@ -35,12 +35,12 @@ button.play:active {@apply bg-primary-600 !important;}
     .button-blue {@apply bg-red-400 text-black !important;}
     .button-green {@apply bg-blue-400 text-black !important;}
     .button-gray {@apply bg-gray-500 text-neutral-200 !important;}
-    .button-red {@apply bg-red-800 text-neutral-200 !important;}
+    .button-red {@apply bg-red-700 text-neutral-200 !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-red-500 text-black !important;}
     .button-green:hover {@apply bg-blue-500 text-black !important;}
     .button-gray:hover {@apply bg-gray-600 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
 
     /* Background */
     background-color:rgb(10, 32, 82) !important;
@@ -63,12 +63,12 @@ button.play:active {@apply bg-primary-600 !important;}
     .button-blue {@apply bg-blue-500 text-neutral-200 !important;}
     .button-green {@apply bg-sky-700 text-neutral-200 !important;}
     .button-gray {@apply bg-indigo-700 text-neutral-200 !important;}
-    .button-red {@apply bg-red-800 text-neutral-200 !important;}
+    .button-red {@apply bg-red-700 text-neutral-200 !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-blue-600 text-neutral-200 !important;}
     .button-green:hover {@apply bg-sky-800 text-neutral-200 !important;}
     .button-gray:hover {@apply bg-indigo-800 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
 
     /* Background */
     background-color:rgb(255, 255, 255) !important;
@@ -91,12 +91,12 @@ button.play:active {@apply bg-primary-600 !important;}
     .button-blue {@apply bg-red-500 text-neutral-200 !important;}
     .button-green {@apply bg-pink-700 text-neutral-200 !important;}
     .button-gray {@apply bg-gray-500 text-neutral-200 !important;}
-    .button-red {@apply bg-red-800 text-neutral-200 !important;}
+    .button-red {@apply bg-red-700 text-neutral-200 !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-red-600 text-neutral-200 !important;}
     .button-green:hover {@apply bg-pink-800 text-neutral-200 !important;}
     .button-gray:hover {@apply bg-gray-600 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
 
     /* Background */
     background-color:rgb(185, 185, 185) !important;
@@ -119,12 +119,12 @@ button.play:active {@apply bg-primary-600 !important;}
     .button-blue {@apply bg-red-500 text-neutral-200 !important;}
     .button-green {@apply bg-pink-700 text-neutral-200 !important;}
     .button-gray {@apply bg-gray-500 text-neutral-200 !important;}
-    .button-red {@apply bg-red-800 text-neutral-200 !important;}
+    .button-red {@apply bg-red-700 text-neutral-200 !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-red-600 text-neutral-200 !important;}
     .button-green:hover {@apply bg-pink-800 text-neutral-200 !important;}
     .button-gray:hover {@apply bg-gray-600 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
 
     /* Background */
     background-color:rgb(136, 0, 0) !important;
@@ -241,7 +241,7 @@ button.play:active {@apply bg-primary-600 !important;}
 [data-theme='hamlindigo'] {
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-primary-500 text-neutral-200 !important;}
+    .button-green {@apply bg-secondary-500 text-neutral-200 !important;}
     .button-gray {@apply bg-tertiary-500 text-neutral-200 !important;}
     .button-red {@apply bg-error-500 text-neutral-200 !important;}
     /* Button hover */
@@ -267,7 +267,7 @@ button.play:active {@apply bg-primary-600 !important;}
 [data-theme='rocket'] {
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-primary-500 text-neutral-200 !important;}
+    .button-green {@apply bg-secondary-500 text-neutral-200 !important;}
     .button-gray {@apply bg-tertiary-500 text-neutral-200 !important;}
     .button-red {@apply bg-error-500 text-neutral-200 !important;}
     /* Button hover */

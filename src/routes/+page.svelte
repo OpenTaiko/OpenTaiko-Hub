@@ -571,12 +571,6 @@
                             <br>Credits for them can be found in the "Information" tab under "Credits".</p>
                             <br><p>The Skeleton preset themes are themes provided by <a href="https://www.skeleton.dev/" target='_blank' class='text-blue-600'>Skeleton UI.</a> <span class="smalltext"><i>(Specifically Skeleton v2.)</i></span>
                             <br>You can find info about the provided Skeleton themes <a href="https://www.skeleton.dev/docs/design/themes" target='_blank' class='text-blue-600'>here.</a></p>
-
-                            <button type="button" class="button-blue font-medium rounded-lg text-sm px-3 py-1">blue</button>
-                            <button type="button" class="button-green font-medium rounded-lg text-sm px-3 py-1">green</button>
-                            <button type="button" class="button-gray font-medium rounded-lg text-sm px-3 py-1">gray</button>
-                            <button type="button" class="button-red font-medium rounded-lg text-sm px-3 py-1">red</button>
-
                        </div>
 
                         <div class="grid grid-cols-1 grid-rows-7 gap-4 w-[120px]">

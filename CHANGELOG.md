@@ -15,6 +15,8 @@ You can update either through the OpenTaiko Hub, or directly from the releases t
 - [Enhancement] Added the OpenTaiko Blog to the "Links" tab.
 - [Enhancement] Added a banner, header, and icon for the OpenTaiko Hub installer.
 - [Chore] Changed the updater code to pull the app version from "tauri.conf.json".
+- [Chore] Renamed the "OpenTaiko Version" tab to "Home".
+
 
 ## [0.1.6] - 2025-07-27 (Alpha)
 
