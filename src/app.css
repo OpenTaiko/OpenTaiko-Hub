@@ -1,6 +1,7 @@
 @import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
+@import "@fontsource/quicksand";
 
 @layer base {
     h1 {@apply text-2xl mb-2;}
@@ -252,6 +253,8 @@ button.play:active {@apply bg-primary-600 !important;}
 }
 
 [data-theme='modern'] {
+    body {font-family: 'Quicksand', sans-serif !important;}
+    
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-neutral-200 !important;}
     .button-green {@apply bg-secondary-500 text-black !important;}

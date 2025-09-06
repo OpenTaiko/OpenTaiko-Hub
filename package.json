@@ -22,6 +22,7 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@fontsource/quicksand": "^5.2.8",
 		"@fortawesome/fontawesome-free": "^6.7.2",
 		"@skeletonlabs/skeleton": "^2.11.0",
 		"@skeletonlabs/tw-plugin": "^0.4.1",
