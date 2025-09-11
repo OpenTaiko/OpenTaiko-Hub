@@ -1,5 +1,3 @@
-# Credits
-
 ## OpenTaiko
 All credits on the OpenTaiko repository:  
 https://github.com/0auBSQ/OpenTaiko/blob/main/README.md
