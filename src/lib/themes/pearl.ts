@@ -13,7 +13,7 @@ export const pearl: CustomThemeConfig = {
 		"--theme-rounded-container": "8px",
 		"--theme-border-base": "1px",
 		// =~= Theme On-X Colors =~=
-		"--on-primary": "255 255 255",
+		"--on-primary": "0 0 0",
 		"--on-secondary": "255 255 255",
 		"--on-tertiary": "255 255 255",
 		"--on-success": "0 0 0",
@@ -95,8 +95,8 @@ export const pearl: CustomThemeConfig = {
 		"--color-surface-400": "234 234 234", // #eaeaea
 		"--color-surface-500": "225 225 225", // #e1e1e1
 		"--color-surface-600": "203 203 203", // #cbcbcb
-		"--color-surface-700": "102 102 102", // #666666
+		"--color-surface-700": "64 64 64", // #404040
 		"--color-surface-800": "32 32 32", // #202020
-		"--color-surface-900": "18 18 18", // #121212
+		"--color-surface-900": "16 16 16", // #101010
 	}
 }

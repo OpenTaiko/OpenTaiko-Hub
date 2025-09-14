@@ -10,8 +10,8 @@ export const dashy: CustomThemeConfig = {
 		"--theme-rounded-base": "9999px",
 		"--theme-rounded-container": "8px",
 		"--theme-border-base": "1px",
-		"--on-primary": "0 0 0",
-		"--on-secondary": "255 255 255",
+		"--on-primary": "255 255 255",
+		"--on-secondary": "0 0 0",
 		"--on-tertiary": "0 0 0",
 		"--on-success": "0 0 0",
 		"--on-warning": "0 0 0",
@@ -83,9 +83,9 @@ export const dashy: CustomThemeConfig = {
 		"--color-surface-300": "234 234 234",
 		"--color-surface-400": "218 218 218",
 		"--color-surface-500": "202 202 202",
-		"--color-surface-600": "182 182 182",
-		"--color-surface-700": "102 102 102",
+		"--color-surface-600": "145 145 145",
+		"--color-surface-700": "64 64 64",
 		"--color-surface-800": "32 32 32",
-		"--color-surface-900": "18 18 18",
+		"--color-surface-900": "16 16 16",
 	}
 }

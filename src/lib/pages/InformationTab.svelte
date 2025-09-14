@@ -22,7 +22,9 @@
         return link.replace("<a","<a target='_blank' class='text-blue-600 underline'");
     };
     marked.setOptions({
-        renderer: renderer
+        renderer: renderer,
+        gfm: true,
+        breaks: true
     })
 
     const updateChangeLogs = async () => {
@@ -110,7 +112,7 @@
 <!-- OpenTaiko Changelogs -->
 {#if currentInfo === 0}
     <div class="content">
-        <Accordion class="border border-surface-600 rounded-container-token">
+        <Accordion class="card rounded-container-token">
             <AccordionItem>
                 <svelte:fragment slot="summary"><b>In case you're a bit lost...</b></svelte:fragment>
                 <svelte:fragment slot="content">
@@ -142,7 +144,7 @@
 <!-- OpenTaiko Hub Changelogs -->
 {#if currentInfo === 1}
     <div class="content">
-        <Accordion class="border border-surface-600 rounded-container-token">
+        <Accordion class="card rounded-container-token">
             <AccordionItem>
                 <svelte:fragment slot="summary"><b>In case you're a bit lost...</b></svelte:fragment>
                 <svelte:fragment slot="content">

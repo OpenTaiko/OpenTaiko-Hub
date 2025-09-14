@@ -1,7 +1,7 @@
 import type { CustomThemeConfig } from '@skeletonlabs/tw-plugin';
 
-export const hubdefault: CustomThemeConfig = {
-    name: 'hubdefault',
+export const optkkun: CustomThemeConfig = {
+    name: 'optkkun',
     properties: {
 		"--theme-font-family-base": "system-ui",
 		"--theme-font-family-heading": "system-ui",

@@ -373,7 +373,7 @@
 					{#if songCountProgressBar !== null}
 					<ProgressBar bind:value={songCountProgressBar} max={100} />
 					{:else}
-					<button type="button" on:click={DownloadDisplayedSongs} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green"><i class="fa-solid fa-download"></i> Bulk download</button>
+					<button type="button" on:click={DownloadDisplayedSongs} class="button-green button-main"><i class="fa-solid fa-download"></i> Bulk download</button>
 					{/if}
 				</th>
 			</tr>
@@ -423,7 +423,7 @@
 					<p>Not downloaded</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={DownloadSong(songInfo, null)} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green"><i class="fa-solid fa-download"></i> Download</button>
+					<button type="button" on:click={DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> Download</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -433,7 +433,7 @@
 					<p>Up-to-date</p>
                     <br />
                     {#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="text-white bg-gray-700 hover:bg-gray-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-600 dark:hover:bg-gray-700 button-gray"><i class="fa-solid fa-download"></i> Redownload</button>
+					<button type="button" on:click={DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> Redownload</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -443,7 +443,7 @@
 					<p>Outdated</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green"><i class="fa-solid fa-download"></i> Update</button>
+					<button type="button" on:click={DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> Update</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}

@@ -9,12 +9,51 @@
 
     import { path } from '@tauri-apps/api';
 
-    // Themes
     import { RadioGroup, RadioItem } from '@skeletonlabs/skeleton';
     import { setModeCurrent } from '@skeletonlabs/skeleton';
 
-    let currentTheme = '';
-    let themeDetails = 'Loading...';
+    // Debug mode code
+    let debugMode = false;
+
+    const DisableDebugMode = async () => {
+        TriggerSuccess('<b>Debug mode has been disabled.</b><br><p class="smalltext">(Note: You need to change the "debugMode" value to fully disable debug mode!)</p>');
+        debugMode = false;
+    }
+
+    let currentThemeModeDebug = 'dark';
+
+    const ThemeChangerDebug = async () => {
+        const themeselect = document.getElementById("themeselect");
+        const themevalue = themeselect.value;
+        const themetarget = document.getElementById('themetarget');
+        const themedata = themetarget.getAttribute('data-theme');
+        
+        if (themedata == themevalue) {
+            TriggerWarning("DEBUG: Selected theme is the same as current theme.");
+        } 
+        else {
+            currentTheme = themevalue;
+            document.body.dataset.theme = themevalue;
+            console.log("DEBUG: theme has been changed")
+        }
+    }
+    
+    const ThemeModeChangerDebug = async () => { 
+        if (currentThemeModeDebug === "dark") {
+            setModeCurrent(false);
+            console.log("DEBUG: mode has been changed to dark")
+        }
+        else if (currentThemeModeDebug === "light") {
+            setModeCurrent(true);
+            console.log("DEBUG: mode has been changed to light")
+        }
+    }
+
+    // Theme code
+    export let currentTile = 0;
+
+    let currentTheme = 'skeleton';
+    let themeDetails = 'dark';
     let themeSettingsNotFound = false;
     let themeModeSettingsNotFound = false;
 
@@ -30,7 +69,7 @@
             themeDetails = `${currentTheme}`;
         } catch (err) {
             themeSettingsNotFound = true;
-            currentTheme = 'hubdefault';
+            currentTheme = 'skeleton';
             themeDetails = "theme.json doesn't exist";
             TriggerError("The theme.json file (or the settings folder) doesn't exist or is corrupted!<br>Please reinstall the OpenTaiko Hub to fix this.");
         }
@@ -107,93 +146,203 @@
         }
     }
 
+    // Tooltips
+    
+
     onMount(async () => {
         TryFetchingCurrentTheme();
         TryFetchingCurrentThemeMode();
     });
 </script>
 
-<div class="grid h-screen grid-rows-[auto_1fr_auto]">
-    <section class="card w-full">
-        <div class="p-4 space-y-4">
-            <h1>Select a theme.</h1>
-            <div class="flex gap-2">
-                <!-- value={currentTheme} on:change={themeChanger} on:click={TryFetchingCurrentTheme} -->
-                <select id="themeselect" size="12" class="select w-full max-w-[265px]" value={currentTheme} on:change={ThemeChanger} on:click={TryFetchingCurrentTheme}>
-                    <optgroup label="OpenTaiko Hub themes:">
-                        <option value="hubdefault">Default</option>
-                        <option value="gleamingsky">Gleaming Sky</option>
-                        <option value="dashy">888</option>
-                        <option value="deceiver">Deceiver</option>
-                        <option value="onyx">Onyx</option>
-                        <option value="pearl">Pearl</option>
-                    </optgroup>
+{#if currentTile === 7}
+    {#if debugMode === false}
+        <div id="themetab">
+            <section class="card w-full">
+                <div class="p-4 space-y-4">
+                    <h1>Select a theme.</h1>
+                    <div class="flex gap-2">
+                        <!-- value={currentTheme} on:change={themeChanger} on:click={TryFetchingCurrentTheme} -->
+                        <select id="themeselect" size="11" class="select w-full max-w-[265px]" value={currentTheme} on:change={ThemeChanger} on:click={TryFetchingCurrentTheme}>
+                            <optgroup label="OpenTaiko Hub themes:">
+                                <option value="gleamingsky">Gleaming Sky</option>
+                                <option value="dashy">888</option>
+                                <option value="deceiver">Deceiver</option>
+                                <option value="onyx">Onyx</option>
+                                <option value="pearl">Pearl</option>
+                                <option value="optkkun">OpenTaiko-Kun</option>
+                            </optgroup>
 
-                    <optgroup label="Skeleton preset themes:">
-                        <option value="skeleton">Legacy</option>
-                        <option value="wintry">Wintry</option>
-                        <option value="modern">Modern</option>
-                        <option value="rocket">Rocket</option>
-                        <option value="seafoam">Seafoam</option>
-                        <option value="vintage">Vintage</option>
-                        <option value="sahara">Sahara</option>
-                        <option value="hamlindigo">Hamlindigo</option>
-                        <option value="gold-nouveau">Gold Nouveau</option>
-                        <option value="crimson">Crimson</option>
-                    </optgroup>
-                </select>
+                            <optgroup label="Skeleton preset themes:">
+                                <option value="skeleton">Legacy</option>
+                                <option value="wintry">Wintry</option>
+                                <option value="modern">Modern</option>
+                                <option value="rocket">Rocket</option>
+                                <option value="seafoam">Seafoam</option>
+                                <option value="vintage">Vintage</option>
+                                <option value="sahara">Sahara</option>
+                                <option value="hamlindigo">Hamlindigo</option>
+                                <option value="gold-nouveau">Gold Nouveau</option>
+                                <option value="crimson">Crimson</option>
+                            </optgroup>
+                        </select>
 
-                <div class="card w-full p-4 border-2 border-surface-300 dark:border-surface-600">
-                    <h1>Welcome to the OpenTaiko Hub Themes tab!</h1>
-                    <p>This tab has a decent amount of content in it, so here's a guide to everything here.</p>
-                            
-                    <hr class="m-4">
-                            
-                    <h1>Menu guide</h1>
-                    <p><i class="fa-solid fa-arrow-left"></i> <b>On this side there's the theme selector, and light/dark mode selector.</b></p>
-                    <p class="alignright"><b>And on this side there's the color preview.</b> <i class="fa-solid fa-arrow-right"></i></p>
-                            
-                    <hr class="m-4">
+                        <div class="card w-full p-4 rounded-container-token">
+                            <h1>Welcome to the OpenTaiko Hub Themes tab!</h1>
 
-                    <h1>Theme credits</h1>
-                    <p>The "OpenTaiko Hub themes" are themes made for the OpenTaiko Hub. 
-                    <br>Credits for them can be found in the "Information" tab under "Credits".</p>
-                    <br><p>The Skeleton preset themes are themes provided by <a href="https://www.skeleton.dev/" target='_blank' class='text-blue-600'>Skeleton UI.</a> <span class="smalltext"><i>(Specifically Skeleton v2.)</i></span>
-                    <br>You can find info about the provided Skeleton themes <a href="https://www.skeleton.dev/docs/design/themes" target='_blank' class='text-blue-600'>here.</a></p>
+                            <hr class="m-4">
+                                    
+                            <h2>Color preview</h2>
+                            <div class="grid grid-cols-1 grid-rows-3 gap-2">
+                                <div class="flex">
+                                    <p class="flex gap-1 badge card p-2">
+                                        <span>Theme accents:</span>                        
+                                        <span class="badge p-2 variant-filled-primary">Primary accent</span>
+                                        <span class="badge p-2 variant-filled-secondary">Secondary accent</span>
+                                        <span class="badge p-2 variant-filled-tertiary">Tertiary accent</span>
+                                    </p>
+                                </div>
+
+                                <div class="flex">
+                                    <p class="flex gap-1 badge card p-2">
+                                        <span>Button colors:</span>
+                                        <span class="badge p-2 button-blue">Action</span>
+                                        <span class="badge p-2 button-green">Download</span>
+                                        <span class="badge p-2 button-gray">Repeat</span>
+                                        <span class="badge p-2 button-red ">Destructive/Error</span>
+                                    </p>
+                                </div>
+
+                                <div class="flex">
+                                    <p class="flex gap-1 badge card p-2">
+                                        <span>Notifications:</span>
+                                        <span class="badge p-2 variant-filled-success">Success</span>
+                                        <span class="badge p-2 variant-filled-warning">Warning</span>
+                                        <span class="badge p-2 variant-filled-error">Error</span>
+                                    </p>
+                                </div>
+                            </div>
+                                    
+                            <hr class="m-4">
+
+                            <h2>Theme credits</h2>
+                            <p>All theme credits can be found here:</p>
+                            <a href="https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md" target="_blank">https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md</a>
+                            
+                        </div>
+                    </div>
+                            
+                    <RadioGroup>
+                        <RadioItem bind:group={currentThemeMode} on:change={ThemeModeChanger} name="justify" value={"dark"}><i class="fa-solid fa-moon"></i></RadioItem>
+                        <RadioItem bind:group={currentThemeMode} on:change={ThemeModeChanger} name="justify" value={"light"}><i class="fa-solid fa-sun"></i></RadioItem>
+                        
+                        {#if currentThemeMode === "dark"}
+                            <p class="flex items-center px-2">Current Mode: Dark</p>
+                        {:else if currentThemeMode === "light"}
+                            <p class="flex items-center px-2">Current Mode: Light</p>
+                        {/if}
+                    </RadioGroup>
                 </div>
-
-                <div class="grid grid-cols-1 grid-rows-7 gap-4 w-[120px]">
-                    <span class="badge p-2 border-2 border-surface-300 dark:border-surface-600">Surface</span>
-                    <span class="badge p-2 variant-filled-primary">Primary</span>
-                    <span class="badge p-2 variant-filled-secondary">Secondary</span>
-                    <span class="badge p-2 variant-filled-tertiary">Tertiary</span>
-                    <span class="badge p-2 variant-filled-success">Success</span>
-                    <span class="badge p-2 variant-filled-warning">Warning</span>
-                    <span class="badge p-2 variant-filled-error">Error</span>
-                </div>
-            </div>
-
-                    
-            <RadioGroup>
-                <RadioItem bind:group={currentThemeMode} on:change={ThemeModeChanger} name="justify" value={"dark"}><i class="fa-solid fa-moon"></i></RadioItem>
-                <RadioItem bind:group={currentThemeMode} on:change={ThemeModeChanger} name="justify" value={"light"}><i class="fa-solid fa-sun"></i></RadioItem>
-                   
-                {#if currentThemeMode === "dark"}
-                    <p class="flex items-center px-2">Current Mode: Dark</p>
-                {:else if currentThemeMode === "light"}
-                    <p class="flex items-center px-2">Current Mode: Light</p>
-                {:else}
-                    <p class="flex items-center px-2">Current Mode: Loading...</p>
-                {/if}
-            </RadioGroup>
+            </section>
         </div>
-    </section>
-</div>
+    {:else if debugMode === true}
+        <div id="themetab">
+            <section class="card w-full">
+                <div class="p-4 space-y-4">
+                    <h1>Select a theme. <b>(DEBUG MODE ON)</b></h1>
+                    <div class="flex gap-2">
+                        <!-- value={currentTheme} on:change={themeChanger} on:click={TryFetchingCurrentTheme} -->
+                        <select id="themeselect" size="11" class="select w-full max-w-[265px]" value={currentTheme} on:change={ThemeChangerDebug}>
+                            <optgroup label="OpenTaiko Hub themes:">
+                                <option value="gleamingsky">Gleaming Sky</option>
+                                <option value="dashy">888</option>
+                                <option value="deceiver">Deceiver</option>
+                                <option value="onyx">Onyx</option>
+                                <option value="pearl">Pearl</option>
+                                <option value="optkkun">OpenTaiko-Kun</option>
+                            </optgroup>
+
+                            <optgroup label="Skeleton preset themes:">
+                                <option value="skeleton">Legacy</option>
+                                <option value="wintry">Wintry</option>
+                                <option value="modern">Modern</option>
+                                <option value="rocket">Rocket</option>
+                                <option value="seafoam">Seafoam</option>
+                                <option value="vintage">Vintage</option>
+                                <option value="sahara">Sahara</option>
+                                <option value="hamlindigo">Hamlindigo</option>
+                                <option value="gold-nouveau">Gold Nouveau</option>
+                                <option value="crimson">Crimson</option>
+                            </optgroup>
+                        </select>
+
+                        <div class="card w-full p-4 rounded-container-token">
+                            <h1>Welcome to the OpenTaiko Hub Themes tab!</h1>
+
+                            <hr class="m-4">
+                                    
+                            <h2>Color preview</h2>
+                            <div class="grid grid-cols-1 grid-rows-3 gap-2">
+                                <div class="flex">
+                                    <p class="flex gap-1 badge card p-2">
+                                        <span>Theme accents:</span>                        
+                                        <span class="badge p-2 variant-filled-primary">Primary accent</span>
+                                        <span class="badge p-2 variant-filled-secondary">Secondary accent</span>
+                                        <span class="badge p-2 variant-filled-tertiary">Tertiary accent</span>
+                                    </p>
+                                </div>
+
+                                <div class="flex">
+                                    <p class="flex gap-1 badge card p-2">
+                                        <span>Button colors:</span>
+                                        <span class="badge p-2 button-blue">Action</span>
+                                        <span class="badge p-2 button-green">Download</span>
+                                        <span class="badge p-2 button-gray">Repeat</span>
+                                        <span class="badge p-2 button-red ">Destructive/Error</span>
+                                    </p>
+                                </div>
+
+                                <div class="flex">
+                                    <p class="flex gap-1 badge card p-2">
+                                        <span>Notifications:</span>
+                                        <span class="badge p-2 variant-filled-success">Success</span>
+                                        <span class="badge p-2 variant-filled-warning">Warning</span>
+                                        <span class="badge p-2 variant-filled-error">Error</span>
+                                    </p>
+                                </div>
+                            </div>
+                                    
+                            <hr class="m-4">
+
+                            <h2>Theme credits</h2>
+                            <p>All theme credits can be found here:</p>
+                            <a href="https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md" target="_blank">https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md</a>
+                        </div>
+                    </div>
+                            
+                    <div class="flex gap-2">
+                        <RadioGroup>
+                            <RadioItem bind:group={currentThemeModeDebug} on:change={ThemeModeChangerDebug} name="justify" value={"dark"}><i class="fa-solid fa-moon"></i></RadioItem>
+                            <RadioItem bind:group={currentThemeModeDebug} on:change={ThemeModeChangerDebug} name="justify" value={"light"}><i class="fa-solid fa-sun"></i></RadioItem>
+                            
+                            {#if currentThemeModeDebug === "dark"}
+                                <p class="flex items-center px-2">Current Mode: Dark</p>
+                            {:else if currentThemeModeDebug === "light"}
+                                <p class="flex items-center px-2">Current Mode: Light</p>
+                            {/if}
+                        </RadioGroup>
+
+                        <button type="button" on:click={DisableDebugMode} class="button-red button-main"><i class="fa-solid fa-code"></i> Disable debug mode</button>
+                    </div>
+                </div>
+            </section>
+        </div>
+    {/if}
+{:else}
+    <!-- Hide content -->
+{/if}
 
 <style>
-    /* Main CSS */
-    .alignright {text-align: right;}
-    
     /* Theme page CSS */
     option {text-align: center;}
 </style>

@@ -1,9 +1,9 @@
-import { hubdefault } from './src/lib/themes/hubdefault'
 import { gleamingsky } from './src/lib/themes/gleamingsky'
 import { dashy } from './src/lib/themes/dashy'
 import { deceiver } from './src/lib/themes/deceiver'
 import { onyx } from './src/lib/themes/onyx'
 import { pearl } from './src/lib/themes/pearl'
+import { optkkun } from './src/lib/themes/optkkun'
 
 // @ts-check
 import { join } from 'path';
@@ -37,7 +37,7 @@ export default {
 	plugins: [
 		skeleton({
             themes: { preset: [ "skeleton", "crimson", "gold-nouveau", "hamlindigo", "modern", "rocket", "sahara", "seafoam", "vintage", "wintry" ],
-                custom: [ hubdefault, gleamingsky, dashy, deceiver, onyx, pearl ]
+                custom: [ optkkun, gleamingsky, dashy, deceiver, onyx, pearl ]
             }
         })
 	]

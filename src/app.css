@@ -11,65 +11,54 @@
     ol {@apply list-decimal list-inside ml-5;}
     li {@apply mb-2;}
     a {@apply underline;}
+    hr {@apply border-token;}
 }
 
 /* Text */
-a {@apply text-primary-800 dark:text-primary-300 !important;}
-.smalltext {font-size: 12px;}
+a {@apply text-primary-800 dark:text-primary-300;}
 .fetch-error {@apply text-red-800 dark:text-red-300 !important;}
-.time span {
-	font-size: 0.7em;
-    @apply text-black !important;
-    @apply dark:text-white !important;
-}
+.smalltext {font-size: 12px;}
 
-/* Song preview */
+/* Buttons */
+.button-main {@apply font-medium rounded-lg text-sm px-3 py-1;}
+.button-blue {@apply bg-blue-600 text-neutral-200 !important;}
+.button-green {@apply bg-green-600 text-neutral-200 !important;}
+.button-gray {@apply bg-gray-600 text-neutral-200 !important;}
+.button-red {@apply bg-red-600 text-neutral-200 !important;}
+/* Button hover */
+.button-blue:hover {@apply bg-blue-700 text-neutral-200 !important;}
+.button-green:hover {@apply bg-green-700 text-neutral-200 !important;}
+.button-gray:hover {@apply bg-gray-700 text-neutral-200 !important;}
+.button-red:hover {@apply bg-red-700 text-neutral-200 !important;}
+
+/* Song tab */
 button.play {@apply bg-primary-500 !important;}
 button.play:hover {@apply bg-primary-400 !important;}
 button.play:active {@apply bg-primary-600 !important;}
 .slider {@apply bg-primary-800 !important;}
 .progress {@apply bg-primary-500 !important;}
 
-/* OpenTaiko Hub themes */
-[data-theme='hubdefault'] {
-    /* Buttons */
-    .button-blue {@apply bg-red-400 text-black !important;}
-    .button-green {@apply bg-blue-400 text-black !important;}
-    .button-gray {@apply bg-gray-500 text-neutral-200 !important;}
-    .button-red {@apply bg-red-700 text-neutral-200 !important;}
-    /* Button hover */
-    .button-blue:hover {@apply bg-red-500 text-black !important;}
-    .button-green:hover {@apply bg-blue-500 text-black !important;}
-    .button-gray:hover {@apply bg-gray-600 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
-
-    /* Background */
-    background-color:rgb(10, 32, 82) !important;
-    background-image:
-        radial-gradient(at 86% 5%, hsla(222,60%,29%,1) 0px, transparent 50%),
-        radial-gradient(at 0% 66%, hsla(222,74%,31%,1) 0px, transparent 50%),
-        radial-gradient(at 8% 40%, hsla(222,72%,38%,1) 0px, transparent 50%),
-        radial-gradient(at 70% 40%, hsla(222,63%,30%,1) 0px, transparent 50%),
-        radial-gradient(at 69% 99%, hsla(222,73%,29%,1) 0px, transparent 50%),
-        radial-gradient(at 99% 95%, hsla(222,96%,22%,1) 0px, transparent 50%),
-        radial-gradient(at 7% 10%, hsla(222,72%,26%,1) 0px, transparent 50%);
-    background-attachment: fixed;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-size: cover;
+.time span {
+	font-size: 0.7em;
+    @apply text-black dark:text-white !important;
 }
 
+::placeholder {
+    @apply text-stone-400 !important;
+}
+
+/* OpenTaiko Hub themes */
 [data-theme='gleamingsky'] {
     /* Buttons */
-    .button-blue {@apply bg-blue-500 text-neutral-200 !important;}
-    .button-green {@apply bg-sky-700 text-neutral-200 !important;}
-    .button-gray {@apply bg-indigo-700 text-neutral-200 !important;}
-    .button-red {@apply bg-red-700 text-neutral-200 !important;}
+    .button-blue {@apply bg-blue-500 text-black !important;}
+    .button-green {@apply bg-green-500 text-black !important;}
+    .button-gray {@apply bg-indigo-800 text-neutral-200 !important;}
+    .button-red {@apply bg-red-400 text-black !important;}
     /* Button hover */
-    .button-blue:hover {@apply bg-blue-600 text-neutral-200 !important;}
-    .button-green:hover {@apply bg-sky-800 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-indigo-800 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-blue-600 text-black !important;}
+    .button-green:hover {@apply bg-green-600 text-black !important;}
+    .button-gray:hover {@apply bg-indigo-900 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-500 text-black !important;}
 
     /* Background */
     background-color:rgb(255, 255, 255) !important;
@@ -89,14 +78,14 @@ button.play:active {@apply bg-primary-600 !important;}
 
 [data-theme='dashy'] {
     /* Buttons */
-    .button-blue {@apply bg-red-500 text-neutral-200 !important;}
-    .button-green {@apply bg-pink-700 text-neutral-200 !important;}
-    .button-gray {@apply bg-gray-500 text-neutral-200 !important;}
+    .button-blue {@apply bg-blue-500 text-black !important;}
+    .button-green {@apply bg-lime-800 text-neutral-200 !important;}
+    .button-gray {@apply bg-blue-900 text-neutral-200 !important;}
     .button-red {@apply bg-red-700 text-neutral-200 !important;}
     /* Button hover */
-    .button-blue:hover {@apply bg-red-600 text-neutral-200 !important;}
-    .button-green:hover {@apply bg-pink-800 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-gray-600 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-blue-600 text-black !important;}
+    .button-green:hover {@apply bg-lime-900 text-neutral-200 !important;}
+    .button-gray:hover {@apply bg-blue-950 text-neutral-200 !important;}
     .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
 
     /* Background */
@@ -113,19 +102,22 @@ button.play:active {@apply bg-primary-600 !important;}
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
+
+    /* Other stuff */
+    hr {@apply border-token dark:border-surface-700;} 
 }
 
 [data-theme='deceiver'] {
     /* Buttons */
-    .button-blue {@apply bg-red-500 text-neutral-200 !important;}
-    .button-green {@apply bg-pink-700 text-neutral-200 !important;}
-    .button-gray {@apply bg-gray-500 text-neutral-200 !important;}
-    .button-red {@apply bg-red-700 text-neutral-200 !important;}
+    .button-blue {@apply bg-neutral-400 text-black !important;}
+    .button-green {@apply bg-green-800 text-neutral-200 !important;}
+    .button-gray {@apply bg-neutral-700 text-neutral-200 !important;}
+    .button-red {@apply bg-red-800 text-neutral-200 !important;}
     /* Button hover */
-    .button-blue:hover {@apply bg-red-600 text-neutral-200 !important;}
-    .button-green:hover {@apply bg-pink-800 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-gray-600 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-neutral-500 text-black !important;}
+    .button-green:hover {@apply bg-green-900 text-neutral-200 !important;}
+    .button-gray:hover {@apply bg-neutral-800 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-900 text-neutral-200 !important;}
 
     /* Background */
     background-color:rgb(136, 0, 0) !important;
@@ -146,14 +138,14 @@ button.play:active {@apply bg-primary-600 !important;}
 [data-theme='onyx'] {
     /* Buttons */
     .button-blue {@apply bg-zinc-100 text-black !important;}
-    .button-green {@apply bg-emerald-200 text-black !important;}
-    .button-gray {@apply bg-zinc-400 text-black !important;}
-    .button-red {@apply bg-red-300 text-black !important;}
+    .button-green {@apply bg-emerald-300 text-black !important;}
+    .button-gray {@apply bg-zinc-700 text-neutral-200 !important;}
+    .button-red {@apply bg-red-400 text-black !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-zinc-200 text-black !important;}
-    .button-green:hover {@apply bg-emerald-300 text-black !important;}
-    .button-gray:hover {@apply bg-zinc-500 text-black !important;}
-    .button-red:hover {@apply bg-red-400 text-black !important;}
+    .button-green:hover {@apply bg-emerald-400 text-black !important;}
+    .button-gray:hover {@apply bg-zinc-800 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-500 text-black !important;}
 
     /* Background */
     background-color:rgb(0, 0, 0) !important;
@@ -173,13 +165,13 @@ button.play:active {@apply bg-primary-600 !important;}
 
 [data-theme='pearl'] {
     /* Buttons */
-    .button-blue {@apply bg-gray-400 text-neutral-200 !important;}
-    .button-green {@apply bg-green-700 text-neutral-200 !important;}
+    .button-blue {@apply bg-gray-400 text-black !important;}
+    .button-green {@apply bg-green-800 text-neutral-200 !important;}
     .button-gray {@apply bg-gray-700 text-neutral-200 !important;}
     .button-red {@apply bg-red-800 text-neutral-200 !important;}
     /* Button hover */
-    .button-blue:hover {@apply bg-gray-500 text-neutral-200 !important;}
-    .button-green:hover {@apply bg-green-800 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-gray-500 text-black !important;}
+    .button-green:hover {@apply bg-green-900 text-neutral-200 !important;}
     .button-gray:hover {@apply bg-gray-800 text-neutral-200 !important;}
     .button-red:hover {@apply bg-red-900 text-neutral-200 !important;}
 
@@ -197,31 +189,62 @@ button.play:active {@apply bg-primary-600 !important;}
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
+
+    /* Other stuff */
+    hr {@apply border-token dark:border-surface-700;} 
+}
+
+[data-theme='optkkun'] {
+    /* Buttons */
+    .button-blue {@apply bg-blue-400 text-black !important;}
+    .button-green {@apply bg-emerald-400 text-black !important;}
+    .button-gray {@apply bg-gray-600 text-neutral-200 !important;}
+    .button-red {@apply bg-red-700 text-neutral-200 !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-blue-500 text-black !important;}
+    .button-green:hover {@apply bg-emerald-500 text-black !important;}
+    .button-gray:hover {@apply bg-gray-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
+
+    /* Background */
+    background-color:rgb(10, 32, 82) !important;
+    background-image:
+        radial-gradient(at 86% 5%, hsla(222,60%,29%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 66%, hsla(222,74%,31%,1) 0px, transparent 50%),
+        radial-gradient(at 8% 40%, hsla(222,72%,38%,1) 0px, transparent 50%),
+        radial-gradient(at 70% 40%, hsla(222,63%,30%,1) 0px, transparent 50%),
+        radial-gradient(at 69% 99%, hsla(222,73%,29%,1) 0px, transparent 50%),
+        radial-gradient(at 99% 95%, hsla(222,96%,22%,1) 0px, transparent 50%),
+        radial-gradient(at 7% 10%, hsla(222,72%,26%,1) 0px, transparent 50%);
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
 }
 
 /* Skeleton preset themes */
 [data-theme='skeleton'] {
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-secondary-500 text-neutral-200 !important;}
-    .button-gray {@apply bg-tertiary-500 text-black !important;}
-    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    .button-blue {@apply bg-secondary-500 text-neutral-200 !important;}
+    .button-green {@apply bg-primary-500 text-black !important;}
+    .button-gray {@apply bg-gray-600 text-neutral-200 !important;}
+    .button-red {@apply bg-red-700 text-neutral-200 !important;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-secondary-600 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-black !important;}
-    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-secondary-600 text-neutral-200 !important;}
+    .button-green:hover {@apply bg-primary-600 text-black !important;}
+    .button-gray:hover {@apply bg-gray-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
 }
 
 [data-theme='crimson'] {
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-neutral-200 !important;}
-    .button-green {@apply bg-secondary-500 text-neutral-200 !important;}
+    .button-blue {@apply bg-secondary-400 text-black !important;}
+    .button-green {@apply bg-emerald-500 text-black !important;}
     .button-gray {@apply bg-tertiary-500 text-black !important;}
     .button-red {@apply bg-error-500 text-black !important;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-neutral-200 !important;}
-    .button-green:hover {@apply bg-secondary-600 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-secondary-500 text-black !important;}
+    .button-green:hover {@apply bg-emerald-600 text-black !important;}
     .button-gray:hover {@apply bg-tertiary-600 text-black !important;}
     .button-red:hover {@apply bg-error-600 text-black !important;}
 }
@@ -229,105 +252,106 @@ button.play:active {@apply bg-primary-600 !important;}
 [data-theme='gold-nouveau'] {
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-neutral-200 dark:text-black !important;}
-    .button-green {@apply bg-secondary-500 text-neutral-200 !important;}
-    .button-gray {@apply bg-tertiary-500 text-neutral-200 !important;}
+    .button-green {@apply bg-secondary-400 text-black !important;}
+    .button-gray {@apply bg-neutral-600 text-neutral-200 !important;}
     .button-red {@apply bg-error-500 text-neutral-200 !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-primary-600 text-neutral-200 dark:text-black !important;}
-    .button-green:hover {@apply bg-secondary-600 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-neutral-200 !important;}
+    .button-green:hover {@apply bg-secondary-500 text-black !important;}
+    .button-gray:hover {@apply bg-neutral-700 text-neutral-200 !important;}
     .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
 }
 
 [data-theme='hamlindigo'] {
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-secondary-500 text-neutral-200 !important;}
-    .button-gray {@apply bg-tertiary-500 text-neutral-200 !important;}
-    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    .button-green {@apply bg-success-700 text-neutral-200 !important;}
+    .button-gray {@apply bg-neutral-600 text-neutral-200 !important;}
+    .button-red {@apply bg-error-700 text-neutral-200 !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-secondary-600 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+    .button-green:hover {@apply bg-success-800 text-neutral-200 !important;}
+    .button-gray:hover {@apply bg-neutral-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-800 text-neutral-200 !important;}
 }
 
 [data-theme='modern'] {
     body {font-family: 'Quicksand', sans-serif !important;}
     
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-neutral-200 !important;}
-    .button-green {@apply bg-secondary-500 text-black !important;}
-    .button-gray {@apply bg-tertiary-500 text-black !important;}
-    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    .button-main {@apply font-bold rounded-lg text-sm px-3 py-1;}
+    .button-blue {@apply bg-secondary-500 text-black !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-zinc-600 text-neutral-200 !important;}
+    .button-red {@apply bg-error-500 text-black !important;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-neutral-200 !important;}
-    .button-green:hover {@apply bg-secondary-600 text-black !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-black !important;}
-    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-secondary-600 text-black !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-zinc-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-600 text-black !important;}
 }
 
 [data-theme='rocket'] {
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-secondary-500 text-neutral-200 !important;}
-    .button-gray {@apply bg-tertiary-500 text-neutral-200 !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-sky-900 text-neutral-200 !important;}
     .button-red {@apply bg-error-500 text-neutral-200 !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-secondary-600 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-neutral-200 !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-sky-950 text-neutral-200 !important;}
     .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
 }
 
 [data-theme='sahara'] {
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-secondary-500 text-black !important;}
-    .button-gray {@apply bg-tertiary-500 text-black !important;}
-    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-orange-800 text-neutral-200 !important;}
+    .button-red {@apply bg-error-500 text-black !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-secondary-600 text-black !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-black !important;}
-    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-orange-900 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-600 text-black !important;}
 }
 
 [data-theme='seafoam'] {
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-secondary-500 text-neutral-200 !important;}
-    .button-gray {@apply bg-tertiary-500 text-neutral-200 !important;}
-    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-secondary-500 text-neutral-200 !important;}
+    .button-red {@apply bg-error-400 text-black !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-secondary-600 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-secondary-600 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-500 text-black !important;}
 }
 
 [data-theme='vintage'] {
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-secondary-500 text-black !important;}
-    .button-gray {@apply bg-tertiary-500 text-black !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-amber-900 text-neutral-200 !important;}
     .button-red {@apply bg-error-500 text-black !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-secondary-600 text-black !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-black !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-amber-950 text-neutral-200 !important;}
     .button-red:hover {@apply bg-error-600 text-black !important;}
 }
 
 [data-theme='wintry'] {
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-secondary-500 text-black !important;}
-    .button-gray {@apply bg-tertiary-500 text-neutral-200 !important;}
-    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-cyan-900 text-neutral-200 !important;}
+    .button-red {@apply bg-error-400 text-black !important;}
     /* Button hover */
     .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-secondary-600 text-black !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-cyan-950 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-500 text-black !important;}
 }

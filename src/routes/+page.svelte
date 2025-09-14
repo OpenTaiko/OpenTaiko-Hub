@@ -10,6 +10,10 @@
 
     import { GetRootPath } from "../lib/utils/path.js";
 
+    import { path } from '@tauri-apps/api';
+    import { invoke } from '@tauri-apps/api/core';
+    import { listen } from '@tauri-apps/api/event';
+
     // Pages
     import SongsTab from '$lib/pages/SongsTab.svelte';
     import AssetsTab from '$lib/pages/AssetsTab.svelte';
@@ -25,62 +29,8 @@
     // Images
     import optkLogoUrl from '$lib/optk.png';
 
-    import { path } from '@tauri-apps/api';
-    import { invoke } from '@tauri-apps/api/core';
-    import { listen } from '@tauri-apps/api/event';
-
     // Themes
-    import { setModeCurrent } from '@skeletonlabs/skeleton';
-
     const themetarget = document.getElementById('themetarget');
-
-    document.addEventListener("DOMContentLoaded", function() {
-        TryFetchingCurrentTheme();
-        TryFetchingCurrentThemeMode();
-    });
-
-    let currentTheme = 'hubdefault';
-    let currentThemeMode = "dark";
-    
-    let themeSettingsNotFound = false;
-    let themeModeSettingsNotFound = false;
-
-    const TryFetchingCurrentTheme = async () => {
-        try {
-            themeSettingsNotFound = false;
-            const filePathTheme = './settings/theme.json';
-            const res = await GetRootPath();
-            const themeFilePath = await path.join(res,filePathTheme)
-            const fileContentTheme = await readTextFile(themeFilePath);
-            const jsonDataTheme = JSON.parse(fileContentTheme);
-            currentTheme = jsonDataTheme.theme;
-        } catch (err) {
-            themeSettingsNotFound = true;
-            currentTheme = 'hubdefault';
-            TriggerError("The theme.json file (or the settings folder) doesn't exist or is corrupted!<br>Please reinstall the OpenTaiko Hub to fix this.");
-        }
-
-        document.body.dataset.theme = currentTheme;
-    }
-
-    const TryFetchingCurrentThemeMode = async () => {
-        try {
-            themeModeSettingsNotFound = false;
-            const filePathMode = './settings/thememode.json';
-            const res = await GetRootPath();
-            const modeFilePath = await path.join(res,filePathMode)
-            const fileContentMode = await readTextFile(modeFilePath);
-            const jsonDataMode = JSON.parse(fileContentMode);
-            currentThemeMode = jsonDataMode.thememode;
-        } catch (err) {
-            themeModeSettingsNotFound = true;
-            currentThemeMode = 'dark';
-            TriggerError("The thememode.json file (or the settings folder) doesn't exist or is corrupted!<br>Please reinstall the OpenTaiko Hub to fix this.");
-        }
-
-        if (currentThemeMode === "dark") {setModeCurrent(false);}
-        else if (currentThemeMode === "light") {setModeCurrent(true);}
-    }
 
     // Navigation
     let currentTile = 0;
@@ -312,8 +262,6 @@
 
     onMount(async () => {
         optk_OS = await GetOS();
-        await TryFetchingCurrentTheme();
-        await TryFetchingCurrentThemeMode();
         await TryFetchingCurrentVersion();
         await TryFetchingLatestVersion();
 
@@ -371,9 +319,6 @@
 			</svelte:fragment>
         </AppRail>
       </aside>
-      <!-- Footer 
-      <div class="footer"><p>Footer</p></div>
-      -->
       <!-- Main Content -->
       <main class="h-screen space-y-4 p-4">
         <!-- OpenTaiko Version Page -->
@@ -391,21 +336,21 @@
                                 <div class="progressbar"><ProgressBar bind:value={progress} max={100} /></div>
                             {:else}
                                 <span>{buildDetails}</span>
-                                <button type="button" on:click={TryFetchingCurrentVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-rotate"></i> Reload</button>
+                                <button type="button" on:click={TryFetchingCurrentVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> Reload</button>
                                 {#if buildDetailsNotFound === true}
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green"><i class="fa-solid fa-download"></i> Download OpenTaiko</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="button-green button-main"><i class="fa-solid fa-download"></i> Download OpenTaiko</button>
                                 {:else if latestVersion !== optk_version && 'Loading...' !== latestVersion}
-                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-rocket"></i> Launch OpenTaiko</button>
-                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-folder-open"></i> Open in Explorer</button>
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green"><i class="fa-solid fa-download"></i> Update OpenTaiko</button>
+                                    <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="button-blue button-main"><i class="fa-solid fa-folder-open"></i> Open in Explorer</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="button-green button-main"><i class="fa-solid fa-download"></i> Update OpenTaiko</button>
                                     {#if checkSkinCompatibility(latestVersion, optk_version) === false}
                                         <span class="text-red-500">(Updating will require a skin update)</span>
                                     {/if}
                                     
                                 {:else}
-                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-rocket"></i> Launch OpenTaiko</button>
-                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-folder-open"></i> Open in Explorer</button>
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-gray-700 hover:bg-gray-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-600 dark:hover:bg-gray-700 button-gray"><i class="fa-solid fa-download"></i> Redownload OpenTaiko</button>
+                                    <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="button-blue button-main"><i class="fa-solid fa-folder-open"></i> Open in Explorer</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="button-gray button-main"><i class="fa-solid fa-download"></i> Redownload OpenTaiko</button>
                                 {/if}
                             {/if}
                         {/if}
@@ -417,12 +362,12 @@
                         <span class="nowrap"><b>Latest OpenTaiko version:</b></span>
                         {#if latestVersionErrorFound === true}
                             <span class="fetch-error"><b>Fetch Error</b></span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700 button-red"><i class="fa-solid fa-triangle-exclamation"></i> Retry</button>
+                            <button type="button" on:click={TryFetchingLatestVersion} class="button-red button-main"><i class="fa-solid fa-triangle-exclamation"></i> Retry</button>
                         {:else if latestVersion === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
                         {:else}
                             <span>{latestVersion}</span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700 button-blue"><i class="fa-solid fa-rotate"></i> Reload</button>
+                            <button type="button" on:click={TryFetchingLatestVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> Reload</button>
                         {/if}
                     </div>
                 </div>
@@ -474,13 +419,9 @@
         {/if}
 
         <!-- OpTk Hub Themes -->
-        {#if currentTile === 7}
-            <ThemesTab 
-                currentTheme={currentTheme}
-                currentThemeMode={currentThemeMode}
-                themeLoading=true
-            />
-        {/if}
+        <ThemesTab
+            bind:currentTile
+        />
       </main>    
     </div>
 </div>

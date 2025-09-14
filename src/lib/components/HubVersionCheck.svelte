@@ -60,12 +60,12 @@
             {#if latestVersionErrorFound === true}
                 <span>Failed to check for updates.</span>
                 <span class="fetch-error"><b>Fetch Error</b></span>
-                <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700 button-red"><i class="fa-solid fa-triangle-exclamation"></i> Retry</button>
+                <button type="button" on:click={TryFetchingLatestVersion} class="button-red button-main"><i class="fa-solid fa-triangle-exclamation"></i> Retry</button>
             {:else if latestVersion === "Loading..."}
                 <span>Checking for updates...</span>
             {:else if VersionHub != latestVersion}
                 <span><b>Your OpenTaiko Hub installation is out of date.</b></span>
-                <button type="button" on:click={UpdateHub} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700 button-green"><i class="fa-solid fa-download"></i> Update OpenTaiko Hub to {latestVersion.slice(1)}</button>
+                <button type="button" on:click={UpdateHub} class="button-green button-main"><i class="fa-solid fa-download"></i> Update OpenTaiko Hub to {latestVersion.slice(1)}</button>
             {:else}
                 <span><b>Your OpenTaiko Hub installation is up to date!</b></span>
             {/if}

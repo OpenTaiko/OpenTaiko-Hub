@@ -6,14 +6,14 @@ You can update either through the OpenTaiko Hub, or directly from the releases t
 ## [0.1.7] - 2025-08-?? (Alpha)
 
 - [Feat/Theme] Added the "OpTk Hub Themes" tab with the following themes:
-    - OpenTaiko Hub themes: "Default" (new default), "Gleaming Sky", "888", "Deceiver", "Onyx", and "Pearl".
-    - Skeleton preset themes: "Legacy" (old default), "Wintry", "Modern", "Rocket", "Seafoam", "Vintage", "Sahara", "Hamlindigo", "Gold Nouveau", and "Crimson".
+    - OpenTaiko Hub themes: "Gleaming Sky", "888", "Deceiver", "Onyx", "Pearl", and "OpenTaiko-Kun".
+    - Skeleton preset themes: "Legacy" (default), "Wintry", "Modern", "Rocket", "Seafoam", "Vintage", "Sahara", "Hamlindigo", "Gold Nouveau", and "Crimson".
 - [Feat] Added a guide for the changelog terms.
 - [Feat] Made the OpenTaiko Hub window resizable.
 - [Enhancement] Added button icons.
 - [Enhancement] A bunch of UI changes.
 - [Enhancement] Added the OpenTaiko Blog to the "Links" tab.
-- [Enhancement] Added a banner, header, and icon for the OpenTaiko Hub installer.
+- [Enhancement] Added a banner, header, and icon to the OpenTaiko Hub installer.
 - [Chore] Changed the updater code to pull the app version from "tauri.conf.json".
 - [Chore] Renamed the "OpenTaiko Version" tab to "Home".
 
