@@ -55,7 +55,7 @@
 						<lite-youtube width="100%" videoid="U0i-z-tpxY8" playlabel="Play: Keynote (Google I/O '18)"></lite-youtube>
 					</header> 
 					<div class="p-4 space-y-4 text-black dark:text-white">
-						<h6 class="h6" data-toc-ignore="">Charting tutorial by ugyuu.</h6>
+						<h6 data-toc-ignore="">Charting tutorial by ugyuu.</h6>
 					</div> 
 				</div>
 			</div>

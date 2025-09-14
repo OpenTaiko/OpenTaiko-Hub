@@ -13,8 +13,8 @@ export let CardText = "";
         <img src={ImageSrc} class="bg-black/50 w-full aspect-[21/9]" alt="Post">
     </header> 
     <div class="p-4 space-y-4 text-black dark:text-white">
-        <h6 class="h6" data-toc-ignore="">{CardTitle}</h6> 
-        <h3 class="h3" data-toc-ignore="">{CardSubtitle}</h3> 
+        <h6 data-toc-ignore="">{CardTitle}</h6> 
+        <h3 data-toc-ignore="">{CardSubtitle}</h3> 
         <article>
             <p>{CardText}
             </p>

@@ -22,7 +22,10 @@
 	},
 	"type": "module",
 	"dependencies": {
+		"@fontsource/abril-fatface": "^5.2.6",
+		"@fontsource/playfair-display": "^5.2.7",
 		"@fontsource/quicksand": "^5.2.8",
+		"@fontsource/space-grotesk": "^5.2.9",
 		"@fortawesome/fontawesome-free": "^6.7.2",
 		"@skeletonlabs/skeleton": "^2.11.0",
 		"@skeletonlabs/tw-plugin": "^0.4.1",

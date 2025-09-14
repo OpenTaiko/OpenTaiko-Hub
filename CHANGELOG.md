@@ -3,7 +3,7 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
-## [0.1.7] - 2025-08-?? (Alpha)
+## [0.1.7] - 2025-09-?? (Alpha)
 
 - [Feat/Theme] Added the "OpTk Hub Themes" tab with the following themes:
     - OpenTaiko Hub themes: "Gleaming Sky", "888", "Deceiver", "Onyx", "Pearl", and "OpenTaiko-Kun".

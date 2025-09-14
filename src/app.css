@@ -2,11 +2,17 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 @import "@fontsource/quicksand";
+@import "@fontsource/space-grotesk";
+@import "@fontsource/abril-fatface";
+@import "@fontsource/playfair-display";
 
 @layer base {
-    h1 {@apply text-2xl mb-2;}
-    h2 {@apply text-xl mb-2;}
-    h3 {@apply text-lg mb-2;}
+    h1 {@apply h1 text-2xl font-bold mb-2;}
+    h2 {@apply h2 text-xl font-bold mb-2;}
+    h3 {@apply h3 text-lg font-bold mb-2;}
+    h4 {@apply h4 font-bold;}
+    h5 {@apply h5 font-bold;}
+    h6 {@apply h6 font-bold;}
     ul {@apply list-disc list-inside ml-5;}
     ol {@apply list-decimal list-inside ml-5;}
     li {@apply mb-2;}
@@ -250,6 +256,8 @@ button.play:active {@apply bg-primary-600 !important;}
 }
 
 [data-theme='gold-nouveau'] {
+    h1, h2, h3, h4, h5, h6 {font-family: 'Quicksand', sans-serif !important;}
+
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-neutral-200 dark:text-black !important;}
     .button-green {@apply bg-secondary-400 text-black !important;}
@@ -263,6 +271,8 @@ button.play:active {@apply bg-primary-600 !important;}
 }
 
 [data-theme='hamlindigo'] {
+    h1, h2, h3, h4, h5, h6 {font-family: serif !important;}
+
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
     .button-green {@apply bg-success-700 text-neutral-200 !important;}
@@ -277,9 +287,9 @@ button.play:active {@apply bg-primary-600 !important;}
 
 [data-theme='modern'] {
     body {font-family: 'Quicksand', sans-serif !important;}
-    
+
     /* Buttons */
-    .button-main {@apply font-bold rounded-lg text-sm px-3 py-1;}
+    .button-main {@apply font-bold !important;}
     .button-blue {@apply bg-secondary-500 text-black !important;}
     .button-green {@apply bg-success-500 text-black !important;}
     .button-gray {@apply bg-zinc-600 text-neutral-200 !important;}
@@ -292,6 +302,8 @@ button.play:active {@apply bg-primary-600 !important;}
 }
 
 [data-theme='rocket'] {
+    h1, h2, h3, h4, h5, h6 {font-family: 'Space Grotesk', sans-serif !important;}
+
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
     .button-green {@apply bg-success-500 text-black !important;}
@@ -318,6 +330,8 @@ button.play:active {@apply bg-primary-600 !important;}
 }
 
 [data-theme='seafoam'] {
+    h1, h2, h3, h4, h5, h6 {font-family: 'Playfair Display', sans-serif !important;}
+
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
     .button-green {@apply bg-success-500 text-black !important;}
@@ -331,6 +345,8 @@ button.play:active {@apply bg-primary-600 !important;}
 }
 
 [data-theme='vintage'] {
+    h1, h2, h3, h4, h5, h6 {font-family: 'Abril Fatface', sans-serif !important;}
+
     /* Buttons */
     .button-blue {@apply bg-primary-500 text-black !important;}
     .button-green {@apply bg-success-500 text-black !important;}
