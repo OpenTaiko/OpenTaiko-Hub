@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "OpenTaiko Hub",
   "identifier": "com.opentaiko.hub",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
@@ -29,7 +29,6 @@
         "icons/icon.icns",
         "icons/icon.ico"
       ],
-      
       "longDescription": "",
       "macOS": {
         "entitlements": null,
@@ -38,10 +37,19 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": [],
+      "resources": { 
+        "settings/theme.json": "settings/theme.json",
+        "settings/thememode.json": "settings/thememode.json",
+        "settings/**/*": "settings/"
+      },
       "shortDescription": "",
       "targets": ["nsis","deb","appimage"],
       "windows": {
+        "nsis": {
+          "headerImage": "icons/installheader.bmp",
+          "sidebarImage": "icons/installbanner.bmp",
+          "installerIcon": "icons/installicon.ico"
+        },
         "certificateThumbprint": null,
         "digestAlgorithm": "sha256",
         "timestampUrl": ""
@@ -54,11 +62,13 @@
     "withGlobalTauri": true,
     "windows": [
       {
-        "fullscreen": false,
-        "height": 700,
-        "resizable": false,
         "title": "OpenTaiko Hub",
+        "fullscreen": false,
+        "resizable": true,
         "width": 1200,
+        "height": 700,
+        "minWidth": 1130,
+        "minHeight": 648,
         "theme": "Dark"
       }
     ]

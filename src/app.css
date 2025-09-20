@@ -1,24 +1,373 @@
 @import "tailwindcss/base";
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
+@import "@fontsource/quicksand";
+@import "@fontsource/space-grotesk";
+@import "@fontsource/abril-fatface";
+@import "@fontsource/playfair-display";
 
 @layer base {
-    h1 {
-        @apply text-2xl;
-    }
-    h2 {
-        @apply text-xl;
-    }
-    h3 {
-        @apply text-lg;
-    }
-    ul {
-        @apply list-disc list-inside ml-5;
-    }
-    ol {
-        @apply list-decimal list-inside ml-5;
-    }
-    li {
-        @apply mb-2;
-    }
+    h1 {@apply h1 text-2xl font-bold mb-2;}
+    h2 {@apply h2 text-xl font-bold mb-2;}
+    h3 {@apply h3 text-lg font-bold mb-2;}
+    h4 {@apply h4 font-bold;}
+    h5 {@apply h5 font-bold;}
+    h6 {@apply h6 font-bold;}
+    ul {@apply list-disc list-inside ml-5;}
+    ol {@apply list-decimal list-inside ml-5;}
+    li {@apply mb-2;}
+    a {@apply underline;}
+    hr {@apply border-token;}
+}
+
+/* Text */
+a {@apply text-primary-800 dark:text-primary-300;}
+.fetch-error {@apply text-red-800 dark:text-red-300 !important;}
+.smalltext {font-size: 12px;}
+
+/* Buttons */
+.button-main {@apply font-medium rounded-lg text-sm px-3 py-1;}
+.button-blue {@apply bg-blue-600 text-neutral-200 !important;}
+.button-green {@apply bg-green-600 text-neutral-200 !important;}
+.button-gray {@apply bg-gray-600 text-neutral-200 !important;}
+.button-red {@apply bg-red-600 text-neutral-200 !important;}
+/* Button hover */
+.button-blue:hover {@apply bg-blue-700 text-neutral-200 !important;}
+.button-green:hover {@apply bg-green-700 text-neutral-200 !important;}
+.button-gray:hover {@apply bg-gray-700 text-neutral-200 !important;}
+.button-red:hover {@apply bg-red-700 text-neutral-200 !important;}
+
+/* Song tab */
+button.play {@apply bg-primary-500 !important;}
+button.play:hover {@apply bg-primary-400 !important;}
+button.play:active {@apply bg-primary-600 !important;}
+.slider {@apply bg-primary-800 !important;}
+.progress {@apply bg-primary-500 !important;}
+
+.time span {
+	font-size: 0.7em;
+    @apply text-black dark:text-white !important;
+}
+
+::placeholder {
+    @apply text-stone-400 !important;
+}
+
+/* OpenTaiko Hub themes */
+[data-theme='gleamingsky'] {
+    /* Buttons */
+    .button-blue {@apply bg-blue-500 text-black !important;}
+    .button-green {@apply bg-green-500 text-black !important;}
+    .button-gray {@apply bg-indigo-800 text-neutral-200 !important;}
+    .button-red {@apply bg-red-400 text-black !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-blue-600 text-black !important;}
+    .button-green:hover {@apply bg-green-600 text-black !important;}
+    .button-gray:hover {@apply bg-indigo-900 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-500 text-black !important;}
+
+    /* Background */
+    background-color:rgb(255, 255, 255) !important;
+    background-image:
+        radial-gradient(at 50% 19%, hsla(214,100%,84%,1) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, hsla(211,100%,89%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, hsla(212,100%,82%,1) 0px, transparent 50%),
+        radial-gradient(at 84% 48%, hsla(208,100%,84%,1) 0px, transparent 50%),
+        radial-gradient(at 6% 93%, hsla(210,100%,88%,1) 0px, transparent 50%),
+        radial-gradient(at 81% 97%, hsla(211,100%,78%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 0%, hsla(218,100%,83%,1) 0px, transparent 50%);
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+[data-theme='dashy'] {
+    /* Buttons */
+    .button-blue {@apply bg-blue-500 text-black !important;}
+    .button-green {@apply bg-lime-800 text-neutral-200 !important;}
+    .button-gray {@apply bg-blue-900 text-neutral-200 !important;}
+    .button-red {@apply bg-red-700 text-neutral-200 !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-blue-600 text-black !important;}
+    .button-green:hover {@apply bg-lime-900 text-neutral-200 !important;}
+    .button-gray:hover {@apply bg-blue-950 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
+
+    /* Background */
+    background-color:rgb(185, 185, 185) !important;
+    background-image:
+        radial-gradient(at 40% 26%, hsla(0,100%,80%,1) 0px, transparent 50%),
+        radial-gradient(at 83% 11%, hsla(0,100%,87%,1) 0px, transparent 50%),
+        radial-gradient(at 11% 63%, hsla(355,100%,71%,1) 0px, transparent 50%),
+        radial-gradient(at 71% 56%, hsla(340,100%,81%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, hsla(0,100%,86%,1) 0px, transparent 50%),
+        radial-gradient(at 80% 100%, hsla(0,100%,85%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 0%, hsla(11,0%,100%,1) 0px, transparent 50%);
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+
+    /* Other stuff */
+    hr {@apply border-token dark:border-surface-700;} 
+}
+
+[data-theme='deceiver'] {
+    /* Buttons */
+    .button-blue {@apply bg-neutral-400 text-black !important;}
+    .button-green {@apply bg-green-800 text-neutral-200 !important;}
+    .button-gray {@apply bg-neutral-700 text-neutral-200 !important;}
+    .button-red {@apply bg-red-800 text-neutral-200 !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-neutral-500 text-black !important;}
+    .button-green:hover {@apply bg-green-900 text-neutral-200 !important;}
+    .button-gray:hover {@apply bg-neutral-800 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-900 text-neutral-200 !important;}
+
+    /* Background */
+    background-color:rgb(136, 0, 0) !important;
+    background-image:
+		radial-gradient(at 40% 26%, hsla(0,100%,40%,1) 0px, transparent 50%),
+		radial-gradient(at 83% 11%, hsla(0,100%,64%,1) 0px, transparent 50%),
+		radial-gradient(at 11% 63%, hsla(355,55%,48%,1) 0px, transparent 50%),
+		radial-gradient(at 80% 50%, hsla(340,100%,31%,1) 0px, transparent 50%),
+		radial-gradient(at 0% 100%, hsla(0,100%,60%,1) 0px, transparent 50%),
+		radial-gradient(at 80% 100%, hsla(0,100%,45%,1) 0px, transparent 50%),
+		radial-gradient(at 0% 0%, hsla(0,100%,34%,1) 0px, transparent 50%);
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+[data-theme='onyx'] {
+    /* Buttons */
+    .button-blue {@apply bg-zinc-100 text-black !important;}
+    .button-green {@apply bg-emerald-300 text-black !important;}
+    .button-gray {@apply bg-zinc-700 text-neutral-200 !important;}
+    .button-red {@apply bg-red-400 text-black !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-zinc-200 text-black !important;}
+    .button-green:hover {@apply bg-emerald-400 text-black !important;}
+    .button-gray:hover {@apply bg-zinc-800 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-500 text-black !important;}
+
+    /* Background */
+    background-color:rgb(0, 0, 0) !important;
+    background-image:
+        radial-gradient(at 10% 0%, hsla(0,0%,3%,1) 0px, transparent 50%),
+        radial-gradient(at 91% 12%, hsla(0,0%,3%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, hsla(0,0%,6%,1) 0px, transparent 50%),
+        radial-gradient(at 91% 76%, hsla(0,0%,5%,1) 0px, transparent 50%),
+        radial-gradient(at 16% 89%, hsla(21,0%,9%,1) 0px, transparent 50%),
+        radial-gradient(at 51% 74%, hsla(0,0%,4%,1) 0px, transparent 50%),
+        radial-gradient(at 52% 3%, hsla(0,0%,12%,1) 0px, transparent 50%);
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+[data-theme='pearl'] {
+    /* Buttons */
+    .button-blue {@apply bg-gray-400 text-black !important;}
+    .button-green {@apply bg-green-800 text-neutral-200 !important;}
+    .button-gray {@apply bg-gray-700 text-neutral-200 !important;}
+    .button-red {@apply bg-red-800 text-neutral-200 !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-gray-500 text-black !important;}
+    .button-green:hover {@apply bg-green-900 text-neutral-200 !important;}
+    .button-gray:hover {@apply bg-gray-800 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-900 text-neutral-200 !important;}
+
+    /* Background */
+    background-color:rgb(155, 155, 155) !important;
+    background-image:
+        radial-gradient(at 40% 20%, hsla(224,100%,96%,1) 0px, transparent 50%),
+        radial-gradient(at 80% 0%, hsla(189,100%,93%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 50%, hsla(224,100%,95%,1) 0px, transparent 50%),
+        radial-gradient(at 80% 50%, hsla(234,100%,95%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 100%, hsla(216,100%,92%,1) 0px, transparent 50%),
+        radial-gradient(at 80% 100%, hsla(240,100%,93%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 0%, hsla(237,100%,95%,1) 0px, transparent 50%);
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+
+    /* Other stuff */
+    hr {@apply border-token dark:border-surface-700;} 
+}
+
+[data-theme='optkkun'] {
+    /* Buttons */
+    .button-blue {@apply bg-blue-400 text-black !important;}
+    .button-green {@apply bg-emerald-400 text-black !important;}
+    .button-gray {@apply bg-gray-600 text-neutral-200 !important;}
+    .button-red {@apply bg-red-700 text-neutral-200 !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-blue-500 text-black !important;}
+    .button-green:hover {@apply bg-emerald-500 text-black !important;}
+    .button-gray:hover {@apply bg-gray-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
+
+    /* Background */
+    background-color:rgb(10, 32, 82) !important;
+    background-image:
+        radial-gradient(at 86% 5%, hsla(222,60%,29%,1) 0px, transparent 50%),
+        radial-gradient(at 0% 66%, hsla(222,74%,31%,1) 0px, transparent 50%),
+        radial-gradient(at 8% 40%, hsla(222,72%,38%,1) 0px, transparent 50%),
+        radial-gradient(at 70% 40%, hsla(222,63%,30%,1) 0px, transparent 50%),
+        radial-gradient(at 69% 99%, hsla(222,73%,29%,1) 0px, transparent 50%),
+        radial-gradient(at 99% 95%, hsla(222,96%,22%,1) 0px, transparent 50%),
+        radial-gradient(at 7% 10%, hsla(222,72%,26%,1) 0px, transparent 50%);
+    background-attachment: fixed;
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+/* Skeleton preset themes */
+[data-theme='skeleton'] {
+    /* Buttons */
+    .button-blue {@apply bg-secondary-500 text-neutral-200 !important;}
+    .button-green {@apply bg-primary-500 text-black !important;}
+    .button-gray {@apply bg-gray-600 text-neutral-200 !important;}
+    .button-red {@apply bg-red-700 text-neutral-200 !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-secondary-600 text-neutral-200 !important;}
+    .button-green:hover {@apply bg-primary-600 text-black !important;}
+    .button-gray:hover {@apply bg-gray-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
+}
+
+[data-theme='crimson'] {
+    /* Buttons */
+    .button-blue {@apply bg-secondary-400 text-black !important;}
+    .button-green {@apply bg-emerald-500 text-black !important;}
+    .button-gray {@apply bg-tertiary-500 text-black !important;}
+    .button-red {@apply bg-error-500 text-black !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-secondary-500 text-black !important;}
+    .button-green:hover {@apply bg-emerald-600 text-black !important;}
+    .button-gray:hover {@apply bg-tertiary-600 text-black !important;}
+    .button-red:hover {@apply bg-error-600 text-black !important;}
+}
+
+[data-theme='gold-nouveau'] {
+    h1, h2, h3, h4, h5, h6 {font-family: 'Quicksand', sans-serif !important;}
+
+    /* Buttons */
+    .button-blue {@apply bg-primary-500 text-neutral-200 dark:text-black !important;}
+    .button-green {@apply bg-secondary-400 text-black !important;}
+    .button-gray {@apply bg-neutral-600 text-neutral-200 !important;}
+    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-primary-600 text-neutral-200 dark:text-black !important;}
+    .button-green:hover {@apply bg-secondary-500 text-black !important;}
+    .button-gray:hover {@apply bg-neutral-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+}
+
+[data-theme='hamlindigo'] {
+    h1, h2, h3, h4, h5, h6 {font-family: serif !important;}
+
+    /* Buttons */
+    .button-blue {@apply bg-primary-500 text-black !important;}
+    .button-green {@apply bg-success-700 text-neutral-200 !important;}
+    .button-gray {@apply bg-neutral-600 text-neutral-200 !important;}
+    .button-red {@apply bg-error-700 text-neutral-200 !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-primary-600 text-black !important;}
+    .button-green:hover {@apply bg-success-800 text-neutral-200 !important;}
+    .button-gray:hover {@apply bg-neutral-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-800 text-neutral-200 !important;}
+}
+
+[data-theme='modern'] {
+    body {font-family: 'Quicksand', sans-serif !important;}
+
+    /* Buttons */
+    .button-main {@apply font-bold !important;}
+    .button-blue {@apply bg-secondary-500 text-black !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-zinc-600 text-neutral-200 !important;}
+    .button-red {@apply bg-error-500 text-black !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-secondary-600 text-black !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-zinc-700 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-600 text-black !important;}
+}
+
+[data-theme='rocket'] {
+    h1, h2, h3, h4, h5, h6 {font-family: 'Space Grotesk', sans-serif !important;}
+
+    /* Buttons */
+    .button-blue {@apply bg-primary-500 text-black !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-sky-900 text-neutral-200 !important;}
+    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-primary-600 text-black !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-sky-950 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+}
+
+[data-theme='sahara'] {
+    /* Buttons */
+    .button-blue {@apply bg-primary-500 text-black !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-orange-800 text-neutral-200 !important;}
+    .button-red {@apply bg-error-500 text-black !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-primary-600 text-black !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-orange-900 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-600 text-black !important;}
+}
+
+[data-theme='seafoam'] {
+    h1, h2, h3, h4, h5, h6 {font-family: 'Playfair Display', sans-serif !important;}
+
+    /* Buttons */
+    .button-blue {@apply bg-primary-500 text-black !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-secondary-500 text-neutral-200 !important;}
+    .button-red {@apply bg-error-400 text-black !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-primary-600 text-black !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-secondary-600 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-500 text-black !important;}
+}
+
+[data-theme='vintage'] {
+    h1, h2, h3, h4, h5, h6 {font-family: 'Abril Fatface', sans-serif !important;}
+
+    /* Buttons */
+    .button-blue {@apply bg-primary-500 text-black !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-amber-900 text-neutral-200 !important;}
+    .button-red {@apply bg-error-500 text-black !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-primary-600 text-black !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-amber-950 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-600 text-black !important;}
+}
+
+[data-theme='wintry'] {
+    /* Buttons */
+    .button-blue {@apply bg-primary-500 text-black !important;}
+    .button-green {@apply bg-success-500 text-black !important;}
+    .button-gray {@apply bg-cyan-900 text-neutral-200 !important;}
+    .button-red {@apply bg-error-400 text-black !important;}
+    /* Button hover */
+    .button-blue:hover {@apply bg-primary-600 text-black !important;}
+    .button-green:hover {@apply bg-success-600 text-black !important;}
+    .button-gray:hover {@apply bg-cyan-950 text-neutral-200 !important;}
+    .button-red:hover {@apply bg-error-500 text-black !important;}
 }

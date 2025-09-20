@@ -2,6 +2,7 @@
     // Dependencies
     import { onMount } from 'svelte';
     import { TabGroup, Tab } from '@skeletonlabs/skeleton';
+    import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
     import { fetch } from "@tauri-apps/plugin-http";
     import { marked } from 'marked';
 
@@ -21,7 +22,9 @@
         return link.replace("<a","<a target='_blank' class='text-blue-600 underline'");
     };
     marked.setOptions({
-        renderer: renderer
+        renderer: renderer,
+        gfm: true,
+        breaks: true
     })
 
     const updateChangeLogs = async () => {
@@ -105,39 +108,107 @@
 	</Tab>
 	<!-- ... -->
 </TabGroup>
+
 <!-- OpenTaiko Changelogs -->
 {#if currentInfo === 0}
-    {@html changelogContent}
+    <div class="content">
+        <Accordion class="card rounded-container-token">
+            <AccordionItem>
+                <svelte:fragment slot="summary"><b>In case you're a bit lost...</b></svelte:fragment>
+                <svelte:fragment slot="content">
+                    <h2><b>[Feat]</b></h2>
+                    <p>Stands for "Feature". Used for feature additions.</p>
+                            
+                    <h2><b>[Enhancement]</b></h2>
+                    <p>Update to an existing feature.</p>
+                            
+                    <h2><b>[Fix/BugFix]</b></h2>
+                    <p>Should be self-explanatory.
+                    <br><span class="smalltext"><b>(Note: [Fix] and [BugFix] are used interchangeably.)</b></span></p>
+                            
+                    <h2><b>[Chore]</b></h2>
+                    <p>Changes that aren't a bugfix, nor a feature addition.</p>
+                            
+                    <h2><b>[i18n]</b></h2>
+                    <p>Stands for internationalization.</p>
+                </svelte:fragment>
+            </AccordionItem>
+        </Accordion>
+        
+        <hr class="my-3">
+
+        {@html changelogContent}
+    </div>
 {/if}
+
 <!-- OpenTaiko Hub Changelogs -->
 {#if currentInfo === 1}
-    {@html hubChangelogContent}
+    <div class="content">
+        <Accordion class="card rounded-container-token">
+            <AccordionItem>
+                <svelte:fragment slot="summary"><b>In case you're a bit lost...</b></svelte:fragment>
+                <svelte:fragment slot="content">
+                    <h2><b>[Feat]</b></h2>
+                    <p>Stands for "Feature". Used for feature additions.</p>
+                            
+                    <h2><b>[Enhancement]</b></h2>
+                    <p>Update to an existing feature.</p>
+                            
+                    <h2><b>[Fix/BugFix]</b></h2>
+                    <p>Should be self-explanatory.
+                    <br><span class="smalltext"><b>(Note: [Fix] and [BugFix] are used interchangeably.)</b></span></p>
+                            
+                    <h2><b>[Chore]</b></h2>
+                    <p>Changes that aren't a bugfix, nor a feature addition.</p>
+                            
+                    <h2><b>[i18n]</b></h2>
+                    <p>Stands for internationalization.</p>
+
+                    <h2><b>[Theme]</b></h2>
+                    <p>For OpenTaiko Hub theme additions, and changes.</p>
+                </svelte:fragment>
+            </AccordionItem>
+        </Accordion>
+        
+        <hr class="my-3">
+
+        {@html hubChangelogContent}
+    </div>
 {/if}
+
 <!-- Documentation -->
 {#if currentInfo === 2}
     <iframe src="https://opentaiko.github.io/OpTk-Documentation/" title="OpenTaiko Documentation" width="100%"  style="background-color:white;height:calc(100% - 100px)"></iframe>
 {/if}
+
 <!-- Troubleshooting -->
 {#if currentInfo === 3}
-    <h2>Support / Bug report</h2>
-    <p>If you encounter an issue or are searching for support about OpenTaiko, please refer to the following links:</p>
-    <a href="https://discord.gg/5xfpGuwASU" target='_blank' class='text-blue-600 underline'>OpenTaiko Discord's #support channel</a>
-    <br />
-    <a href="https://github.com/0auBSQ/OpenTaiko/issues" target='_blank' class='text-blue-600 underline'>Github issues section</a>
-    <p>Note: Be sure to do your own research before asking as the issue might have been treated before, be sure to check Discord's #often_asked_question channel too.</p>
-    <h2>Skin / Asset versioning</h2>
-    <p>All the numbers up to the minor update number (ie. v[0.6.0].2) need to match between a skin and a game version in order to be compatible.</p>
-    <p>It is not mandatory for some asset (character/puchichara) updates as they do not necessarily follow the strict versioning patterns skins do.</p>
-    <p>The revision number (ie. v0.6.0.[2]) is incremented at each game/skin update that do not imply mandatory changes and do not need to match.</p>
-    <p>Example: a skin with a 0.6.1.3 version number will work with any OpenTaiko version from 0.6.1.0 and will stop to be compatible from 0.6.2.0.</p>
-    <p>This section will be completed in future OpenTaiko Hub updates depending on found issues.</p>
+    <div class="content">
+        <h1>Support / Bug report</h1>
+        <p>If you encounter an issue or are searching for support about OpenTaiko, please refer to the following links:</p>
+        <a href="https://discord.gg/5xfpGuwASU" target='_blank' class='text-blue-600 underline'>OpenTaiko Discord's #support channel</a>
+        <br />
+        <a href="https://github.com/0auBSQ/OpenTaiko/issues" target='_blank' class='text-blue-600 underline'>Github issues section</a>
+        <p>Note: Be sure to do your own research before asking as the issue might have been treated before, be sure to check Discord's #often_asked_question channel too.</p>
+        
+        <hr class="m-4">
+
+        <h1>Skin / Asset versioning</h1>
+        <p>All the numbers up to the minor update number (ie. v[0.6.0].2) need to match between a skin and a game version in order to be compatible.</p>
+        <p>It is not mandatory for some asset (character/puchichara) updates as they do not necessarily follow the strict versioning patterns skins do.</p>
+        <p>The revision number (ie. v0.6.0.[2]) is incremented at each game/skin update that do not imply mandatory changes and do not need to match.</p>
+        <p>Example: a skin with a 0.6.1.3 version number will work with any OpenTaiko version from 0.6.1.0 and will stop to be compatible from 0.6.2.0.</p>
+        <p>This section will be completed in future OpenTaiko Hub updates depending on found issues.</p>
+    </div>
 {/if}
+
 <!-- Credits -->
 {#if currentInfo === 4}
-    {@html creditsContent}
+    <div class="content">
+        {@html creditsContent}
+    </div>
 {/if}
 
 <style>
-
-
+    .content {@apply card w-full bg-surface-100-800-token p-4;}
 </style>

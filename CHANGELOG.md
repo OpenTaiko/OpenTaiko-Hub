@@ -1,13 +1,28 @@
 # Changelog
 
-You can update your OpenTaiko Hub version directly from the releases tab:
+You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
+
+## [0.1.7] - 2025-09-20 (Alpha)
+
+- [Feat/Theme] Added the "OpTk Hub Themes" tab with the following themes:
+    - OpenTaiko Hub themes: "Gleaming Sky", "888", "Deceiver", "Onyx", "Pearl", and "OpenTaiko-Kun".
+    - Skeleton preset themes: "Legacy" (default), "Wintry", "Modern", "Rocket", "Seafoam", "Vintage", "Sahara", "Hamlindigo", "Gold Nouveau", and "Crimson".
+- [Feat] Added a guide for the changelog terms.
+- [Feat] Made the OpenTaiko Hub window resizable.
+- [Enhancement] Added button icons.
+- [Enhancement] A bunch of UI changes.
+- [Enhancement] Added the OpenTaiko Blog to the "Links" tab.
+- [Enhancement] Added a banner, header, and icon to the OpenTaiko Hub installer.
+- [Chore] Changed the updater code to pull the app version from "tauri.conf.json".
+- [Chore] Renamed the "OpenTaiko Version" tab to "Home".
+
 
 ## [0.1.6] - 2025-07-27 (Alpha)
 
 - [Feat] Added the current version number to the OpenTaiko Hub.
 - [Feat] Added a update system for the OpenTaiko Hub.
-- [Feat] Added the "Secret" tab. (Maybe go take a look...)
+- [Feat] Added the "Secrets" tab. (Maybe go take a look...)
 - [Feat] Added the "Links" tab.
 - [Feat] Added the "Lyrics" tab under "Tools".
 - [Feat] Added Subtitle Edit to the "Lyrics" tab under "Tools".
@@ -30,5 +45,6 @@ You can update your OpenTaiko Hub version directly from the releases tab:
 - Hotfix
 
 ## [0.1.3] - 2024-10-26 (Alpha)
+
 
 - First release with basic features

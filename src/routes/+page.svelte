@@ -10,6 +10,10 @@
 
     import { GetRootPath } from "../lib/utils/path.js";
 
+    import { path } from '@tauri-apps/api';
+    import { invoke } from '@tauri-apps/api/core';
+    import { listen } from '@tauri-apps/api/event';
+
     // Pages
     import SongsTab from '$lib/pages/SongsTab.svelte';
     import AssetsTab from '$lib/pages/AssetsTab.svelte';
@@ -17,17 +21,16 @@
     import ToolsTab from '$lib/pages/ToolsTab.svelte';
     import SecretTab from '$lib/pages/SecretTab.svelte';
     import LinksTab from '$lib/pages/LinksTab.svelte';
+    import ThemesTab from '$lib/pages/ThemesTab.svelte';
 
     // Components
     import HubVersionCheck from '$lib/components/HubVersionCheck.svelte';
 
     // Images
     import optkLogoUrl from '$lib/optk.png';
-    import arrowUrl from '$lib/messagearrow.png';
 
-    import { path } from '@tauri-apps/api';
-    import { invoke } from '@tauri-apps/api/core';
-    import { listen } from '@tauri-apps/api/event';
+    // Themes
+    const themetarget = document.getElementById('themetarget');
 
     // Navigation
     let currentTile = 0;
@@ -256,11 +259,13 @@
             TriggerError('Error opening the folder:' + error);
         }
     }
-  
+
     onMount(async () => {
         optk_OS = await GetOS();
         await TryFetchingCurrentVersion();
         await TryFetchingLatestVersion();
+
+        themetarget.setAttribute("style", "");
     });
 </script>
 
@@ -269,14 +274,14 @@
     <div class="grid grid-cols-1 md:grid-cols-[auto_1fr]">
       <!-- Left Sidebar. -->
       <aside class="bg-yellow-500">
-        <AppRail height="h-full">
+        <AppRail height="h-full w-[72px]">
             <!-- <svelte:fragment slot="lead">
                 <AppRailAnchor href="/" >(icon)</AppRailAnchor>
             </svelte:fragment> -->
             <!-- --- -->
-            <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Download, update, or launch OpenTaiko.">
-                <svelte:fragment slot="lead"><i class="fa-solid fa-download"></i></svelte:fragment>
-                <span>OpenTaiko Version</span>
+            <AppRailTile bind:group={currentTile} name="tile-1" value={0} title="Manage OpenTaiko and the OpenTaiko Hub.">
+                <svelte:fragment slot="lead"><i class="fa-solid fa-home"></i></svelte:fragment>
+                <span>Home</span>
             </AppRailTile>
             <AppRailTile bind:group={currentTile} name="tile-2" value={1} title="Update your OpenTaiko songs and download the latest ones.">
                 <svelte:fragment slot="lead"><i class="fa-solid fa-music"></i></svelte:fragment>
@@ -304,8 +309,12 @@
                     <svelte:fragment slot="lead"><i class="fa-solid fa-globe"></i></svelte:fragment>
                     <span>Links</span>
                 </AppRailTile>
-				<AppRailAnchor href="https://github.com/OpenTaiko/OpenTaiko-Hub" target="_blank" title="View the OpenTaiko Hub source code.">
-					<i class="fa-brands fa-github text-2xl"></i>
+                <AppRailTile bind:group={currentTile} name="tile-8" value={7} title="Change the theme of the OpenTaiko Hub.">
+                    <svelte:fragment slot="lead"><i class="fa-solid fa-palette"></i></svelte:fragment>
+                    <span>OpTk Hub Themes</span>
+                </AppRailTile>
+				<AppRailAnchor href="https://github.com/OpenTaiko/OpenTaiko-Hub" target="_blank" title="View the OpenTaiko Hub source code." class="sidebaricon">
+					<i class="fa-brands fa-github text-2xl text-black dark:text-white"></i>
 				</AppRailAnchor>
 			</svelte:fragment>
         </AppRail>
@@ -318,8 +327,8 @@
 
             <section class="card w-full">
                 <div class="p-4 space-y-4">
-                    <div class="flex gap-4">
-                        <span><b>Current OpenTaiko version:</b></span>
+                    <div class="flex gap-4"> 
+                        <span class="nowrap"><b>Current OpenTaiko version:</b></span>
                         {#if buildDetails === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
                         {:else}
@@ -327,21 +336,21 @@
                                 <div class="progressbar"><ProgressBar bind:value={progress} max={100} /></div>
                             {:else}
                                 <span>{buildDetails}</span>
-                                <button type="button" on:click={TryFetchingCurrentVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Reload</button>
+                                <button type="button" on:click={TryFetchingCurrentVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> Reload</button>
                                 {#if buildDetailsNotFound === true}
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Download OpenTaiko</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="button-green button-main"><i class="fa-solid fa-download"></i> Download OpenTaiko</button>
                                 {:else if latestVersion !== optk_version && 'Loading...' !== latestVersion}
-                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Launch OpenTaiko</button>
-                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Open in Explorer</button>
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Update OpenTaiko</button>
+                                    <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="button-blue button-main"><i class="fa-solid fa-folder-open"></i> Open in Explorer</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="button-green button-main"><i class="fa-solid fa-download"></i> Update OpenTaiko</button>
                                     {#if checkSkinCompatibility(latestVersion, optk_version) === false}
                                         <span class="text-red-500">(Updating will require a skin update)</span>
                                     {/if}
                                     
                                 {:else}
-                                    <button type="button" on:click={LaunchOpenTaiko} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Launch OpenTaiko</button>
-                                    <button type="button" on:click={OpenInExplorer} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Open in Explorer</button>
-                                    <button type="button" on:click={DownloadOpenTaiko} class="text-white bg-gray-700 hover:bg-gray-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-gray-600 dark:hover:bg-gray-700">Redownload OpenTaiko</button>
+                                    <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> Launch OpenTaiko</button>
+                                    <button type="button" on:click={OpenInExplorer} class="button-blue button-main"><i class="fa-solid fa-folder-open"></i> Open in Explorer</button>
+                                    <button type="button" on:click={DownloadOpenTaiko} class="button-gray button-main"><i class="fa-solid fa-download"></i> Redownload OpenTaiko</button>
                                 {/if}
                             {/if}
                         {/if}
@@ -350,32 +359,30 @@
                 
                 <div class="p-4 space-y-4">
                     <div class="flex gap-4">
-                        <span><b>Latest OpenTaiko version:</b></span>
+                        <span class="nowrap"><b>Latest OpenTaiko version:</b></span>
                         {#if latestVersionErrorFound === true}
-                            <span class="text-red-500">Fetch Error</span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700">Retry</button>
+                            <span class="fetch-error"><b>Fetch Error</b></span>
+                            <button type="button" on:click={TryFetchingLatestVersion} class="button-red button-main"><i class="fa-solid fa-triangle-exclamation"></i> Retry</button>
                         {:else if latestVersion === "Loading..."}
                             <div class="placeholder animate-pulse flex-1" />
                         {:else}
                             <span>{latestVersion}</span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-blue-700 hover:bg-blue-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-blue-600 dark:hover:bg-blue-700">Reload</button>
+                            <button type="button" on:click={TryFetchingLatestVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> Reload</button>
                         {/if}
+                    </div>
+                </div>
+                
+                <hr>
+                
+                <div class="p-4 space-y-4">
+                    <div class="flex gap-4">
+                    <p><b>Be sure to download a skin <span class="smalltext"><i>("Skins" tab)</i></span> and songs <span class="smalltext"><i>("Songlist" tab)</i></span> before first starting the game!</b><br><b>Current OS:</b> {optk_OS}</p>
                     </div>
                 </div>
             </section>
 
-            <div class="download-message">
-                <img src={arrowUrl} alt="" class="arrow">
-                <section class="card w-full">
-                    <div class="p-4 space-y-4">
-                        <div class="flex gap-4">
-                        <p><b>Be sure to download a skin <span class="darktext"><i>(Skins tab)</i></span> and songs <span class="darktext"><i>(Songlist tab)</i></span> before first starting the game!</b><br><b>Current OS:</b> {optk_OS}</p>
-                        </div>
-                    </div>
-                </section>
-            </div>
-
             <HubVersionCheck />
+
         {/if}
 
         <!-- Songs -->
@@ -396,7 +403,7 @@
             <ToolsTab />
         {/if}
 
-        <!-- ??? -->
+        <!-- Secrets -->
         {#if currentTile === 4}
             <SecretTab />
         {/if}
@@ -406,24 +413,27 @@
             <InformationTab />
         {/if}
 
-        <!-- Socials and Websites -->
+        <!-- Links -->
         {#if currentTile === 6}
             <LinksTab />
         {/if}
+
+        <!-- OpTk Hub Themes -->
+        <ThemesTab
+            bind:currentTile
+        />
       </main>    
     </div>
 </div>
 
 <style>
+    /* Main CSS */
     main {overflow-y: auto;}
-    .darktext {color: #6275b6;}
-    .arrow {margin-left: 10px;}
-    .download-message {
-        position: relative;
-        top: -10px;
-    }
+    .nowrap {white-space: nowrap;}
+
+    /* Other CSS */
     .progressbar {
         margin-top: 9px;
-        width: 78.5%;
+        width: 100%;
     }
 </style>

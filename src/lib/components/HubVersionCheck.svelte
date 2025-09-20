@@ -1,12 +1,19 @@
 <script>
     import { onMount } from 'svelte';
+    import { getVersion } from '@tauri-apps/api/app';
     import { fetch } from "@tauri-apps/plugin-http";
 
     import { getContext } from 'svelte';
-    const { TriggerError, TriggerSuccess } = getContext('toast');
+    const { TriggerError, TriggerWarning } = getContext('toast');
 
     // Version Number
-    const VersionHub = "v0.1.6";
+    let VersionHub = "Loading..."
+
+    async function getHubVersion() {
+        const appVersion = await getVersion();
+        VersionHub = "v" + appVersion;
+        console.log(VersionHub);
+    }
 
     // Check version number
     const repoOwner = 'OpenTaiko';//'OpenTaiko'; 
@@ -27,11 +34,10 @@
             
             if (VersionHub == latestVersion) {
                 console.log("Hub version is up to date!");
-
             } 
             else if (VersionHub != latestVersion) {
                 console.log("Hub version is out of date, or newer than the current version on GitHub.");
-                TriggerSuccess('Your OpenTaiko Hub installation is out of date.<br>Please click the "Update OpenTaiko Hub" button.'); 
+                TriggerWarning('Your OpenTaiko Hub installation is out of date.<br>Please click the "Update OpenTaiko Hub" button.'); 
             }
         } catch (err) {
             latestVersionErrorFound = true;
@@ -42,24 +48,24 @@
     const UpdateHub = async () => {window.open("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest");} 
     
     onMount(async () => {
+        getHubVersion()
         await TryFetchingLatestVersion();
     });
 </script>
 
 
-<section class="card w-full">
+<section class="card hubupdatemessage">
     <div class="p-4 space-y-4">
         <div class="flex gap-4">
             {#if latestVersionErrorFound === true}
                 <span>Failed to check for updates.</span>
-                <span class="text-red-500">Fetch Error</span>
-                <button type="button" on:click={TryFetchingLatestVersion} class="text-white bg-red-700 hover:bg-red-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-red-600 dark:hover:bg-red-700">Retry</button>
+                <span class="fetch-error"><b>Fetch Error</b></span>
+                <button type="button" on:click={TryFetchingLatestVersion} class="button-red button-main"><i class="fa-solid fa-triangle-exclamation"></i> Retry</button>
             {:else if latestVersion === "Loading..."}
                 <span>Checking for updates...</span>
-                <div class="placeholder animate-pulse flex-1" />
             {:else if VersionHub != latestVersion}
                 <span><b>Your OpenTaiko Hub installation is out of date.</b></span>
-                <button type="button" on:click={UpdateHub} class="text-white bg-green-700 hover:bg-green-800 font-medium rounded-lg text-sm px-3 py-1 dark:bg-green-600 dark:hover:bg-green-700">Update OpenTaiko Hub to {latestVersion.slice(1)}</button>
+                <button type="button" on:click={UpdateHub} class="button-green button-main"><i class="fa-solid fa-download"></i> Update OpenTaiko Hub to {latestVersion.slice(1)}</button>
             {:else}
                 <span><b>Your OpenTaiko Hub installation is up to date!</b></span>
             {/if}
@@ -67,13 +73,18 @@
     </div>
 </section>
 
-<div class="hubversionnumber">OpenTaiko Hub ({VersionHub.slice(1)})</div>
+<div class="card p-4 hubversionnumber">OpenTaiko Hub ({VersionHub})</div>
 
 <style>
     .hubversionnumber {
+        font-weight: bold;
         position: fixed;
-        bottom: 10px;
-        right: 15px;
-        color: #798dd6
+        bottom: 16px;
+        left: 88px;
+    }
+    .hubupdatemessage {
+        position: fixed;
+        bottom: 16px;
+        right: 16px;
     }
 </style>
