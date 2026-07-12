@@ -1,0 +1,477 @@
+{
+  "common": {
+    "fetch_error": "불러오기 오류",
+    "retry": "재시도",
+    "reload": "새로고침",
+    "cancel": "취소"
+  },
+  "dl": {
+    "error": {
+      "failed_abort": "다운로드에 실패하여 중단합니다"
+    },
+    "warn": {
+      "failed_retry": "다운로드에 실패하여 재시도 중... ({attempt}/{max})"
+    }
+  },
+  "nav": {
+    "home": "홈",
+    "songlist": "곡 목록",
+    "skins": "스킨",
+    "docs": "문서",
+    "tools": "도구",
+    "secrets": "시크릿",
+    "information": "정보",
+    "links": "링크",
+    "themes": "OpTk Hub 테마",
+    "tooltip": {
+      "home": "OpenTaiko와 OpenTaiko Hub를 관리합니다.",
+      "songlist": "OpenTaiko 곡을 업데이트하고 최신 곡을 다운로드하세요.",
+      "skins": "최신 OpenTaiko 스킨과 관련 에셋을 받아보세요.",
+      "docs": "선택한 OpenTaiko 빌드에 포함된 문서를 살펴보세요.",
+      "tools": "OpenTaiko를 더욱 즐겁게 만들어 줄 도구들입니다.",
+      "secrets": "???",
+      "information": "체인지로그와 문서를 확인하거나 문제를 해결할 때 이용하세요.",
+      "links": "OpenTaiko의 소셜 미디어와 웹사이트를 둘러보세요!",
+      "themes": "OpenTaiko Hub의 테마를 변경합니다.",
+      "github": "OpenTaiko Hub 소스 코드를 확인합니다."
+    }
+  },
+  "instances": {
+    "label": "인스턴스",
+    "manage": "관리",
+    "title": "OpenTaiko 인스턴스",
+    "none": "아직 OpenTaiko 인스턴스가 없습니다. \"관리\"를 눌러 새로 만들거나 기존 폴더를 연결하세요.",
+    "active": "사용 중",
+    "set_active": "선택",
+    "attach": "기존 폴더 연결",
+    "create": "새 인스턴스 만들기",
+    "create_name_placeholder": "새 인스턴스 이름...",
+    "detach": "연결 해제",
+    "detach_note": "연결을 해제하면 이 목록에서만 제거되며 파일은 삭제되지 않습니다.",
+    "open_folder": "폴더 열기",
+    "col": {
+      "name": "이름",
+      "path": "폴더",
+      "channel": "유형",
+      "version": "버전",
+      "actions": "동작"
+    },
+    "channel": {
+      "stable": "안정판",
+      "experimental": "실험판",
+      "empty": "빌드 없음"
+    },
+    "error": {
+      "attach_failed": "폴더 연결에 실패했습니다: {error}",
+      "create_failed": "인스턴스 생성에 실패했습니다: {error}"
+    },
+    "success": {
+      "attached": "\"{name}\" 연결 완료",
+      "created": "\"{name}\" 생성 완료",
+      "detached": "\"{name}\" 연결 해제 완료"
+    },
+    "picker": {
+      "title": "설치할 빌드 선택",
+      "install": "설치"
+    }
+  },
+  "home": {
+    "label": {
+      "current_version": "현재 OpenTaiko 버전:",
+      "latest_version": "최신 OpenTaiko 버전:",
+      "latest_experimental": "최신 실험판 빌드:",
+      "current_os": "현재 OS:",
+      "no_version_found": "유효한 OpenTaiko 버전을 찾을 수 없습니다"
+    },
+    "button": {
+      "reload": "새로고침",
+      "download": "OpenTaiko 다운로드",
+      "download_stable": "안정판 다운로드",
+      "download_experimental": "실험판 다운로드",
+      "launch": "OpenTaiko 실행",
+      "explorer": "탐색기에서 열기",
+      "update": "OpenTaiko 업데이트",
+      "redownload": "OpenTaiko 다시 다운로드",
+      "rebuild": "다시 빌드",
+      "retry": "재시도",
+      "install": "빌드 설치..."
+    },
+    "warn": {
+      "skin_update": "(업데이트하면 스킨 업데이트가 필요합니다)"
+    },
+    "hint": {
+      "first_start": "게임을 처음 시작하기 전에 스킨(\"스킨\" 탭)과 곡(\"곡 목록\" 탭)을 꼭 다운로드하세요!",
+      "experimental": "실험판에는 스킨과 캐릭터가 기본 포함되어 있어 바로 플레이할 수 있습니다!"
+    },
+    "experimental": {
+      "unavailable": "현재 사용 가능한 실험판 빌드가 없습니다",
+      "requires_dotnet": "실험판 버전을 빌드하려면 .NET SDK 8이 필요합니다. https://dotnet.microsoft.com/download/dotnet/8.0 에서 설치한 후 다시 시도해 주세요.",
+      "update_available": "새 실험판 빌드가 있습니다!",
+      "up_to_date": "이 실험판 빌드는 최신 상태입니다.",
+      "stage": {
+        "check_sdk": ".NET SDK 확인 중...",
+        "fetch": "브랜치 정보 가져오는 중...",
+        "download": "소스 코드 다운로드 중...",
+        "extract": "소스 코드 압축 해제 중...",
+        "build": "OpenTaiko 빌드 중 (몇 분 정도 걸릴 수 있습니다)...",
+        "install": "빌드 설치 중..."
+      }
+    },
+    "error": {
+      "launch": "앱 실행 중 오류가 발생했습니다: {error}",
+      "already_downloading": "이미 다운로드가 진행 중입니다",
+      "fetch_release": "최신 OpenTaiko 릴리스를 가져오지 못했습니다: {error}",
+      "download_failed": "OpenTaiko 다운로드에 실패했습니다: {error}",
+      "incomplete_build": "설치된 빌드가 불완전합니다(게임 파일 누락). 다시 설치해 주세요."
+    },
+    "success": {
+      "unzipping": "다운로드 완료, 압축 해제 중...",
+      "installing": "압축 해제 완료, 설치 중...",
+      "installed": "다운로드 및 설치 완료"
+    },
+    "tab": {
+      "overview": "개요"
+    }
+  },
+  "docs": {
+    "title": "문서",
+    "not_found": "이 OpenTaiko 빌드에는 로컬 문서가 포함되어 있지 않습니다.",
+    "not_found_hint": "문서가 포함된 빌드를 받으려면 이 인스턴스를 업데이트하거나 다시 빌드하세요."
+  },
+  "hub": {
+    "status": {
+      "outdated": "OpenTaiko Hub가 최신 버전이 아닙니다.",
+      "up_to_date": "OpenTaiko Hub가 최신 버전입니다!",
+      "checking": "업데이트 확인 중...",
+      "fetch_failed": "업데이트 확인에 실패했습니다."
+    },
+    "button": {
+      "update": "OpenTaiko Hub를 {version}(으)로 업데이트"
+    },
+    "warn": {
+      "outdated_toast": "OpenTaiko Hub가 최신 버전이 아닙니다.<br>\"OpenTaiko Hub 업데이트\" 버튼을 눌러 주세요."
+    },
+    "error": {
+      "fetch": "최신 OpenTaiko Hub 릴리스를 가져오지 못했습니다: {error}"
+    }
+  },
+  "songs": {
+    "col": {
+      "name": "곡 이름",
+      "folder": "폴더",
+      "difficulties": "난이도",
+      "charter": "채보 제작자: ",
+      "size": "크기",
+      "status": "상태"
+    },
+    "filter": {
+      "song": "곡 검색...",
+      "folder": "폴더 검색..."
+    },
+    "status": {
+      "scanning": "스캔 중...",
+      "not_downloaded": "미다운로드",
+      "up_to_date": "최신",
+      "outdated": "구버전"
+    },
+    "button": {
+      "bulk_download": "일괄 다운로드",
+      "download": "다운로드",
+      "redownload": "다시 다운로드",
+      "update": "업데이트",
+      "open_folder": "곡 폴더 열기"
+    },
+    "view": {
+      "list": "목록",
+      "tree": "트리"
+    },
+    "scan": {
+      "progress": "곡 스캔 중... ({count}개 발견)",
+      "done": "라이브러리에 있는 곡: {count}개"
+    },
+    "tree": {
+      "custom": "커스텀",
+      "songs_count": "곡 {count}개",
+      "empty": "아직 라이브러리에서 곡을 찾지 못했습니다."
+    },
+    "migrate": {
+      "banner": "\"{instance}\" 안에서 곡 폴더 {count}개를 발견했습니다. 공유 곡 라이브러리로 옮길까요?",
+      "button": "곡 옮기기",
+      "later": "나중에",
+      "success": "곡 폴더 {moved}개를 옮겼습니다 ({skipped}개는 이미 존재)",
+      "error": "곡을 옮기지 못했습니다: {error}"
+    },
+    "metadata": {
+      "updated": "장르 폴더 {count}개를 업데이트했습니다 (box.def / preimages)"
+    },
+    "experimental_note": "선택한 인스턴스는 실험판 빌드입니다. 자체 곡이 포함되어 있으며 공유 곡 라이브러리를 사용하지 않습니다.",
+    "error": {
+      "scanning": "로컬 폴더 스캔 중에는 곡을 다운로드할 수 없습니다",
+      "scan_failed": "곡 라이브러리 스캔에 실패했습니다: {error}"
+    },
+    "success": {
+      "all_up_to_date": "모든 곡이 이미 최신 상태입니다",
+      "download_complete": "다운로드 완료",
+      "download_nb": "곡 다운로드 완료: {nb}/{total}"
+    }
+  },
+  "assets": {
+    "tab": {
+      "skins": "스킨",
+      "characters": "캐릭터",
+      "puchicharas": "푸치캐라"
+    },
+    "col": {
+      "asset": "에셋",
+      "version": "버전",
+      "resolution": "해상도",
+      "author": "제작자",
+      "size": "크기",
+      "status": "상태"
+    },
+    "button": {
+      "bulk_download": "일괄 다운로드"
+    },
+    "type": {
+      "skins": "스킨",
+      "characters": "캐릭터",
+      "puchicharas": "푸치캐라"
+    },
+    "experimental": {
+      "blocked_title": "실험판 빌드에서는 사용할 수 없습니다",
+      "blocked_text": "실험판 빌드에는 자체 스킨, 캐릭터, 푸치캐라가 이미 포함되어 있습니다."
+    },
+    "error": {
+      "scanning": "로컬 폴더 스캔 중에는 {type}을(를) 다운로드할 수 없습니다",
+      "zip_not_found": "서버에서 스킨 패키지를 찾을 수 없습니다. 5분 후에 다시 시도해 주세요. 문제가 계속되면 OpenTaiko 팀에 문의해 주세요."
+    },
+    "success": {
+      "all_up_to_date": "모든 {type}이(가) 이미 최신 상태입니다",
+      "download_complete": "다운로드 완료",
+      "download_nb": "{type} 다운로드 완료: {nb}/{total}"
+    }
+  },
+  "asset_cell": {
+    "scanning": "스캔 중...",
+    "not_downloaded": "미다운로드",
+    "button": {
+      "download": "다운로드",
+      "redownload": "다시 다운로드",
+      "update": "업데이트"
+    }
+  },
+  "hof": {
+    "website_link": "OpenTaiko 웹사이트에서 보기",
+    "no_scores": "아직 기록된 스코어가 없습니다.",
+    "max_list_points": "최대 리스트 포인트",
+    "col": {
+      "rank": "순위",
+      "player": "플레이어",
+      "score": "점수",
+      "grade": "등급",
+      "good": "굿",
+      "ok": "OK",
+      "bad": "배드",
+      "list_points": "리스트 pt",
+      "video": "영상",
+      "status": "상태"
+    },
+    "video_link": "보기",
+    "close": "닫기",
+    "status": {
+      "perfect": "퍼펙트",
+      "full_combo": "풀 콤보",
+      "clear": "클리어"
+    }
+  },
+  "version_chip": {
+    "incompatible": "현재 OpenTaiko 버전과 호환되지 않습니다",
+    "outdated": "구버전일 수 있으니 주의해서 사용하세요"
+  },
+  "player": {
+    "play": "재생",
+    "pause": "일시정지"
+  },
+  "info": {
+    "tab": {
+      "changelog_game": "체인지로그 (게임)",
+      "changelog_hub": "체인지로그 (Hub)",
+      "documentation": "문서",
+      "troubleshooting": "문제 해결",
+      "credits": "크레딧"
+    },
+    "legend": {
+      "title": "조금 헷갈리신다면...",
+      "feat": "\"Feature\"의 약자로, 기능 추가에 사용됩니다.",
+      "enhancement": "기존 기능의 개선입니다.",
+      "fix": "이름 그대로 수정입니다.",
+      "fix_note": "(참고: [Fix]와 [BugFix]는 같은 의미로 사용됩니다.)",
+      "chore": "버그 수정도 기능 추가도 아닌 변경 사항입니다.",
+      "i18n": "국제화(internationalization)의 약자입니다.",
+      "theme": "OpenTaiko Hub 테마 추가 및 변경에 사용됩니다."
+    },
+    "troubleshoot": {
+      "title": "지원 / 버그 신고",
+      "intro": "OpenTaiko 사용 중 문제가 발생했거나 도움이 필요하다면 아래 링크를 참고해 주세요:",
+      "discord": "OpenTaiko Discord의 #support 채널",
+      "github": "GitHub 이슈 섹션",
+      "note": "참고: 이미 다뤄진 문제일 수 있으니 질문하기 전에 직접 찾아보시고, Discord의 #often_asked_question 채널도 꼭 확인해 주세요."
+    },
+    "versioning": {
+      "title": "스킨 / 에셋 버전 관리",
+      "compat": "스킨과 게임 버전이 호환되려면 마이너 업데이트 번호까지의 모든 숫자(예: v[0.6.0].2)가 일치해야 합니다.",
+      "optional": "일부 에셋(캐릭터/푸치캐라) 업데이트는 스킨처럼 엄격한 버전 규칙을 따르지 않으므로 반드시 일치할 필요는 없습니다.",
+      "revision": "리비전 번호(예: v0.6.0.[2])는 필수 변경이 없는 게임/스킨 업데이트마다 증가하며, 일치하지 않아도 됩니다.",
+      "example": "예: 버전이 0.6.1.3인 스킨은 OpenTaiko 0.6.1.0부터 호환되며 0.6.2.0부터는 호환되지 않습니다.",
+      "wip": "이 섹션은 발견되는 문제에 따라 향후 OpenTaiko Hub 업데이트에서 보완될 예정입니다."
+    },
+    "error": {
+      "changelog": "체인지로그를 불러오지 못했습니다.",
+      "credits": "크레딧 정보를 불러오지 못했습니다.",
+      "generic": "오류: {error}"
+    }
+  },
+  "links": {
+    "section": {
+      "socials": "소셜/GitHub",
+      "websites": "웹사이트"
+    },
+    "discord_en": "공식 영어 Discord 서버",
+    "discord_ja": "공식 일본어 Discord 서버",
+    "youtube": "공식 YouTube 채널",
+    "bluesky": "공식 Bluesky 계정",
+    "twitter": "공식 Twitter/X 계정",
+    "source_main": "OpenTaiko 메인 소스 코드",
+    "source_hub": "OpenTaiko Hub 소스 코드",
+    "github_org": "GitHub 조직",
+    "website": "공식 OpenTaiko 웹사이트",
+    "blog": "공식 OpenTaiko 블로그",
+    "wiki": "공식 OpenTaiko 위키"
+  },
+  "tools": {
+    "tab": {
+      "charting": "채보 제작",
+      "lyrics": "가사",
+      "submit": "콘텐츠를 제출하세요!"
+    },
+    "charting": {
+      "primary": "주요 자료:",
+      "tutorial": {
+        "title": "Taiko .TJA 채보 제작 튜토리얼",
+        "subtitle": "ugyuu의 채보 제작 튜토리얼입니다."
+      },
+      "peepo_dl": "PeepoDrumKit 다운로드:",
+      "additional": "추가 자료:"
+    },
+    "lyrics": {
+      "dl": "가사 편집기"
+    },
+    "submit": {
+      "soundtrack": "OpenTaiko 사운드트랙"
+    },
+    "card": {
+      "peepo_origin": {
+        "subtitle": "오리지널 최신판",
+        "text": "samyuu의 오리지널 버전으로, 실험적 기능이 없는 일반 채보 제작용입니다."
+      },
+      "peepo_optk": {
+        "subtitle": "OpenTaiko 팀 최신판",
+        "text": "Komi와 OpenTaiko 팀 멤버들이 이어가는 버전으로, OpenTaiko가 지원하는 실험적 기능을 추가하고 일반 편집 기능을 개선했습니다."
+      },
+      "peepo_preview": {
+        "subtitle": "OpenTaiko 팀 최신판 (프리뷰)",
+        "text": "IID가 만드는 차기 OpenTaiko 팀 버전의 프리뷰로, 더 많은 실험적 기능을 추가합니다."
+      },
+      "peepo_sdl3": {
+        "subtitle": "OpenTaiko 팀 최신판 (SDL3 포트)",
+        "text": "Steve-xmh의 크로스 플랫폼 SDL3 포트로, 차기 OpenTaiko 팀 버전을 위해 IID가 선정한 기능을 담고 있습니다."
+      },
+      "tja_tools": {
+        "title": "TJA Tools",
+        "subtitle": "WHMHammer의 포크",
+        "text": "채보를 시각화하고 채보 통계를 바로 확인해 보세요!"
+      },
+      "arrow_vortex": {
+        "title": "Arrow Vortex",
+        "subtitle": "공식 최신판",
+        "text": "채보 싱크를 손쉽게 맞출 수 있는 추천 도구입니다!"
+      },
+      "subtitle_edit": {
+        "title": "Subtitle Edit",
+        "subtitle": "공식 최신판",
+        "text": "채보용 VTT 파일을 만들 때 추천하는 도구입니다!"
+      },
+      "submission": {
+        "title": "곡 제출 양식",
+        "subtitle": "자신의 곡 제출용",
+        "text": "OpenTaiko 사운드트랙에 넣고 싶은 곡을 여기서 제출할 수 있습니다! 곡이 채택되면 보통 2주 안에 채보가 제작됩니다."
+      },
+      "suggestion": {
+        "title": "곡 추천 양식",
+        "subtitle": "다른 아티스트 추천용",
+        "text": "OpenTaiko에 어울릴 것 같은 곡의 아티스트를 여기서 추천할 수 있습니다!"
+      }
+    }
+  },
+  "themes": {
+    "title": "테마를 선택하세요.",
+    "title_debug": "테마를 선택하세요. (디버그 모드 켜짐)",
+    "optgroup": {
+      "optk": "OpenTaiko Hub 테마:",
+      "skeleton": "Skeleton 프리셋 테마:"
+    },
+    "preview": {
+      "title": "OpenTaiko Hub 테마 탭에 오신 것을 환영합니다!",
+      "color": "색상 미리보기",
+      "accents": "테마 강조색:",
+      "accent_primary": "기본 강조색",
+      "accent_secondary": "보조 강조색",
+      "accent_tertiary": "3차 강조색",
+      "buttons": "버튼 색상:",
+      "btn_action": "동작",
+      "btn_download": "다운로드",
+      "btn_repeat": "반복",
+      "btn_error": "삭제/오류",
+      "notifs": "알림:",
+      "notif_success": "성공",
+      "notif_warning": "경고",
+      "notif_error": "오류"
+    },
+    "credits": {
+      "title": "테마 크레딧",
+      "text": "모든 테마 크레딧은 여기에서 확인할 수 있습니다:"
+    },
+    "mode": {
+      "dark": "다크",
+      "light": "라이트",
+      "current": "현재 모드: {mode}"
+    },
+    "debug": {
+      "disable_btn": "디버그 모드 끄기"
+    },
+    "error": {
+      "theme_json": "theme.json 파일(또는 settings 폴더)이 없거나 손상되었습니다!<br>OpenTaiko Hub를 다시 설치하여 해결해 주세요.",
+      "thememode_json": "thememode.json 파일(또는 settings 폴더)이 없거나 손상되었습니다!<br>OpenTaiko Hub를 다시 설치하여 해결해 주세요."
+    },
+    "warn": {
+      "same_theme": "선택한 테마가 현재 테마와 같습니다.",
+      "same_theme_debug": "DEBUG: 선택한 테마가 현재 테마와 같습니다."
+    },
+    "success": {
+      "debug_disabled": "<b>디버그 모드가 비활성화되었습니다.</b><br><p class=\"smalltext\">(참고: 디버그 모드를 완전히 끄려면 \"debugMode\" 값을 변경해야 합니다!)</p>"
+    }
+  },
+  "lang": {
+    "label": "Language",
+    "en": "English",
+    "ja": "日本語",
+    "zh_Hans": "中文 (简体)",
+    "zh_Hant": "中文 (繁體)",
+    "fr": "Français",
+    "es": "Español",
+    "de": "Deutsch",
+    "nl": "Nederlands",
+    "ko": "한국어",
+    "ru": "Русский"
+  }
+}

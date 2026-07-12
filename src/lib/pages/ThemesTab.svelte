@@ -241,6 +241,12 @@
                                 <option value="ja">{$_('lang.ja')}</option>
                                 <option value="zh-Hans">{$_('lang.zh_Hans')}</option>
                                 <option value="zh-Hant">{$_('lang.zh_Hant')}</option>
+                                <option value="fr">{$_('lang.fr')}</option>
+                                <option value="es">{$_('lang.es')}</option>
+                                <option value="de">{$_('lang.de')}</option>
+                                <option value="nl">{$_('lang.nl')}</option>
+                                <option value="ko">{$_('lang.ko')}</option>
+                                <option value="ru">{$_('lang.ru')}</option>
                             </select>
                         </div>
                     </div>

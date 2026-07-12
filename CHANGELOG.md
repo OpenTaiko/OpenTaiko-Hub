@@ -3,6 +3,19 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.2.0] - 2026-07-12 (Alpha)
+
+- [Feat] Multiple OpenTaiko instances: create new instances (OpenTaiko-[uuid] folders), attach existing installs, and switch between them from the new instance bar
+- [Feat] Stable and Experimental build channels; when the latest release is older than 0.6.1, the "InDev 0.6.1" experimental build is offered (fetches the branch source at its head commit and builds it locally with the .NET SDK 8, on Windows and Linux; updates track new branch commits)
+- [Feat] Docs tab: builds from 0.6.1 show their bundled documentation (docs/index.html) rendered fully locally inside the Hub, per instance
+- [Feat] Shared Songs library between all instances (Config.ini TJAPath is linked automatically, written as Shift_JIS); songs found inside instances can be transferred to the shared library in one click
+- [Feat] Song library tree view per genre folder, including custom charts/songs
+- [Enhancement] Game version is now read directly from the game executable (works for Windows and Linux single-file builds); version.json remains as fallback
+- [Enhancement] Song scanning rewritten natively: async, near-instant, with live progress and per-song status streaming in
+- [Enhancement] Bulk download now detects and updates outdated box.def and default.png files by comparing against the soundtrack repository
+- [Enhancement] Skins/characters/puchicharas are scoped to the selected instance; downloads are disabled on experimental builds (they ship with their own assets)
+- [i18n] Added French, Spanish, German, Dutch, Korean and Russian translations
+
 ## [0.1.20] - 2026-04-13 (Alpha)
 
 - [Chore/i18n] Correct all instances of チャート to 譜面 in the 日本語 (Japanese) translation

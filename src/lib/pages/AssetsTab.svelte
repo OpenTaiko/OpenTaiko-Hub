@@ -34,7 +34,8 @@ for (const file of files) {
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext('toast');
 
-    import { GetRootPath } from "$lib/utils/path.js";
+    import { GetTmpPath } from "$lib/utils/path.js";
+    import { activeInstance, instanceVersions } from "$lib/stores/instances.js";
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
@@ -42,10 +43,28 @@ for (const file of files) {
     import AssetStatusCell from '$lib/components/AssetStatusCell.svelte';
     import VersionNumberChip from '$lib/components/VersionNumberChip.svelte';
 
-    export let optk_version = "0.6.0.0";
-    
+    // Asset folders relative to an instance
+    const assetBaseDirs = {
+        "Skins": "System",
+        "Characters": "Global/Characters",
+        "Puchicharas": "Global/PuchiChara"
+    };
 
-    let currentAsset = 0;
+    $: optk_version = ($activeInstance && $instanceVersions[$activeInstance.id]) || "0.0.0.0";
+    $: isExperimental = $activeInstance?.channel === 'experimental';
+
+    // When embedded in the Home sub-tabs the asset type is controlled by the parent
+    // and the internal tab bar is hidden
+    export let ShowTabs = true;
+    export let currentAsset = 0;
+
+    // Rescan whenever another instance becomes active
+    let scannedInstanceId = null;
+    $: if ($activeInstance && !isExperimental && $activeInstance.id !== scannedInstanceId) {
+        scannedInstanceId = $activeInstance.id;
+        currentAssets = { "Skins": {}, "Characters": {}, "Puchicharas": {} };
+        crawlAssets();
+    }
 
     const assetsInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/assets_info.json';
     let assetsInfo = {
@@ -99,17 +118,20 @@ for (const file of files) {
     }
 
     const crawlAssets = async () => {
+        const instance = get(activeInstance);
+        if (!instance) return;
         assetScanning = true;
-        await crawlAsset("./OpenTaiko/System", "Skins");
-        await crawlAsset("./OpenTaiko/Global/Characters", "Characters");
-        await crawlAsset("./OpenTaiko/Global/PuchiChara", "Puchicharas");
+        await crawlAsset(instance, "Skins");
+        await crawlAsset(instance, "Characters");
+        await crawlAsset(instance, "Puchicharas");
 
         console.log(currentAssets);
         assetScanning = false;
     }
 
-    const crawlAsset = async (baseDir, assetType) => {
-        const res = await GetRootPath();
+    const crawlAsset = async (instance, assetType) => {
+        const res = instance.path;
+        const baseDir = assetBaseDirs[assetType];
         const targetFile = {
             "Skins": "SkinConfig.ini",
             "Characters": "CharaConfig.txt",
@@ -219,13 +241,15 @@ for (const file of files) {
     }
 
     const DownloadAsset = async (assetObj, currentObj, assetType, assetNb = undefined, assetTotal = undefined) => {
-        const res = await GetRootPath();
+        const instance = get(activeInstance);
+        if (!instance) return;
+        if (instance.channel === 'experimental') {
+            TriggerError(get(_)('assets.experimental.blocked_text'));
+            return;
+        }
+        const res = instance.path;
 
-        const baseDir = {
-            "Skins": "./OpenTaiko/System",
-            "Characters": "./OpenTaiko/Global/Characters",
-            "Puchicharas": "./OpenTaiko/Global/PuchiChara"
-        }[assetType];
+        const baseDir = assetBaseDirs[assetType];
         const assetPrefix = AssetPrefix(assetType);
         const assetRelpath = assetObj[`${assetPrefix}Folder`];
         const assetSize = assetObj[`${assetPrefix}Size`];
@@ -239,9 +263,7 @@ for (const file of files) {
         if (!await exists(assetFullPath))
             await mkdir(assetFullPath, { recursive: true });
 
-        const tmpFolder = await path.join(res, "./tmp");
-        const uuid = crypto.randomUUID();
-        const assetDownloadFolder = await path.join(tmpFolder, uuid);
+        const assetDownloadFolder = await GetTmpPath(crypto.randomUUID());
 
         if (!await exists(assetDownloadFolder))
             await mkdir(assetDownloadFolder, { recursive: true });
@@ -365,12 +387,22 @@ for (const file of files) {
 
     onMount(async () => {
         updateAssetsInfo();
-        crawlAssets();
+        // Local asset scanning is triggered reactively when the active instance is known
     });
 
 </script>
 
-<TabGroup 
+{#if isExperimental}
+<section class="card w-full">
+	<div class="p-6 space-y-3 text-center">
+		<p class="text-2xl"><i class="fa-solid fa-flask"></i></p>
+		<p><b>{$_('assets.experimental.blocked_title')}</b></p>
+		<p class="opacity-70">{$_('assets.experimental.blocked_text')}</p>
+	</div>
+</section>
+{:else}
+{#if ShowTabs}
+<TabGroup
 	justify="justify-center"
 	active="variant-filled-primary"
 	hover="hover:variant-soft-primary"
@@ -393,6 +425,7 @@ for (const file of files) {
 	</Tab>
 	<!-- ... -->
 </TabGroup>
+{/if}
 <div class="table-container text-token">
 	<table class="table table-hover">
 		<thead>
@@ -444,6 +477,7 @@ for (const file of files) {
 		</tbody>
 	</table>
 </div>
+{/if}
 
 <style>
 

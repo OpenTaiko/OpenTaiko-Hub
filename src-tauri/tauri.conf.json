@@ -2,11 +2,11 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "OpenTaiko Hub",
   "identifier": "com.opentaiko.hub",
-  "version": "0.1.20",
+  "version": "0.2.0",
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
-    "devUrl": "http://localhost:5173",
+    "devUrl": "http://localhost:15731",
     "frontendDist": "../build"
   },
   "bundle": {

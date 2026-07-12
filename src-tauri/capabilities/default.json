@@ -6,6 +6,7 @@
     "permissions": [
       "os:default",
       "core:app:allow-set-app-theme",
-      "core:app:allow-version"
+      "core:app:allow-version",
+      "dialog:default"
     ]
   }

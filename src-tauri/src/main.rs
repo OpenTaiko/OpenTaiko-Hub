@@ -1,6 +1,12 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod binver;
+mod configini;
+mod fsops;
+mod procs;
+mod scan;
+
 use std::fs::File;
 use std::io::BufReader;
 use std::path::Path;
@@ -77,6 +83,13 @@ async fn unzip_and_get_first_folder(
                     .map_err(|err| format!("ERR: Failed to create file: {}", err))?;
                 std::io::copy(&mut file, &mut out_file)
                     .map_err(|err| format!("ERR: Failed to write file: {}", err))?;
+
+                // Preserve unix permissions (e.g. the executable bit of the game binary)
+                #[cfg(unix)]
+                if let Some(mode) = file.unix_mode() {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = std::fs::set_permissions(&out_path, std::fs::Permissions::from_mode(mode));
+                }
             }
 
             // Update progress after each file is extracted
@@ -102,9 +115,16 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_shell::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             unzip_and_get_first_folder,
-            execute_external_app
+            execute_external_app,
+            binver::get_game_version,
+            scan::scan_songs,
+            procs::run_streamed,
+            fsops::merge_move_dir,
+            fsops::migrate_songs,
+            configini::ensure_config_tjapath
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

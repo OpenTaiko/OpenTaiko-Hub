@@ -1,4 +1,4 @@
-import { resourceDir, documentDir, appConfigDir } from '@tauri-apps/api/path';
+import { resourceDir, documentDir, appConfigDir, join } from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 
 export const GetOS = async () => {
@@ -39,4 +39,19 @@ export const GetRootPath = async () => {
     }
 
     return _dir;
+}
+
+// Shared Songs library used by every (non-experimental) OpenTaiko instance
+export const GetGlobalSongsPath = async () => {
+    return await join(await GetRootPath(), 'Songs');
+}
+
+export const GetTmpPath = async (subFolder = null) => {
+    const tmp = await join(await GetRootPath(), 'tmp');
+    return subFolder ? await join(tmp, subFolder) : tmp;
+}
+
+// Pre-0.2 single-instance game folder, adopted as the first instance on upgrade
+export const GetLegacyInstancePath = async () => {
+    return await join(await GetRootPath(), 'OpenTaiko');
 }

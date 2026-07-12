@@ -1,6 +1,6 @@
 {
 	"name": "opentaiko-updater",
-	"version": "0.0.1",
+	"version": "0.2.0",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
@@ -30,6 +30,7 @@
 		"@skeletonlabs/skeleton": "^2.11.0",
 		"@skeletonlabs/tw-plugin": "^0.4.1",
 		"@tauri-apps/api": "~2.10.1",
+		"@tauri-apps/plugin-dialog": "~2.7.1",
 		"@tauri-apps/plugin-fs": "~2.5.0",
 		"@tauri-apps/plugin-http": "~2.5.8",
 		"@tauri-apps/plugin-opener": "~2.5.3",
