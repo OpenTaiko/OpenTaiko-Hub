@@ -190,16 +190,32 @@
       "done": "曲庫中共有 {count} 首歌曲"
     },
     "tree": {
+      "soundtrack": "OpenTaiko 音軌",
       "custom": "自訂",
       "songs_count": "{count} 首歌曲",
-      "empty": "曲庫中尚未找到任何歌曲。"
+      "empty": "曲庫中尚未找到任何歌曲。",
+      "spicy": "辣口",
+      "sweet": "甜口"
     },
     "migrate": {
-      "banner": "在「{instance}」中找到 {count} 個歌曲資料夾。要將它們轉移到共享曲庫嗎？",
-      "button": "轉移歌曲",
+      "banner": "在「{instance}」中找到 {count} 個歌曲資料夾。是否移動到共享曲庫？",
+      "button": "移動歌曲",
       "later": "稍後",
-      "success": "已轉移 {moved} 個歌曲資料夾（{skipped} 個已存在）",
-      "error": "轉移歌曲失敗：{error}"
+      "modal_title": "從「{instance}」移動歌曲",
+      "summary_new": "{count} 個新譜面將被加入共享曲庫。",
+      "summary_identical": "{count} 個完全相同的譜面將從此實例中移除。",
+      "nothing": "此實例沒有可移動的譜面。",
+      "conflicts_title": "衝突（{count}）",
+      "conflicts_hint": "這些譜面在共享曲庫中已存在但內容不同。請選擇要保留的版本。",
+      "col_global": "共享曲庫",
+      "col_instance": "此實例",
+      "bulk_keep_global": "全部保留共享",
+      "bulk_use_instance": "全部使用實例",
+      "hash": "雜湊",
+      "edited": "編輯時間",
+      "apply": "套用",
+      "applied": "移動完成：新增 {moved}，取代 {replaced}，捨棄 {discarded}。",
+      "error": "移動歌曲失敗：{error}"
     },
     "metadata": {
       "updated": "已更新 {count} 個曲風資料夾（box.def／預覽圖）"

@@ -24,6 +24,7 @@
     import AudioPlayer from '$lib/components/AudioPlayer.svelte';
     import SongDifficultyChip from '$lib/components/SongDifficultyChip.svelte';
     import SongTree from '$lib/components/SongTree.svelte';
+    import SongMigrationModal from '$lib/components/SongMigrationModal.svelte';
 
     // Soundtrack
     const soundtrackInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/soundtrack_info.json';
@@ -47,7 +48,8 @@
 
     // Songs found inside attached instances that can be moved to the shared library
     let migrationCandidates = [];
-    let migrationBusy = false;
+    let migrationCandidate = null;   // the instance whose migration modal is open
+    let migrationGlobalPath = null;
 
     $: catalogById = new Map(Array.isArray(soundtrackInfo) ? soundtrackInfo.map((s) => [s.uniqueId, s]) : []);
 
@@ -263,22 +265,18 @@
         migrationCandidates = candidates;
     }
 
-    const MigrateSongs = async (candidate) => {
-        if (migrationBusy) return;
-        migrationBusy = true;
-        try {
-            const globalSongs = await GetGlobalSongsPath();
-            const summary = await invoke('migrate_songs', {
-                srcSongs: candidate.srcPath,
-                destSongs: globalSongs
-            });
-            TriggerSuccess(get(_)('songs.migrate.success', { values: { moved: summary.moved, skipped: summary.skipped } }));
-            migrationCandidates = migrationCandidates.filter((c) => c !== candidate);
-            crawlSongs();
-        } catch (error) {
-            TriggerError(get(_)('songs.migrate.error', { values: { error } }));
-        }
-        migrationBusy = false;
+    // Opens the resolve/transfer modal for one instance (conflicts are decided there)
+    const OpenMigration = async (candidate) => {
+        migrationGlobalPath = await GetGlobalSongsPath();
+        migrationCandidate = candidate;
+    }
+
+    // Called by the modal after a plan was applied; the resolved instance is emptied,
+    // so it drops out of the candidate list and won't prompt again.
+    const OnMigrationApplied = (candidate) => {
+        migrationCandidates = migrationCandidates.filter((c) => c !== candidate);
+        migrationCandidate = null;
+        crawlSongs();
     }
 
     const OpenSongsFolder = async () => {
@@ -493,6 +491,12 @@
     }
 
     const DownloadSong = async (songObj, currentObj, songNb = undefined, songTotal = undefined) => {
+        // Never write into the library while it is still being scanned — the scan's
+        // final result would otherwise clobber this download's bookkeeping.
+        if (scanning) {
+            TriggerError(get(_)('songs.error.scanning'));
+            return;
+        }
         songDLProgress[songObj.uniqueId] = 0;
         //console.log(songDLProgress);
 
@@ -642,7 +646,7 @@
 <aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
 	<i class="fa-solid fa-boxes-packing"></i>
 	<span class="flex-1">{$_('songs.migrate.banner', { values: { count: candidate.count, instance: candidate.instance.name } })}</span>
-	<button type="button" class="button-green button-main" disabled={migrationBusy || scanning} on:click={() => MigrateSongs(candidate)}>
+	<button type="button" class="button-green button-main" disabled={scanning} on:click={() => OpenMigration(candidate)}>
 		<i class="fa-solid fa-right-left"></i> {$_('songs.migrate.button')}
 	</button>
 	<button type="button" class="button-gray button-main" on:click={() => migrationCandidates = migrationCandidates.filter((c) => c !== candidate)}>
@@ -651,14 +655,14 @@
 </aside>
 {/each}
 
-<div class="flex items-center gap-3 mb-2 flex-wrap">
+<div class="card bg-surface-100-800-token p-3 mb-2 flex items-center gap-3 flex-wrap">
 	{#if scanning}
 		<div class="flex-1 flex items-center gap-3 min-w-[16rem]">
 			<ProgressBar />
 			<span class="whitespace-nowrap text-sm">{$_('songs.scan.progress', { values: { count: scanStats.found } })}</span>
 		</div>
 	{:else}
-		<span class="text-sm opacity-70">{$_('songs.scan.done', { values: { count: allScannedSongs.length } })}</span>
+		<span class="text-sm">{$_('songs.scan.done', { values: { count: allScannedSongs.length } })}</span>
 		<button type="button" class="button-blue button-main" on:click={crawlSongs}><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
 		<button type="button" class="button-blue button-main" on:click={OpenSongsFolder}><i class="fa-solid fa-folder-open"></i> {$_('songs.button.open_folder')}</button>
 		<span class="flex-1"></span>
@@ -751,7 +755,7 @@
 					<p>{$_('songs.status.not_downloaded')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
+					<button type="button" on:click={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -761,7 +765,7 @@
 					<p>{$_('songs.status.up_to_date')}</p>
                     <br />
                     {#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
+					<button type="button" on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -771,7 +775,7 @@
 					<p>{$_('songs.status.outdated')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
+					<button type="button" on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -889,6 +893,16 @@
         {/if}
     </div>
 </div>
+{/if}
+
+{#if migrationCandidate}
+<SongMigrationModal
+	Candidate={migrationCandidate}
+	GlobalPath={migrationGlobalPath}
+	CatalogById={catalogById}
+	OnClose={() => migrationCandidate = null}
+	OnApplied={() => OnMigrationApplied(migrationCandidate)}
+/>
 {/if}
 
 <style>

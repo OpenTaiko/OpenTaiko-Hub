@@ -4,6 +4,7 @@
 mod binver;
 mod configini;
 mod fsops;
+mod migrate;
 mod procs;
 mod scan;
 
@@ -146,7 +147,8 @@ fn main() {
             scan::scan_songs,
             procs::run_streamed,
             fsops::merge_move_dir,
-            fsops::migrate_songs,
+            migrate::plan_migration,
+            migrate::apply_migration,
             configini::ensure_config_tjapath
         ])
         .run(tauri::generate_context!())

@@ -190,16 +190,32 @@
       "done": "{count} nummers in de bibliotheek"
     },
     "tree": {
+      "soundtrack": "OpenTaiko-soundtrack",
       "custom": "Aangepast",
       "songs_count": "{count} nummers",
-      "empty": "Nog geen nummers gevonden in de bibliotheek."
+      "empty": "Nog geen nummers gevonden in de bibliotheek.",
+      "spicy": "Pittig",
+      "sweet": "Zoet"
     },
     "migrate": {
-      "banner": "Er zijn {count} songmap(pen) gevonden in \"{instance}\". Wil je ze overzetten naar de gedeelde muziekbibliotheek?",
+      "banner": "{count} muziekmap(pen) gevonden in \"{instance}\". Overzetten naar de gedeelde muziekbibliotheek?",
       "button": "Nummers overzetten",
       "later": "Later",
-      "success": "{moved} songmap(pen) overgezet ({skipped} bestond(en) al)",
-      "error": "Overzetten van de nummers mislukt: {error}"
+      "modal_title": "Nummers overzetten uit \"{instance}\"",
+      "summary_new": "{count} nieuwe chart(s) worden toegevoegd aan de gedeelde bibliotheek.",
+      "summary_identical": "{count} identieke chart(s) worden uit deze instantie verwijderd.",
+      "nothing": "Deze instantie heeft geen charts om over te zetten.",
+      "conflicts_title": "Conflicten ({count})",
+      "conflicts_hint": "Deze charts bestaan al in de gedeelde bibliotheek met andere inhoud. Kies welke versie je wilt behouden.",
+      "col_global": "Gedeelde bibliotheek",
+      "col_instance": "Deze instantie",
+      "bulk_keep_global": "Overal gedeelde houden",
+      "bulk_use_instance": "Overal instantie gebruiken",
+      "hash": "Hash",
+      "edited": "Bewerkt",
+      "apply": "Toepassen",
+      "applied": "Overzetten voltooid: {moved} toegevoegd, {replaced} vervangen, {discarded} verworpen.",
+      "error": "Kon de nummers niet overzetten: {error}"
     },
     "metadata": {
       "updated": "{count} genremap(pen) bijgewerkt (box.def / preimages)"

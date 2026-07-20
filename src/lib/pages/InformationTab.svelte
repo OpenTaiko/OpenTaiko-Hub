@@ -96,10 +96,6 @@
 		<svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
 		<span>{$_('info.tab.changelog_hub')}</span>
 	</Tab>
-	<Tab bind:group={currentInfo} name="tab3" value={2}>
-		<svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
-		<span>{$_('info.tab.documentation')}</span>
-	</Tab>
 	<Tab bind:group={currentInfo} name="tab4" value={3}>
 		<svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
 		<span>{$_('info.tab.troubleshooting')}</span>
@@ -152,10 +148,8 @@
     </div>
 {/if}
 
-<!-- Documentation -->
-{#if currentInfo === 2}
-    <iframe src="https://opentaiko.github.io/OpTk-Documentation/" title={$_('info.tab.documentation')} width="100%"  style="background-color:white;height:calc(100% - 100px)"></iframe>
-{/if}
+<!-- Documentation moved to per-build Docs (Home tab); no online documentation here anymore -->
+
 
 <!-- Troubleshooting -->
 {#if currentInfo === 3}

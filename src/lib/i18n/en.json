@@ -190,15 +190,31 @@
       "done": "{count} songs in the library"
     },
     "tree": {
+      "soundtrack": "OpenTaiko Soundtrack",
       "custom": "Custom",
       "songs_count": "{count} songs",
-      "empty": "No songs found in the library yet."
+      "empty": "No songs found in the library yet.",
+      "spicy": "Spicy",
+      "sweet": "Sweet"
     },
     "migrate": {
       "banner": "{count} song folder(s) were found inside \"{instance}\". Transfer them to the shared Songs library?",
       "button": "Transfer songs",
       "later": "Later",
-      "success": "Transferred {moved} song folder(s) ({skipped} already existed)",
+      "modal_title": "Transfer songs from \"{instance}\"",
+      "summary_new": "{count} new chart(s) will be added to the shared library.",
+      "summary_identical": "{count} identical chart(s) will be removed from this instance.",
+      "nothing": "This instance has no charts to transfer.",
+      "conflicts_title": "Conflicts ({count})",
+      "conflicts_hint": "These charts already exist in the shared library with different content. Choose which version to keep.",
+      "col_global": "Shared library",
+      "col_instance": "This instance",
+      "bulk_keep_global": "Keep shared for all",
+      "bulk_use_instance": "Use instance for all",
+      "hash": "Hash",
+      "edited": "Edited",
+      "apply": "Apply",
+      "applied": "Transfer complete: {moved} added, {replaced} replaced, {discarded} discarded.",
       "error": "Failed to transfer the songs: {error}"
     },
     "metadata": {

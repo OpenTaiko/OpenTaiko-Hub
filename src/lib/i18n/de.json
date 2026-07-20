@@ -190,16 +190,32 @@
       "done": "{count} Songs in der Bibliothek"
     },
     "tree": {
+      "soundtrack": "OpenTaiko-Soundtrack",
       "custom": "Benutzerdefiniert",
       "songs_count": "{count} Songs",
-      "empty": "Noch keine Songs in der Bibliothek gefunden."
+      "empty": "Noch keine Songs in der Bibliothek gefunden.",
+      "spicy": "Scharf",
+      "sweet": "Süß"
     },
     "migrate": {
-      "banner": "{count} Song-Ordner wurde(n) in \"{instance}\" gefunden. In die gemeinsame Song-Bibliothek übertragen?",
+      "banner": "{count} Song-Ordner in „{instance}“ gefunden. In die geteilte Song-Bibliothek übertragen?",
       "button": "Songs übertragen",
       "later": "Später",
-      "success": "{moved} Song-Ordner übertragen ({skipped} bereits vorhanden)",
-      "error": "Die Songs konnten nicht übertragen werden: {error}"
+      "modal_title": "Songs aus „{instance}“ übertragen",
+      "summary_new": "{count} neue(s) Chart(s) werden zur geteilten Bibliothek hinzugefügt.",
+      "summary_identical": "{count} identische(s) Chart(s) werden aus dieser Instanz entfernt.",
+      "nothing": "Diese Instanz hat keine Charts zum Übertragen.",
+      "conflicts_title": "Konflikte ({count})",
+      "conflicts_hint": "Diese Charts sind bereits mit anderem Inhalt in der geteilten Bibliothek vorhanden. Wähle die zu behaltende Version.",
+      "col_global": "Geteilte Bibliothek",
+      "col_instance": "Diese Instanz",
+      "bulk_keep_global": "Überall geteilte behalten",
+      "bulk_use_instance": "Überall Instanz verwenden",
+      "hash": "Hash",
+      "edited": "Bearbeitet",
+      "apply": "Anwenden",
+      "applied": "Übertragung abgeschlossen: {moved} hinzugefügt, {replaced} ersetzt, {discarded} verworfen.",
+      "error": "Songs konnten nicht übertragen werden: {error}"
     },
     "metadata": {
       "updated": "{count} Genre-Ordner aktualisiert (box.def / preimages)"

@@ -10,6 +10,11 @@
     $: folders = [...Node.children.values()].sort((a, b) => a.name.localeCompare(b.name));
     $: songs = [...Node.songs].sort((a, b) => SongLabel(a).localeCompare(SongLabel(b)));
 
+    const DIFF_ORDER = ['Easy', 'Normal', 'Hard', 'Oni', 'Edit', 'Tower', 'Dan'];
+    const DIFF_ABBR = { Easy: 'EZ', Normal: 'NM', Hard: 'HD', Oni: 'EX', Edit: 'EXEX', Tower: 'Tower', Dan: 'Dan' };
+
+    const IsCatalog = (song) => !!(song.uniqueId && CatalogById.has(song.uniqueId));
+
     const SongLabel = (song) => {
         const catalogEntry = song.uniqueId ? CatalogById.get(song.uniqueId) : null;
         return catalogEntry?.chartTitle ?? song.title ?? song.relPath.split('/').pop();
@@ -19,6 +24,23 @@
         const catalogEntry = song.uniqueId ? CatalogById.get(song.uniqueId) : null;
         if (!catalogEntry) return 'custom';
         return (song.tjaMd5s ?? []).includes(catalogEntry.tjaMD5) ? 'up_to_date' : 'outdated';
+    };
+
+    // Difficulty chips from the locally scanned chart, ordered Easy → Dan
+    const DiffList = (song) => {
+        const levels = {};
+        for (const d of song.difficulties ?? []) levels[d.course] = d.level;
+        return DIFF_ORDER
+            .filter((course) => course in levels)
+            .map((course) => ({ course, abbr: DIFF_ABBR[course] ?? course, level: levels[course] }));
+    };
+
+    // Fractional levels: 10 and above use the Taiko "+" convention (10.5+ → "10+",
+    // 10.4 → "10"); below 10 the integer is shown.
+    const FormatLevel = (level) => {
+        const base = Math.floor(level);
+        if (level >= 10 && level - base >= 0.5) return `${base}+`;
+        return `${base}`;
     };
 </script>
 
@@ -42,13 +64,28 @@
                 <div class="tree-row tree-song" title={song.relPath}>
                     <i class="fa-solid fa-music song-icon"></i>
                     <span class="song-title">{SongLabel(song)}</span>
-                    {#if status === 'custom'}
-                        <span class="badge variant-soft-secondary">{$_('songs.tree.custom')}</span>
-                    {:else if status === 'up_to_date'}
-                        <span class="badge variant-soft-success">{$_('songs.status.up_to_date')}</span>
+                    {#if IsCatalog(song)}
+                        <span class="badge variant-soft-primary source-chip">{$_('songs.tree.soundtrack')}</span>
+                        {#if status === 'up_to_date'}
+                            <span class="badge variant-soft-success">{$_('songs.status.up_to_date')}</span>
+                        {:else}
+                            <span class="badge variant-soft-warning">{$_('songs.status.outdated')}</span>
+                        {/if}
                     {:else}
-                        <span class="badge variant-soft-warning">{$_('songs.status.outdated')}</span>
+                        <span class="badge variant-soft-secondary source-chip">{$_('songs.tree.custom')}</span>
                     {/if}
+                    <span class="diffs">
+                        {#each DiffList(song) as diff (diff.course)}
+                            <span class="diff-chip diff-{diff.course}" title={diff.course}>{diff.abbr}&nbsp;{FormatLevel(diff.level)}</span>
+                            {#if diff.course === 'Tower'}
+                                {#if song.side === 'Ex'}
+                                    <span class="diff-chip side-spicy">{$_('songs.tree.spicy')}</span>
+                                {:else}
+                                    <span class="diff-chip side-sweet">{$_('songs.tree.sweet')}</span>
+                                {/if}
+                            {/if}
+                        {/each}
+                    </span>
                 </div>
             {/each}
         </div>
@@ -123,8 +160,42 @@
         width: 0.8rem;
     }
     .song-title {
+        /* Title yields first: it shrinks and truncates so the chips never wrap */
+        flex: 1 1 auto;
+        min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
     }
+    .source-chip {
+        font-size: 0.68rem;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+    .diffs {
+        display: inline-flex;
+        gap: 0.25rem;
+        flex-wrap: nowrap;
+        flex-shrink: 0;
+        margin-left: auto;
+    }
+    .diff-chip {
+        font-size: 0.66rem;
+        font-weight: 700;
+        padding: 0.05rem 0.35rem;
+        border-radius: 0.25rem;
+        white-space: nowrap;
+    }
+    /* Same difficulty colours as the list view's SongDifficultyChip
+       (Easy=blue, Normal=green, Hard=yellow, Oni=red, Edit=purple, Tower=orange, Dan=blue) */
+    .diff-Easy   { background: #dbeafe; color: #1e40af; }
+    .diff-Normal { background: #dcfce7; color: #166534; }
+    .diff-Hard   { background: #fef9c3; color: #854d0e; }
+    .diff-Oni    { background: #fee2e2; color: #991b1b; }
+    .diff-Edit   { background: #f3e8ff; color: #6b21a8; }
+    .diff-Tower  { background: #ffedd5; color: #9a3412; }
+    .diff-Dan    { background: #dbeafe; color: #1e40af; }
+    /* Tower side: Spicy (Ex, red) / Sweet (green) */
+    .side-spicy { background: #fee2e2; color: #991b1b; }
+    .side-sweet { background: #dcfce7; color: #166534; }
 </style>

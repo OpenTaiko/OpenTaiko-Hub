@@ -190,15 +190,31 @@
       "done": "{count} chansons dans la bibliothèque"
     },
     "tree": {
+      "soundtrack": "Bande-son OpenTaiko",
       "custom": "Personnalisé",
       "songs_count": "{count} chansons",
-      "empty": "Aucune chanson trouvée dans la bibliothèque pour le moment."
+      "empty": "Aucune chanson trouvée dans la bibliothèque pour le moment.",
+      "spicy": "Épicé",
+      "sweet": "Doux"
     },
     "migrate": {
-      "banner": "{count} dossier(s) de chansons ont été trouvés dans \"{instance}\". Les transférer vers la bibliothèque de chansons partagée ?",
+      "banner": "{count} dossier(s) de chansons trouvé(s) dans « {instance} ». Les transférer vers la bibliothèque de chansons partagée ?",
       "button": "Transférer les chansons",
       "later": "Plus tard",
-      "success": "{moved} dossier(s) de chansons transféré(s) ({skipped} déjà existant(s))",
+      "modal_title": "Transférer les chansons de « {instance} »",
+      "summary_new": "{count} nouveau(x) chart(s) seront ajoutés à la bibliothèque partagée.",
+      "summary_identical": "{count} chart(s) identique(s) seront retirés de cette instance.",
+      "nothing": "Cette instance n'a aucun chart à transférer.",
+      "conflicts_title": "Conflits ({count})",
+      "conflicts_hint": "Ces charts existent déjà dans la bibliothèque partagée avec un contenu différent. Choisissez la version à conserver.",
+      "col_global": "Bibliothèque partagée",
+      "col_instance": "Cette instance",
+      "bulk_keep_global": "Tout garder du partagé",
+      "bulk_use_instance": "Tout prendre de l'instance",
+      "hash": "Empreinte",
+      "edited": "Modifié le",
+      "apply": "Appliquer",
+      "applied": "Transfert terminé : {moved} ajoutés, {replaced} remplacés, {discarded} écartés.",
       "error": "Échec du transfert des chansons : {error}"
     },
     "metadata": {

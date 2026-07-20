@@ -190,15 +190,31 @@
       "done": "ライブラリに{count}曲あります"
     },
     "tree": {
+      "soundtrack": "OpenTaiko サウンドトラック",
       "custom": "カスタム",
       "songs_count": "{count}曲",
-      "empty": "ライブラリにはまだ曲がありません。"
+      "empty": "ライブラリにはまだ曲がありません。",
+      "spicy": "辛口",
+      "sweet": "甘口"
     },
     "migrate": {
-      "banner": "「{instance}」内に{count}個の曲フォルダが見つかりました。共有曲ライブラリに移動しますか？",
+      "banner": "「{instance}」内に {count} 個の曲フォルダが見つかりました。共有曲ライブラリに移動しますか？",
       "button": "曲を移動",
-      "later": "後で",
-      "success": "{moved}個の曲フォルダを移動しました（{skipped}個はすでに存在していました）",
+      "later": "あとで",
+      "modal_title": "「{instance}」から曲を移動",
+      "summary_new": "{count} 個の新しい譜面が共有ライブラリに追加されます。",
+      "summary_identical": "{count} 個の同一の譜面がこのインスタンスから削除されます。",
+      "nothing": "このインスタンスに移動できる譜面はありません。",
+      "conflicts_title": "競合 ({count})",
+      "conflicts_hint": "これらの譜面は内容の異なるものが共有ライブラリに既に存在します。どちらの版を残すか選択してください。",
+      "col_global": "共有ライブラリ",
+      "col_instance": "このインスタンス",
+      "bulk_keep_global": "すべて共有を維持",
+      "bulk_use_instance": "すべてインスタンスを使用",
+      "hash": "ハッシュ",
+      "edited": "最終編集",
+      "apply": "適用",
+      "applied": "移動完了：追加 {moved} 件、置換 {replaced} 件、破棄 {discarded} 件。",
       "error": "曲の移動に失敗しました：{error}"
     },
     "metadata": {

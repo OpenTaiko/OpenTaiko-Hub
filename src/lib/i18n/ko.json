@@ -190,15 +190,31 @@
       "done": "라이브러리에 있는 곡: {count}개"
     },
     "tree": {
+      "soundtrack": "OpenTaiko 사운드트랙",
       "custom": "커스텀",
       "songs_count": "곡 {count}개",
-      "empty": "아직 라이브러리에서 곡을 찾지 못했습니다."
+      "empty": "아직 라이브러리에서 곡을 찾지 못했습니다.",
+      "spicy": "매운맛",
+      "sweet": "순한맛"
     },
     "migrate": {
-      "banner": "\"{instance}\" 안에서 곡 폴더 {count}개를 발견했습니다. 공유 곡 라이브러리로 옮길까요?",
+      "banner": "\"{instance}\"에서 {count}개의 곡 폴더를 찾았습니다. 공유 곡 라이브러리로 옮기시겠습니까?",
       "button": "곡 옮기기",
       "later": "나중에",
-      "success": "곡 폴더 {moved}개를 옮겼습니다 ({skipped}개는 이미 존재)",
+      "modal_title": "\"{instance}\"에서 곡 옮기기",
+      "summary_new": "{count}개의 새 채보가 공유 라이브러리에 추가됩니다.",
+      "summary_identical": "{count}개의 동일한 채보가 이 인스턴스에서 제거됩니다.",
+      "nothing": "이 인스턴스에는 옮길 채보가 없습니다.",
+      "conflicts_title": "충돌 ({count})",
+      "conflicts_hint": "이 채보들은 내용이 다른 상태로 공유 라이브러리에 이미 존재합니다. 어느 버전을 남길지 선택하세요.",
+      "col_global": "공유 라이브러리",
+      "col_instance": "이 인스턴스",
+      "bulk_keep_global": "모두 공유본 유지",
+      "bulk_use_instance": "모두 인스턴스본 사용",
+      "hash": "해시",
+      "edited": "수정일",
+      "apply": "적용",
+      "applied": "옮기기 완료: 추가 {moved}개, 교체 {replaced}개, 폐기 {discarded}개.",
       "error": "곡을 옮기지 못했습니다: {error}"
     },
     "metadata": {
