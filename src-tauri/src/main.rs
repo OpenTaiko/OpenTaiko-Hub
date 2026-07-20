@@ -28,6 +28,19 @@ fn execute_external_app(os: String, path: String) -> Result<(), String> {
         .parent()
         .ok_or_else(|| String::from("Failed to extract directory from path"))?;
 
+    // Release zips are packed on a Windows CI runner, which does not store the unix
+    // execute bit, so the extracted game binary is not executable. Ensure it is before
+    // launching (the official Linux installer does the same).
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        if let Ok(meta) = std::fs::metadata(&full_path) {
+            let mut perms = meta.permissions();
+            perms.set_mode(perms.mode() | 0o111);
+            let _ = std::fs::set_permissions(&full_path, perms);
+        }
+    }
+
     Command::new(&full_path)
         .current_dir(dir)
         .spawn()
@@ -107,6 +120,16 @@ async fn unzip_and_get_first_folder(
 }
 
 fn main() {
+    // WebKitGTK 2.42+ renders a blank window on several Linux setups (notably NVIDIA
+    // and some Mesa drivers) unless the DMABUF renderer is disabled. Apply the standard
+    // workaround by default, while still letting a user override it from the environment.
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())

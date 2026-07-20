@@ -5,6 +5,36 @@ use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use tauri::ipc::Channel;
 
+// Desktop-launched Linux apps inherit a minimal PATH that usually omits the common
+// .NET SDK install locations, so `dotnet` fails to resolve even when it is installed.
+// Append those locations (without disturbing the user's own PATH order).
+#[cfg(unix)]
+fn augmented_tool_path(base_path: &str, home: Option<&str>) -> String {
+    let mut dirs: Vec<String> = base_path
+        .split(':')
+        .filter(|s| !s.is_empty())
+        .map(|s| s.to_string())
+        .collect();
+
+    let mut candidates = vec![
+        "/usr/local/bin".to_string(),
+        "/usr/share/dotnet".to_string(),
+        "/usr/lib/dotnet".to_string(),
+        "/opt/dotnet".to_string(),
+        "/snap/bin".to_string(),
+    ];
+    if let Some(home) = home {
+        candidates.push(format!("{}/.dotnet", home));
+    }
+
+    for candidate in candidates {
+        if !dirs.iter().any(|dir| dir == &candidate) {
+            dirs.push(candidate);
+        }
+    }
+    dirs.join(":")
+}
+
 #[tauri::command]
 pub async fn run_streamed(
     program: String,
@@ -26,6 +56,12 @@ pub async fn run_streamed(
             use std::os::windows::process::CommandExt;
             const CREATE_NO_WINDOW: u32 = 0x0800_0000;
             cmd.creation_flags(CREATE_NO_WINDOW);
+        }
+        #[cfg(unix)]
+        {
+            let base = std::env::var("PATH").unwrap_or_default();
+            let home = std::env::var("HOME").ok();
+            cmd.env("PATH", augmented_tool_path(&base, home.as_deref()));
         }
 
         let mut child = cmd
@@ -62,4 +98,28 @@ pub async fn run_streamed(
     })
     .await
     .map_err(|e| format!("Task failed: {e}"))?
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn appends_dotnet_locations_without_dropping_existing() {
+        let result = augmented_tool_path("/usr/bin:/bin", Some("/home/user"));
+        // Existing entries stay first and in order
+        assert!(result.starts_with("/usr/bin:/bin"));
+        // Common dotnet locations get appended
+        assert!(result.split(':').any(|d| d == "/usr/share/dotnet"));
+        assert!(result.split(':').any(|d| d == "/snap/bin"));
+        assert!(result.split(':').any(|d| d == "/home/user/.dotnet"));
+    }
+
+    #[test]
+    fn does_not_duplicate_already_present_dirs() {
+        let result = augmented_tool_path("/usr/local/bin:/usr/bin", None);
+        assert_eq!(result.split(':').filter(|d| *d == "/usr/local/bin").count(), 1);
+        // Without HOME, no ~/.dotnet entry is added
+        assert!(!result.split(':').any(|d| d.ends_with("/.dotnet")));
+    }
 }

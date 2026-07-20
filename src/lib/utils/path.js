@@ -1,4 +1,4 @@
-import { resourceDir, documentDir, appConfigDir, join } from '@tauri-apps/api/path';
+import { resourceDir, documentDir, homeDir, appConfigDir, join } from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 
 export const GetOS = async () => {
@@ -23,25 +23,23 @@ export const GetPreferencesPath = async () => {
 
 export const GetRootPath = async () => {
     const _os = await GetOS();
-    let _dir = null;
 
-    switch (_os) {
-        case "Win":
-            {
-                _dir = await resourceDir();
-                break;
-            }
-        default: // Linux
-            {
-                _dir = await documentDir();
-                break;
-            }
+    if (_os === "Win") {
+        return await resourceDir();
     }
 
-    return _dir;
+    // Linux / Mac: prefer ~/Documents, but fall back to the home directory on minimal
+    // installs where the XDG user dirs (XDG_DOCUMENTS_DIR) are not configured — there
+    // documentDir() throws, which would otherwise break every path in the app.
+    try {
+        return await documentDir();
+    } catch (error) {
+        console.warn('documentDir() unavailable, falling back to the home directory:', error);
+        return await homeDir();
+    }
 }
 
-// Shared Songs library used by every (non-experimental) OpenTaiko instance
+// Shared Songs library used by every OpenTaiko instance
 export const GetGlobalSongsPath = async () => {
     return await join(await GetRootPath(), 'Songs');
 }
