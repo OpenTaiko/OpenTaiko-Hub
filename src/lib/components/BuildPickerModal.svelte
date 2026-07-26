@@ -58,16 +58,28 @@
         {:else}
             <label class="option-row" class:selected={selected === 'stable'}>
                 <input type="radio" name="build" value="stable" bind:group={selected} />
-                <span class="badge variant-filled-primary">{$_('instances.channel.stable')}</span>
-                <span class="flex-1">{latestTag ?? '—'}</span>
+                <div class="option-body">
+                    <div class="option-head">
+                        <span class="badge variant-filled-primary">{$_('instances.channel.stable')}</span>
+                        <span>{latestTag ?? '—'}</span>
+                    </div>
+                    <p class="option-desc">{$_('instances.picker.stable_desc')}</p>
+                </div>
             </label>
 
             {#if experimentalOptions.length > 0}
                 {#each experimentalOptions as option, index}
                     <label class="option-row" class:selected={selected === index}>
                         <input type="radio" name="build" value={index} bind:group={selected} />
-                        <span class="badge variant-filled-warning">{$_('instances.channel.experimental')}</span>
-                        <span class="flex-1">{option.label}</span>
+                        <div class="option-body">
+                            <div class="option-head">
+                                <span class="badge variant-filled-warning">{$_('instances.channel.experimental')}</span>
+                                <span>{option.label}</span>
+                            </div>
+                            <p class="option-desc">
+                                {option.kind === 'indev' ? $_('instances.picker.indev_desc') : $_('instances.picker.prerelease_desc')}
+                            </p>
+                        </div>
                     </label>
                 {/each}
             {:else}
@@ -115,5 +127,21 @@
     .option-row.selected {
         border-color: rgba(var(--color-primary-500) / 1);
         background: rgba(var(--color-primary-500) / 0.1);
+    }
+    .option-body {
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        flex: 1;
+        min-width: 0;
+    }
+    .option-head {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+    }
+    .option-desc {
+        font-size: 0.78rem;
+        opacity: 0.7;
     }
 </style>

@@ -9,8 +9,16 @@ import { readTextFile, writeTextFile, mkdir, exists } from '@tauri-apps/plugin-f
 import { join, basename } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
 import { GetPreferencesPath, GetRootPath, GetGlobalSongsPath, GetLegacyInstancePath } from '../utils/path.js';
+import { isVersionInSeries } from '../utils/versions.js';
 
 const REGISTRY_FILE = 'instances.json';
+
+// Only the 0.6.0.x series keeps its Favorite / Recent / Search boxes as box.def folders
+// inside the instance's own Songs folder, so only those instances need that folder in
+// TJAPath. Every other version (0.6.1 experimental today, the official 0.6.1, and
+// anything later such as a direct 0.6.0 to 0.7.0 update) reads the shared library alone.
+// Matching the series rather than a "below 0.6.1" range keeps this exact.
+const LOCAL_BOXES_SERIES = [0, 6, 0];
 
 export const instances = writable([]);
 export const activeInstanceId = writable(null);
@@ -162,18 +170,26 @@ export const refreshInstanceVersion = async (id) => {
 };
 
 // Points the instance's Config.ini ([System] TJAPath) at the shared Songs library.
-// Every instance is linked; experimental builds use ONLY the shared library (their
-// bundled Songs folder is dropped from TJAPath), while stable installs keep their
-// local Songs entry alongside it.
+// Only 0.6.0.x instances also keep their own Songs folder in TJAPath, because that is
+// where their Favorite / Recent / Search boxes live (see LOCAL_BOXES_SERIES).
 export const linkGlobalSongs = async (instance) => {
     if (!instance) return;
     try {
+        let version = get(instanceVersions)[instance.id] ?? null;
+        if (!version) version = await refreshInstanceVersion(instance.id);
+        // An unreadable version keeps the local folder: it never removes something a
+        // 0.6.0 install needs, and since installs no longer ship charts locally the
+        // extra path cannot introduce duplicates. The link is redone on every startup.
+        const includeLocal = version === null
+            ? true
+            : isVersionInSeries(version, ...LOCAL_BOXES_SERIES);
+
         const globalSongs = await GetGlobalSongsPath();
         await mkdir(globalSongs, { recursive: true });
         await invoke('ensure_config_tjapath', {
             instanceDir: instance.path,
             globalSongsPath: globalSongs,
-            includeLocal: instance.channel !== 'experimental'
+            includeLocal
         });
     } catch (error) {
         console.error('Failed to link the global Songs folder:', error);

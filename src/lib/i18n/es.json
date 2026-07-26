@@ -72,7 +72,10 @@
     },
     "picker": {
       "title": "Elige una versión para instalar",
-      "install": "Instalar"
+      "install": "Instalar",
+      "stable_desc": "Versión oficial, descargada desde GitHub. Los skins y las canciones los gestiona el Hub.",
+      "indev_desc": "Compilada en tu máquina desde la rama en desarrollo (requiere el .NET SDK 8). Incluye sus propios skins y personajes.",
+      "prerelease_desc": "Versión preliminar, descargada desde GitHub."
     }
   },
   "home": {
@@ -137,6 +140,41 @@
     "title": "Documentación",
     "not_found": "Esta build de OpenTaiko no incluye documentación local.",
     "not_found_hint": "Actualiza o recompila esta instancia para obtener una build que incluya su documentación."
+  },
+  "saves": {
+    "tab": "Partidas",
+    "title": "Datos de partida",
+    "description": "Exporta una partida (una ranura, identificada por su nombre de jugador) con todos sus datos (puntuaciones, desbloqueos, monedas y progreso), o importa una. Una partida con un id único coincidente se fusiona; de lo contrario se añade como nueva partida.",
+    "current_version": "Versión de la base de datos de partidas:",
+    "no_saves": "Aún no hay datos de partida (inicia el juego una vez para crearlos).",
+    "import": "Importar una partida",
+    "export": "Exportar",
+    "hint": "No importes mientras el juego esté en ejecución.",
+    "col": {
+      "player": "Jugador",
+      "slot": "Ranura",
+      "uid": "Id único"
+    },
+    "slot_reserve": "Reserva",
+    "slot_n": "Ranura {n}",
+    "success": {
+      "export": "Partida «{name}» exportada.",
+      "merge": "Datos importados fusionados en la partida existente «{name}».",
+      "add": "«{name}» añadida como nueva partida en la ranura {slot}.",
+      "add_reserve": "«{name}» añadida como partida de reserva (las 5 ranuras están en uso: actívala desde el juego).",
+      "rebind": "Partida «{name}» movida.",
+      "rebind_swap": "Partidas «{a}» y «{b}» intercambiadas."
+    },
+    "error": {
+      "no_db": "Esta instancia aún no tiene base de datos de partidas.",
+      "load": "No se pudo leer la base de datos de partidas.",
+      "invalid_file": "El archivo seleccionado no es una exportación de partida de OpenTaiko válida.",
+      "older": "Esta partida ({imported}) es más antigua que la base de datos de partidas de la instancia ({current}); se canceló la importación para evitar problemas de compatibilidad.",
+      "export": "No se pudo exportar la partida: {error}",
+      "import": "No se pudo importar la partida: {error}",
+      "rebind": "No se pudo cambiar la ranura: {error}"
+    },
+    "rebind_hint": "Cambia la ranura de esta partida (una ranura ocupada intercambia las dos partidas)."
   },
   "hub": {
     "status": {
@@ -229,6 +267,12 @@
       "all_up_to_date": "Todas las canciones ya están actualizadas",
       "download_complete": "Descarga completa",
       "download_nb": "Canción descargada: {nb} de {total}"
+    },
+    "duplicates": {
+      "banner": "{count} carpeta(s) de «{instance}» no contienen charts pero existen en la biblioteca compartida, así que el juego las muestra como cajas vacías duplicadas. ¿Eliminarlas?",
+      "button": "Limpiar",
+      "success": "Se eliminaron {count} carpeta(s) duplicada(s).",
+      "error": "No se pudieron eliminar las carpetas duplicadas: {error}"
     }
   },
   "assets": {

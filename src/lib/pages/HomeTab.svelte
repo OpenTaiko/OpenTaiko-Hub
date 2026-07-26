@@ -2,7 +2,6 @@
     import { afterUpdate, getContext } from 'svelte';
     import { ProgressBar, TabGroup, Tab } from '@skeletonlabs/skeleton';
     import { writeTextFile, mkdir, exists, remove } from '@tauri-apps/plugin-fs';
-    import { openPath } from '@tauri-apps/plugin-opener';
     import { path } from '@tauri-apps/api';
     import { invoke, Channel } from '@tauri-apps/api/core';
     import { listen } from '@tauri-apps/api/event';
@@ -35,6 +34,7 @@
     import BuildPickerModal from '$lib/components/BuildPickerModal.svelte';
     import AssetsTab from '$lib/pages/AssetsTab.svelte';
     import DocsTab from '$lib/pages/DocsTab.svelte';
+    import SavesTab from '$lib/pages/SavesTab.svelte';
 
     // Images
     import optkLogoUrl from '$lib/optk.png';
@@ -75,7 +75,8 @@
     // Sub-tab availability
     $: assetsAvailable = current !== null && current.channel !== 'experimental' && currentVersion !== null;
     $: docsAvailable = current !== null && isVersionAtLeast(currentVersion, '0.6.1');
-    $: if ((homeSubTab >= 1 && homeSubTab <= 3 && !assetsAvailable) || (homeSubTab === 4 && !docsAvailable)) homeSubTab = 0;
+    $: savesAvailable = current !== null && currentVersion !== null; // any installed build has saves
+    $: if ((homeSubTab >= 1 && homeSubTab <= 3 && !assetsAvailable) || (homeSubTab === 4 && !docsAvailable) || (homeSubTab === 5 && !savesAvailable)) homeSubTab = 0;
 
     $: if (current && versionLoadedFor !== current.id) {
         versionLoadedFor = current.id;
@@ -215,6 +216,8 @@
             progress = undefined;
 
             await remove(zipPath);
+            // Songs live in the shared library, so never install a build's own copies
+            await invoke('strip_song_content', { songsDir: await path.join(sourceFolder, 'Songs') });
             await invoke('merge_move_dir', { src: sourceFolder, dest: instancePath });
             await VerifyInstall(instancePath);
             return true;
@@ -397,6 +400,9 @@
             // 6. Install the publish output (and local docs when the branch ships them)
             buildStage = 'install';
             const publishDir = await path.join(srcFolder, 'OpenTaiko', 'bin', 'Release', 'net8.0', rid, 'publish');
+            // A local publish carries the repository's whole Songs tree; drop those
+            // charts so the instance uses only the shared library
+            await invoke('strip_song_content', { songsDir: await path.join(publishDir, 'Songs') });
             await invoke('merge_move_dir', { src: publishDir, dest: instance.path });
             await VerifyInstall(instance.path);
             const docsDir = await path.join(srcFolder, 'OpenTaiko', 'docs');
@@ -436,13 +442,8 @@
         }
     }
 
-    const OpenInExplorer = async () => {
-        try {
-            await openPath(current.path);
-        } catch (error) {
-            TriggerError(get(_)('home.error.launch', { values: { error } }));
-        }
-    }
+    // Opening the instance folder lives in the instance bar (one canonical place,
+    // next to the instance selector) instead of being repeated in every button row.
 
     TryFetchingLatestVersion();
 </script>
@@ -478,6 +479,12 @@
     <Tab bind:group={homeSubTab} name="home-tab-docs" value={4}>
         <svelte:fragment slot="lead"><i class="fa-solid fa-book"></i></svelte:fragment>
         <span>{$_('docs.title')}</span>
+    </Tab>
+    {/if}
+    {#if savesAvailable}
+    <Tab bind:group={homeSubTab} name="home-tab-saves" value={5}>
+        <svelte:fragment slot="lead"><i class="fa-solid fa-floppy-disk"></i></svelte:fragment>
+        <span>{$_('saves.tab')}</span>
     </Tab>
     {/if}
 </TabGroup>
@@ -524,7 +531,6 @@
                             <button type="button" on:click={() => showBuildPicker = true} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.install')}</button>
                         {:else if isIndev}
                             <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
-                            <button type="button" on:click={OpenInExplorer} class="button-blue button-main"><i class="fa-solid fa-folder-open"></i> {$_('home.button.explorer')}</button>
                             {#if indevUpdateAvailable}
                                 <button type="button" on:click={() => DownloadIndev(current.experimental)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
                             {:else}
@@ -532,18 +538,15 @@
                             {/if}
                         {:else if isPrerelease}
                             <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
-                            <button type="button" on:click={OpenInExplorer} class="button-blue button-main"><i class="fa-solid fa-folder-open"></i> {$_('home.button.explorer')}</button>
                             <button type="button" on:click={() => showBuildPicker = true} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
                         {:else if latestVersion !== null && latestVersion !== currentVersion}
                             <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
-                            <button type="button" on:click={OpenInExplorer} class="button-blue button-main"><i class="fa-solid fa-folder-open"></i> {$_('home.button.explorer')}</button>
                             <button type="button" on:click={DownloadStable} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
                             {#if checkSkinCompatibility(latestVersion, currentVersion) === false}
                                 <span class="text-red-500">{$_('home.warn.skin_update')}</span>
                             {/if}
                         {:else}
                             <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
-                            <button type="button" on:click={OpenInExplorer} class="button-blue button-main"><i class="fa-solid fa-folder-open"></i> {$_('home.button.explorer')}</button>
                             <button type="button" on:click={DownloadStable} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
                         {/if}
                     {/if}
@@ -609,15 +612,23 @@
 <!-- Skins / Characters / Puchicharas -->
 {#if assetsAvailable}
 <div class="w-full h-full" style:display={homeSubTab >= 1 && homeSubTab <= 3 ? null : 'none'}>
-    <AssetsTab ShowTabs={false} currentAsset={Math.max(0, homeSubTab - 1)} />
+    <!-- Only sub-tabs 1..3 map to an asset type; any other value (Docs/Saves active
+         while this stays mounted) must never reach AssetsTab as an out-of-range index -->
+    <AssetsTab ShowTabs={false} currentAsset={homeSubTab >= 1 && homeSubTab <= 3 ? homeSubTab - 1 : 0} />
 </div>
 {/if}
 
-<!-- Documentation of the selected instance -->
-{#if docsAvailable}
-<div class="w-full h-full" style:display={homeSubTab === 4 ? null : 'none'}>
+<!-- Documentation of the selected instance (mounted only when viewed: the inlined docs
+     can be large, so it is not kept alive in the background) -->
+{#if docsAvailable && homeSubTab === 4}
+<div class="w-full h-full">
     <DocsTab />
 </div>
+{/if}
+
+<!-- Save import / export -->
+{#if savesAvailable && homeSubTab === 5}
+    <SavesTab />
 {/if}
 
 <BuildPickerModal Show={showBuildPicker} OnClose={() => showBuildPicker = false} OnPick={OnBuildPicked} />

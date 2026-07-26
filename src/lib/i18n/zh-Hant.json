@@ -72,7 +72,10 @@
     },
     "picker": {
       "title": "選擇要安裝的版本",
-      "install": "安裝"
+      "install": "安裝",
+      "stable_desc": "從 GitHub 下載的官方發布版。皮膚和歌曲由 Hub 管理。",
+      "indev_desc": "從開發分支在您的機器上建置（需要 .NET SDK 8）。自帶皮膚和角色。",
+      "prerelease_desc": "從 GitHub 下載的預發布版。"
     }
   },
   "home": {
@@ -137,6 +140,41 @@
     "title": "說明文件",
     "not_found": "此 OpenTaiko 版本未內含本機說明文件。",
     "not_found_hint": "請更新或重新建置此實例，以取得內含說明文件的版本。"
+  },
+  "saves": {
+    "tab": "存檔",
+    "title": "存檔資料",
+    "description": "匯出某個存檔（以玩家名稱標識的槽位）及其全部資料（成績、解鎖、金幣和進度），或匯入一個。唯一 id 相符的存檔將被合併，否則將作為新存檔加入。",
+    "current_version": "存檔資料庫版本：",
+    "no_saves": "尚無存檔資料（啟動一次遊戲即可建立）。",
+    "import": "匯入存檔",
+    "export": "匯出",
+    "hint": "請勿在遊戲執行時匯入。",
+    "col": {
+      "player": "玩家",
+      "slot": "槽位",
+      "uid": "唯一 id"
+    },
+    "slot_reserve": "備用",
+    "slot_n": "槽位 {n}",
+    "success": {
+      "export": "已匯出存檔「{name}」。",
+      "merge": "已將匯入的資料合併到現有存檔「{name}」。",
+      "add": "已將「{name}」作為新存檔加入槽位 {slot}。",
+      "add_reserve": "已將「{name}」加入為備用存檔（5 個槽位均已使用，請在遊戲內啟用）。",
+      "rebind": "已移動存檔「{name}」。",
+      "rebind_swap": "已交換存檔「{a}」和「{b}」。"
+    },
+    "error": {
+      "no_db": "此實例尚無存檔資料庫。",
+      "load": "無法讀取存檔資料庫。",
+      "invalid_file": "所選檔案不是有效的 OpenTaiko 存檔匯出檔。",
+      "older": "此存檔（{imported}）比該實例的存檔資料庫（{current}）舊；為避免相容性問題，已取消匯入。",
+      "export": "匯出存檔失敗：{error}",
+      "import": "匯入存檔失敗：{error}",
+      "rebind": "更改存檔槽位失敗：{error}"
+    },
+    "rebind_hint": "更改此存檔的槽位（選擇已佔用的槽位會交換兩個存檔）。"
   },
   "hub": {
     "status": {
@@ -229,6 +267,12 @@
       "all_up_to_date": "所有歌曲皆是最新版",
       "download_complete": "下載完成",
       "download_nb": "已下載第 {nb}/{total} 首歌曲"
+    },
+    "duplicates": {
+      "banner": "「{instance}」中有 {count} 個資料夾不含譜面，但共享曲庫中已存在，因此遊戲會將它們顯示為重複的空資料夾。要刪除嗎？",
+      "button": "清理",
+      "success": "已刪除 {count} 個重複資料夾。",
+      "error": "刪除重複資料夾失敗：{error}"
     }
   },
   "assets": {

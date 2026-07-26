@@ -72,7 +72,10 @@
     },
     "picker": {
       "title": "Build zur Installation auswählen",
-      "install": "Installieren"
+      "install": "Installieren",
+      "stable_desc": "Offizielle Version, von GitHub heruntergeladen. Skins und Songs verwaltet der Hub.",
+      "indev_desc": "Wird auf deinem Rechner aus dem Entwicklungszweig gebaut (benötigt das .NET SDK 8). Enthält eigene Skins und Charaktere.",
+      "prerelease_desc": "Vorabversion, von GitHub heruntergeladen."
     }
   },
   "home": {
@@ -137,6 +140,41 @@
     "title": "Dokumentation",
     "not_found": "Dieser OpenTaiko-Build enthält keine lokale Dokumentation.",
     "not_found_hint": "Diese Instanz aktualisieren oder neu erstellen, um einen Build mit enthaltener Dokumentation zu erhalten."
+  },
+  "saves": {
+    "tab": "Spielstände",
+    "title": "Spielstanddaten",
+    "description": "Exportiere einen Spielstand (einen Slot, per Spielername identifiziert) mit all seinen Daten (Punkte, Freischaltungen, Münzen und Fortschritt) oder importiere einen. Ein Spielstand mit passender eindeutiger ID wird zusammengeführt, andernfalls als neuer Spielstand hinzugefügt.",
+    "current_version": "Version der Spielstand-Datenbank:",
+    "no_saves": "Noch keine Spielstanddaten (starte das Spiel einmal, um sie zu erstellen).",
+    "import": "Spielstand importieren",
+    "export": "Exportieren",
+    "hint": "Nicht importieren, während das Spiel läuft.",
+    "col": {
+      "player": "Spieler",
+      "slot": "Slot",
+      "uid": "Eindeutige ID"
+    },
+    "slot_reserve": "Reserve",
+    "slot_n": "Slot {n}",
+    "success": {
+      "export": "Spielstand „{name}“ exportiert.",
+      "merge": "Importierte Daten in den vorhandenen Spielstand „{name}“ zusammengeführt.",
+      "add": "„{name}“ als neuer Spielstand in Slot {slot} hinzugefügt.",
+      "add_reserve": "„{name}“ als Reserve-Spielstand hinzugefügt (alle 5 Slots sind belegt, aktiviere ihn im Spiel).",
+      "rebind": "Spielstand „{name}“ verschoben.",
+      "rebind_swap": "Spielstände „{a}“ und „{b}“ getauscht."
+    },
+    "error": {
+      "no_db": "Diese Instanz hat noch keine Spielstand-Datenbank.",
+      "load": "Die Spielstand-Datenbank konnte nicht gelesen werden.",
+      "invalid_file": "Die ausgewählte Datei ist kein gültiger OpenTaiko-Spielstand-Export.",
+      "older": "Dieser Spielstand ({imported}) ist älter als die Spielstand-Datenbank der Instanz ({current}); der Import wurde abgebrochen, um Kompatibilitätsprobleme zu vermeiden.",
+      "export": "Spielstand konnte nicht exportiert werden: {error}",
+      "import": "Spielstand konnte nicht importiert werden: {error}",
+      "rebind": "Slot-Wechsel fehlgeschlagen: {error}"
+    },
+    "rebind_hint": "Ändert den Slot dieses Spielstands (ein belegter Slot tauscht die beiden Spielstände)."
   },
   "hub": {
     "status": {
@@ -229,6 +267,12 @@
       "all_up_to_date": "Alle Songs sind bereits aktuell",
       "download_complete": "Download abgeschlossen",
       "download_nb": "Song {nb} von {total} heruntergeladen"
+    },
+    "duplicates": {
+      "banner": "{count} Ordner in „{instance}“ enthalten keine Charts, existieren aber in der geteilten Bibliothek, daher zeigt das Spiel sie als doppelte, leere Boxen. Entfernen?",
+      "button": "Aufräumen",
+      "success": "{count} doppelte(r) Ordner entfernt.",
+      "error": "Doppelte Ordner konnten nicht entfernt werden: {error}"
     }
   },
   "assets": {
@@ -331,7 +375,7 @@
       "intro": "Bei Problemen oder Fragen rund um OpenTaiko helfen die folgenden Links weiter:",
       "discord": "Der #support-Kanal auf dem OpenTaiko-Discord",
       "github": "Issues-Bereich auf GitHub",
-      "note": "Hinweis: Vor dem Fragen bitte selbst recherchieren, da das Problem möglicherweise schon behandelt wurde – auch ein Blick in den #often_asked_question-Kanal auf Discord lohnt sich."
+      "note": "Hinweis: Vor dem Fragen bitte selbst recherchieren, da das Problem möglicherweise schon behandelt wurde. Auch ein Blick in den #often_asked_question-Kanal auf Discord lohnt sich."
     },
     "versioning": {
       "title": "Skin-/Asset-Versionierung",

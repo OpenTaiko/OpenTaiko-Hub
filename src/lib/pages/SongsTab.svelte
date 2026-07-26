@@ -11,8 +11,7 @@
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext('toast');
 
-    import initSqlJs from 'sql.js';
-    import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
+    import { getSQL } from '$lib/utils/sqljs.js';
 
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -29,6 +28,7 @@
     // Soundtrack
     const soundtrackInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/soundtrack_info.json';
     let soundtrackInfo = [];
+    let catalogFetchFailed = false;
     let currentSongs = {};          // uniqueId → { chartMD5s: string[], chartRelativePath }
     let allScannedSongs = [];       // every scanned song, catalog or custom
     let scannedGenres = {};         // relPath → { title, boxDefSha1, preimageSha1 }
@@ -50,6 +50,11 @@
     let migrationCandidates = [];
     let migrationCandidate = null;   // the instance whose migration modal is open
     let migrationGlobalPath = null;
+
+    // Chart-less folders in an instance that the shared library already provides: the
+    // game reads both paths, so each one shows up as a duplicate, empty box
+    let duplicateCandidates = [];
+    let duplicateBusy = false;
 
     $: catalogById = new Map(Array.isArray(soundtrackInfo) ? soundtrackInfo.map((s) => [s.uniqueId, s]) : []);
 
@@ -90,10 +95,11 @@
 
     const updateHoFInfo = async () => {
         try {
-            const SQL = await initSqlJs({ locateFile: () => sqlWasmUrl });
+            const SQL = await getSQL();
 
             const response = await fetch(hofDbUrl);
             const buffer = await response.arrayBuffer();
+            hofDb?.close();
             hofDb = new SQL.Database(new Uint8Array(buffer));
 
             // Global rank: all entries sorted by internalDifficultyIndex DESC regardless of difficulty
@@ -168,6 +174,7 @@
     }
 
     const updateSoundtrackInfo = async () => {
+        catalogFetchFailed = false;
         try {
             const response = await fetch(soundtrackInfoUrl);
         if (response.ok) {
@@ -181,10 +188,13 @@
                 soundtrackInfo = filter2(soundtrackInfo);
             }
         } else {
-            soundtrackInfo = {};
+            // Keep an ARRAY: template #each and .filter/.sort calls expect one
+            soundtrackInfo = [];
+            catalogFetchFailed = true;
         }
         } catch (error) {
-            soundtrackInfo = {};
+            soundtrackInfo = [];
+            catalogFetchFailed = true;
         }
     }
     
@@ -263,6 +273,49 @@
             console.error('Migration check failed:', error);
         }
         migrationCandidates = candidates;
+        CheckDuplicates();
+    }
+
+    // Looks for chart-less folders an instance duplicates from the shared library
+    const CheckDuplicates = async () => {
+        const found = [];
+        try {
+            const globalSongs = await GetGlobalSongsPath();
+            for (const inst of get(instances)) {
+                const instSongs = await path.join(inst.path, 'Songs');
+                try {
+                    const folders = await invoke('find_duplicate_song_folders', {
+                        instanceSongs: instSongs,
+                        globalSongs
+                    });
+                    if (folders.length > 0) {
+                        found.push({ instance: inst, srcPath: instSongs, globalSongs, folders });
+                    }
+                } catch (error) {
+                    console.error(`Duplicate check failed for ${inst.name}:`, error);
+                }
+            }
+        } catch (error) {
+            console.error('Duplicate check failed:', error);
+        }
+        duplicateCandidates = found;
+    }
+
+    const CleanDuplicates = async (candidate) => {
+        if (duplicateBusy) return;
+        duplicateBusy = true;
+        try {
+            const removed = await invoke('remove_duplicate_song_folders', {
+                instanceSongs: candidate.srcPath,
+                globalSongs: candidate.globalSongs,
+                relPaths: candidate.folders.map((f) => f.relPath)
+            });
+            TriggerSuccess(get(_)('songs.duplicates.success', { values: { count: removed } }));
+            duplicateCandidates = duplicateCandidates.filter((c) => c !== candidate);
+        } catch (error) {
+            TriggerError(get(_)('songs.duplicates.error', { values: { error } }));
+        }
+        duplicateBusy = false;
     }
 
     // Opens the resolve/transfer modal for one instance (conflicts are decided there)
@@ -601,11 +654,12 @@
     let expandedSongUid = null;
 
     const updateArtistInfo = async () => {
+        let db = null;
         try {
-            const SQL = await initSqlJs({ locateFile: () => sqlWasmUrl });
+            const SQL = await getSQL();
             const response = await fetch(artistsDbUrl);
             const buffer = await response.arrayBuffer();
-            const db = new SQL.Database(new Uint8Array(buffer));
+            db = new SQL.Database(new Uint8Array(buffer));
 
             const artistsResult = db.exec('SELECT entryId, artist, youtube, soundcloud, spotify, bandcamp, bilibili, other FROM artists');
             const artistsById = {};
@@ -626,6 +680,8 @@
             songArtistsMap = songArtistsMap;
         } catch (e) {
             console.error('Failed to load artist info:', e);
+        } finally {
+            db?.close();
         }
     };
 
@@ -641,6 +697,33 @@
     });
 
 </script>
+
+{#if catalogFetchFailed}
+<aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
+	<i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+	<span class="flex-1"><b>{$_('common.fetch_error')}</b></span>
+	<button type="button" class="button-red button-main" on:click={updateSoundtrackInfo}>
+		<i class="fa-solid fa-rotate"></i> {$_('common.retry')}
+	</button>
+</aside>
+{/if}
+
+{#each duplicateCandidates as candidate (candidate.instance.id)}
+<aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
+	<i class="fa-solid fa-clone text-yellow-500"></i>
+	<span class="flex-1">
+		{$_('songs.duplicates.banner', { values: { count: candidate.folders.length, instance: candidate.instance.name } })}
+		<br />
+		<span class="text-sm opacity-70">{candidate.folders.map((f) => f.relPath).join(', ')}</span>
+	</span>
+	<button type="button" class="button-green button-main" disabled={duplicateBusy} on:click={() => CleanDuplicates(candidate)}>
+		<i class="fa-solid fa-broom"></i> {$_('songs.duplicates.button')}
+	</button>
+	<button type="button" class="button-gray button-main" on:click={() => duplicateCandidates = duplicateCandidates.filter((c) => c !== candidate)}>
+		{$_('songs.migrate.later')}
+	</button>
+</aside>
+{/each}
 
 {#each migrationCandidates as candidate (candidate.instance.id)}
 <aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">

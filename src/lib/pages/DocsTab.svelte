@@ -14,8 +14,14 @@
     let notFound = false;
     let loading = false;
     let refreshToken = 0;
+    let renderedFor = null;
 
-    $: if ($activeInstance) Refresh($activeInstance);
+    // Only (re)build when the active instance actually changes — building inlines the
+    // whole docs site, so avoid redundant rebuilds on unrelated store updates.
+    $: if ($activeInstance && renderedFor !== $activeInstance.id) {
+        renderedFor = $activeInstance.id;
+        Refresh($activeInstance);
+    }
 
     const IMAGE_MIME = {
         png: 'image/png',

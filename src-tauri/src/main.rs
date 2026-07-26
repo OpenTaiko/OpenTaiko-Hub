@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod assetscan;
 mod binver;
 mod configini;
 mod fsops;
@@ -145,10 +146,14 @@ fn main() {
             execute_external_app,
             binver::get_game_version,
             scan::scan_songs,
+            assetscan::scan_asset_versions,
             procs::run_streamed,
             fsops::merge_move_dir,
             migrate::plan_migration,
             migrate::apply_migration,
+            migrate::find_duplicate_song_folders,
+            migrate::strip_song_content,
+            migrate::remove_duplicate_song_folders,
             configini::ensure_config_tjapath
         ])
         .run(tauri::generate_context!())

@@ -27,3 +27,11 @@ export const isVersionBelow = (version, target) => {
     const cmp = compareVersions(version, target);
     return cmp !== null && cmp < 0;
 }
+
+// True when a version belongs to a given release series, ignoring the revision.
+// isVersionInSeries('0.6.0.107', 0, 6, 0) === true
+export const isVersionInSeries = (version, main, major, minor) => {
+    const parsed = parseVersion(version);
+    if (!parsed) return false;
+    return parsed[0] === main && parsed[1] === major && parsed[2] === minor;
+}

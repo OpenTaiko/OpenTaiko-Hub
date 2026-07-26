@@ -268,7 +268,226 @@ fn apply_plan(src: &Path, dest: &Path, decisions: &[MigrationDecision]) -> Resul
         }
     }
 
+    // Prune the genre folders we just emptied. Leaving them behind would make the game
+    // show a second, empty box next to the shared library's real one, because a stable
+    // instance reads both its local Songs folder and the shared library.
+    let mut ancestors: Vec<PathBuf> = seen.into_iter().collect();
+    // Deepest first, so a parent can be pruned once its children are gone
+    ancestors.sort_by_key(|p| std::cmp::Reverse(p.components().count()));
+    for ancestor in ancestors {
+        let src_dir = src.join(&ancestor);
+        // Only ever remove a song-less folder whose metadata now lives in the library
+        if src_dir.is_dir() && !contains_tja(&src_dir) && dest.join(&ancestor).is_dir() {
+            let _ = std::fs::remove_dir_all(&src_dir);
+        }
+    }
+
     Ok(summary)
+}
+
+/// True when the folder holds at least one .tja anywhere beneath it.
+pub(crate) fn contains_tja(dir: &Path) -> bool {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return false,
+    };
+    let mut subdirs = Vec::new();
+    for entry in entries.flatten() {
+        let file_type = match entry.file_type() {
+            Ok(t) => t,
+            Err(_) => continue,
+        };
+        if file_type.is_dir() {
+            subdirs.push(entry.path());
+        } else if file_type.is_file()
+            && entry.file_name().to_string_lossy().to_lowercase().ends_with(".tja")
+        {
+            return true;
+        }
+    }
+    subdirs.iter().any(|sub| contains_tja(sub))
+}
+
+/// True when the folder holds no file at all anywhere beneath it.
+fn is_recursively_empty(dir: &Path) -> bool {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return false,
+    };
+    let mut subdirs = Vec::new();
+    for entry in entries.flatten() {
+        match entry.file_type() {
+            Ok(t) if t.is_dir() => subdirs.push(entry.path()),
+            Ok(t) if t.is_file() => return false,
+            _ => {}
+        }
+    }
+    subdirs.iter().all(|sub| is_recursively_empty(sub))
+}
+
+/// Removes the chart content shipped inside a build's own Songs folder, keeping the
+/// functional scaffolding (the box.def-only boxes such as X1 Favorite, X2 Recent, the
+/// search boxes and the local drop folders).
+///
+/// A local `dotnet publish` copies the repository's whole Songs tree, so an
+/// experimental build would otherwise install its own copies of songs alongside the
+/// shared library. Returns the number of song folders removed.
+#[tauri::command]
+pub async fn strip_song_content(songs_dir: String) -> Result<usize, String> {
+    tokio::task::spawn_blocking(move || {
+        let base = PathBuf::from(&songs_dir);
+        if !base.is_dir() {
+            return 0;
+        }
+
+        let mut song_dirs = Vec::new();
+        collect_song_dirs(&base, &mut song_dirs);
+        let mut removed = 0;
+        for dir in song_dirs {
+            // Never remove the Songs folder itself, only song folders inside it
+            if dir == base {
+                continue;
+            }
+            if std::fs::remove_dir_all(&dir).is_ok() {
+                removed += 1;
+            }
+        }
+
+        // Drop containers that held nothing but those songs, deepest first
+        let mut leftovers = Vec::new();
+        collect_dirs(&base, &mut leftovers);
+        leftovers.sort_by_key(|p| std::cmp::Reverse(p.components().count()));
+        for dir in leftovers {
+            if dir != base && is_recursively_empty(&dir) {
+                let _ = std::fs::remove_dir_all(&dir);
+            }
+        }
+
+        removed
+    })
+    .await
+    .map_err(|e| format!("Task failed: {e}"))
+}
+
+fn collect_dirs(dir: &Path, out: &mut Vec<PathBuf>) {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            if entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                let path = entry.path();
+                collect_dirs(&path, out);
+                out.push(path);
+            }
+        }
+    }
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DuplicateFolder {
+    pub rel_path: String,
+    pub file_count: usize,
+}
+
+fn count_files(dir: &Path) -> usize {
+    let entries = match std::fs::read_dir(dir) {
+        Ok(entries) => entries,
+        Err(_) => return 0,
+    };
+    let mut total = 0;
+    for entry in entries.flatten() {
+        match entry.file_type() {
+            Ok(t) if t.is_dir() => total += count_files(&entry.path()),
+            Ok(t) if t.is_file() => total += 1,
+            _ => {}
+        }
+    }
+    total
+}
+
+/// Finds top-level folders in an instance's Songs folder that hold no chart at all while
+/// the shared library has a folder of the same name that does. Because the game reads
+/// both paths, each of these renders as a duplicate, empty box.
+///
+/// Folders with no counterpart in the library are never reported, which is what keeps
+/// the game's own boxes (X1 Favorite, X2 Recent, the search boxes, the local drop
+/// folders) untouched.
+#[tauri::command]
+pub async fn find_duplicate_song_folders(
+    instance_songs: String,
+    global_songs: String,
+) -> Result<Vec<DuplicateFolder>, String> {
+    tokio::task::spawn_blocking(move || {
+        let src = PathBuf::from(&instance_songs);
+        let dest = PathBuf::from(&global_songs);
+        let mut out = Vec::new();
+        if !src.is_dir() || !dest.is_dir() {
+            return out;
+        }
+        // Never report anything when both paths are the same folder
+        if src == dest {
+            return out;
+        }
+        let entries = match std::fs::read_dir(&src) {
+            Ok(entries) => entries,
+            Err(_) => return out,
+        };
+        for entry in entries.flatten() {
+            if !entry.file_type().map(|t| t.is_dir()).unwrap_or(false) {
+                continue;
+            }
+            let path = entry.path();
+            let counterpart = dest.join(entry.file_name());
+            if !contains_tja(&path) && counterpart.is_dir() && contains_tja(&counterpart) {
+                out.push(DuplicateFolder {
+                    rel_path: entry.file_name().to_string_lossy().to_string(),
+                    file_count: count_files(&path),
+                });
+            }
+        }
+        out.sort_by(|a, b| a.rel_path.cmp(&b.rel_path));
+        out
+    })
+    .await
+    .map_err(|e| format!("Task failed: {e}"))
+}
+
+/// Removes the given top-level folders from an instance's Songs folder. Each one is
+/// re-checked to be chart-less and duplicated in the library before deletion, so a
+/// stale UI list can never delete real songs.
+#[tauri::command]
+pub async fn remove_duplicate_song_folders(
+    instance_songs: String,
+    global_songs: String,
+    rel_paths: Vec<String>,
+) -> Result<usize, String> {
+    tokio::task::spawn_blocking(move || {
+        let src = PathBuf::from(&instance_songs);
+        let dest = PathBuf::from(&global_songs);
+        if src == dest {
+            return Err("Refusing to prune: both paths are the same folder".to_string());
+        }
+        let mut removed = 0;
+        for rel in rel_paths {
+            // Plain child names only: never traverse out of the Songs folder
+            if rel.is_empty() || rel.contains('/') || rel.contains('\\') || rel.contains("..") {
+                continue;
+            }
+            let path = src.join(&rel);
+            let counterpart = dest.join(&rel);
+            if path.is_dir()
+                && !contains_tja(&path)
+                && counterpart.is_dir()
+                && contains_tja(&counterpart)
+            {
+                std::fs::remove_dir_all(&path)
+                    .map_err(|e| format!("Failed to remove {}: {}", path.display(), e))?;
+                removed += 1;
+            }
+        }
+        Ok(removed)
+    })
+    .await
+    .map_err(|e| format!("Task failed: {e}"))?
 }
 
 #[tauri::command]
@@ -366,5 +585,135 @@ mod tests {
         let mut leftover = Vec::new();
         collect_song_dirs(&src, &mut leftover);
         assert!(leftover.is_empty(), "instance should hold no more song folders");
+
+        // The emptied genre folder is pruned, so the game cannot show a duplicate,
+        // empty box next to the shared library's real one
+        assert!(!src.join("01 Pop").exists(), "emptied genre folder should be pruned");
+    }
+
+    #[test]
+    fn prune_keeps_folders_that_still_hold_charts() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("inst/Songs");
+        let dest = tmp.path().join("global/Songs");
+
+        write(&src.join("01 Pop/box.def"), "#TITLE:Pop");
+        write(&src.join("01 Pop/Moved/song.tja"), "TITLE:Moved\n");
+        write(&src.join("01 Pop/Kept/song.tja"), "TITLE:Kept\n");
+
+        // Only migrate one of the two songs
+        let decisions = vec![MigrationDecision {
+            src_rel_path: "01 Pop/Moved".into(),
+            action: "move".into(),
+            dest_rel_path: None,
+        }];
+        apply_plan(&src, &dest, &decisions).unwrap();
+
+        // The genre folder still holds a chart, so it must survive
+        assert!(src.join("01 Pop/Kept/song.tja").is_file());
+        assert!(src.join("01 Pop").is_dir(), "folder with remaining charts must be kept");
+    }
+
+    #[test]
+    fn strip_removes_shipped_songs_but_keeps_functional_boxes() {
+        let tmp = tempfile::tempdir().unwrap();
+        let songs = tmp.path().join("publish/Songs");
+
+        // Real chart content a local publish would carry over
+        write(&songs.join("05 Chapter V/box.def"), "#TITLE:V");
+        write(&songs.join("05 Chapter V/Song A/song.tja"), "TITLE:A\n");
+        write(&songs.join("05 Chapter V/Song A/song.ogg"), "audio");
+        write(&songs.join("S1 Dan-i Dojo/box.def"), "#TITLE:Dan");
+        write(&songs.join("S1 Dan-i Dojo/Dan 1/dan.tja"), "TITLE:D\n");
+        // Functional scaffolding that must survive untouched
+        write(&songs.join("X1 Favorite/box.def"), "#TITLE:Fav");
+        write(&songs.join("X1 Favorite/! Keep this folder empty !"), "");
+        write(&songs.join("L2 Custom Charts/box.def"), "#TITLE:Custom");
+        write(&songs.join("L2 Custom Charts/01 Pop/box.def"), "#TITLE:Pop");
+        write(&songs.join("L3 Downloaded Songs/box.def"), "#TITLE:DL");
+
+        let removed = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(strip_song_content(songs.to_str().unwrap().into()))
+            .unwrap();
+        assert_eq!(removed, 2, "both song folders should be removed");
+
+        // No chart survives anywhere under Songs
+        assert!(!contains_tja(&songs), "no chart may remain in the build's Songs folder");
+        assert!(!songs.join("05 Chapter V/Song A").exists());
+        assert!(!songs.join("S1 Dan-i Dojo/Dan 1").exists());
+        // Scaffolding, including nested genre boxes, is intact
+        assert!(songs.join("X1 Favorite/box.def").is_file());
+        assert!(songs.join("X1 Favorite/! Keep this folder empty !").is_file());
+        assert!(songs.join("L2 Custom Charts/01 Pop/box.def").is_file());
+        assert!(songs.join("L3 Downloaded Songs/box.def").is_file());
+        // Boxes whose own box.def remains are kept (their metadata is still meaningful)
+        assert!(songs.join("S1 Dan-i Dojo/box.def").is_file());
+        assert!(songs.join("05 Chapter V/box.def").is_file());
+        // And the Songs folder itself always survives
+        assert!(songs.is_dir());
+    }
+
+    #[test]
+    fn strip_is_a_noop_without_a_songs_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let missing = tmp.path().join("publish/Songs");
+        let removed = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(strip_song_content(missing.to_str().unwrap().into()))
+            .unwrap();
+        assert_eq!(removed, 0);
+    }
+
+    #[test]
+    fn finds_only_chartless_folders_duplicated_in_the_library() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("inst/Songs");
+        let dest = tmp.path().join("global/Songs");
+
+        // Chart-less leftover whose library counterpart has songs → a duplicate box
+        write(&src.join("01 Chapter I/box.def"), "#TITLE:I");
+        write(&src.join("01 Chapter I/default.png"), "png");
+        write(&dest.join("01 Chapter I/Song/song.tja"), "TITLE:S\n");
+        // Shipped scaffolding with a populated library counterpart → also a duplicate
+        write(&src.join("S1 Dan-i Dojo/box.def"), "#TITLE:Dan");
+        write(&dest.join("S1 Dan-i Dojo/Dan/dan.tja"), "TITLE:D\n");
+        // The game's own boxes have no counterpart in the library → must be kept
+        write(&src.join("X1 Favorite/box.def"), "#TITLE:Fav");
+        write(&src.join("L3 Downloaded Songs/box.def"), "#TITLE:DL");
+        // A local folder that still holds a chart → must be kept
+        write(&src.join("L2 Custom Charts/Mine/mine.tja"), "TITLE:Mine\n");
+        write(&dest.join("L2 Custom Charts/Other/other.tja"), "TITLE:Other\n");
+
+        let src_s = src.to_str().unwrap();
+        let dest_s = dest.to_str().unwrap();
+        let found = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(find_duplicate_song_folders(src_s.into(), dest_s.into()))
+            .unwrap();
+        let names: Vec<&str> = found.iter().map(|f| f.rel_path.as_str()).collect();
+        assert_eq!(names, vec!["01 Chapter I", "S1 Dan-i Dojo"]);
+
+        // Removal takes only those, and re-verifies before deleting
+        let removed = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(remove_duplicate_song_folders(
+                src_s.into(),
+                dest_s.into(),
+                vec![
+                    "01 Chapter I".into(),
+                    "S1 Dan-i Dojo".into(),
+                    "X1 Favorite".into(),      // no counterpart: must be refused
+                    "L2 Custom Charts".into(), // holds a chart: must be refused
+                    "../escape".into(),        // path traversal: must be refused
+                ],
+            ))
+            .unwrap();
+        assert_eq!(removed, 2);
+        assert!(!src.join("01 Chapter I").exists());
+        assert!(!src.join("S1 Dan-i Dojo").exists());
+        assert!(src.join("X1 Favorite/box.def").is_file(), "game boxes must be kept");
+        assert!(src.join("L3 Downloaded Songs/box.def").is_file());
+        assert!(src.join("L2 Custom Charts/Mine/mine.tja").is_file());
     }
 }

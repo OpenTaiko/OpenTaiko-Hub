@@ -1,8 +1,19 @@
 <script>
     import { _ } from 'svelte-i18n';
+    import { openPath } from '@tauri-apps/plugin-opener';
     import { instances, activeInstanceId, activeInstance, setActiveInstance, instanceVersions } from '$lib/stores/instances.js';
 
     export let OnManage = () => {};
+
+    const OpenActiveFolder = async () => {
+        const inst = $activeInstance;
+        if (!inst) return;
+        try {
+            await openPath(inst.path);
+        } catch (error) {
+            console.error('Failed to open the instance folder:', error);
+        }
+    };
 
     const channelKey = (inst) => {
         if (!inst?.channel) return 'empty';
@@ -41,6 +52,9 @@
             {#if $instanceVersions[$activeInstance.id]}
                 <span class="opacity-70 text-sm whitespace-nowrap">{$instanceVersions[$activeInstance.id]}</span>
             {/if}
+            <button type="button" class="button-blue button-main" title={$_('instances.open_folder')} on:click={OpenActiveFolder}>
+                <i class="fa-solid fa-folder-open"></i>
+            </button>
         {/if}
     {/if}
     <button type="button" class="button-blue button-main whitespace-nowrap" on:click={OnManage}>

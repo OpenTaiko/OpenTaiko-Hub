@@ -2,7 +2,7 @@
     // Dependencies
     import { onMount } from 'svelte';
     import { ProgressBar, TabGroup, Tab } from '@skeletonlabs/skeleton';
-    import { readTextFile, mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
+    import { mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
     import { fetch } from "@tauri-apps/plugin-http";
     import { path } from '@tauri-apps/api';
     import { invoke } from '@tauri-apps/api/core';
@@ -121,80 +121,43 @@ for (const file of files) {
         const instance = get(activeInstance);
         if (!instance) return;
         assetScanning = true;
-        await crawlAsset(instance, "Skins");
-        await crawlAsset(instance, "Characters");
-        await crawlAsset(instance, "Puchicharas");
-
-        console.log(currentAssets);
+        const scanned = {
+            "Skins": await crawlAsset(instance, "Skins"),
+            "Characters": await crawlAsset(instance, "Characters"),
+            "Puchicharas": await crawlAsset(instance, "Puchicharas")
+        };
+        // Reassign so the status cells react (Svelte 4 needs a fresh reference)
+        if (get(activeInstance)?.id === instance.id) currentAssets = scanned;
         assetScanning = false;
     }
 
     const crawlAsset = async (instance, assetType) => {
-        const res = instance.path;
-        const baseDir = assetBaseDirs[assetType];
         const targetFile = {
             "Skins": "SkinConfig.ini",
             "Characters": "CharaConfig.txt",
             "Puchicharas": "PuchiConfig.txt"
         }[assetType];
-        
-        async function folderExists(folderPath) {
-            try {
-                const fullPath = await path.join(res, folderPath);
-                const entries = await readDir(fullPath);
-                return true;
-            } catch (error) {
-                // Directory does not exist
-                console.log(error)
-                return false;
-            }
-        }
 
-        async function processFolder(folderPath) {
-            try {
-                const fullPath = await path.join(res, folderPath);
-                const entries = await readDir(fullPath, { recursive: true });
-
-                for (const entry of entries) {
-                    if (entry.isDirectory) {
-                        // If it's a folder, process it recursively
-                        await processFolder([folderPath, entry.name].join("/"));
-                    } else if (entry.name === targetFile) {
-                        
-                        const configPath = [folderPath, entry.name].join("/");
-                        const relativePath = folderPath.replace(`${baseDir}/`, '');
-
-                        const configFullPath = await path.join(res, configPath);
-                        const configData = await readTextFile(configFullPath);
-                        const _extract = configData.match(/^[^=]*\b\w*Version\b\s*=\s*(.+)$/m)?.[1];
-                        const _version = (_extract === undefined) ? "Unknown" : _extract;
-
-                        currentAssets[assetType][relativePath] = {
-                            assetFolderName: relativePath,
-                            assetVersion: _version
-                        };
-                    }
-                }
-            } catch (error) {
-                console.error(`Error processing folder ${folderPath}:`, error);
-            }
-        }
-
+        // Native single-call scan: walking a full build's asset tree (thousands of
+        // files) from JS with per-file IPC would flood the event loop and freeze the UI.
+        const scanned = {};
         try {
-            // Check if base directory exists
-            if (await folderExists(baseDir)) {
-                // Start the process with the base directory
-                await processFolder(baseDir);
-            } else {
-                console.warn(`The directory "${baseDir}" does not exist.`);
+            const baseDir = await path.join(instance.path, assetBaseDirs[assetType]);
+            const found = await invoke('scan_asset_versions', { baseDir, targetFile });
+            for (const { relPath, version } of found) {
+                scanned[relPath] = { assetFolderName: relPath, assetVersion: version };
             }
         } catch (error) {
-            console.error(`Error scanning assets:`, error);
+            console.error(`Error scanning ${assetType}:`, error);
         }
+        return scanned;
     }
 
     const AssetPrefix = (assetType) => (assetType === "Skins") ? "skin" : "chara";
-    const AssetTabType = (currentAsset) => ["Skins", "Characters", "Puchicharas"][currentAsset];
+    // Total function: an out-of-range index falls back to Skins instead of returning
+    // undefined — `assetsInfo[undefined]` would make `{#each}` throw during render,
+    // which breaks Svelte's update cycle and softlocks the whole app.
+    const AssetTabType = (currentAsset) => ["Skins", "Characters", "Puchicharas"][currentAsset] ?? "Skins";
     const AssetTabPrefix = (currentAsset) => AssetPrefix(AssetTabType(currentAsset));
 
     const DownloadDisplayedAssets = async (assetType) => {
@@ -453,7 +416,7 @@ for (const file of files) {
 			</tr>
 		</thead>
 		<tbody>
-			{#each assetsInfo[AssetTabType(currentAsset)] as info}
+			{#each assetsInfo[AssetTabType(currentAsset)] ?? [] as info}
 			<tr>
 				<td>{info[`${AssetTabPrefix(currentAsset)}Name`]}</td>
 				<td>
