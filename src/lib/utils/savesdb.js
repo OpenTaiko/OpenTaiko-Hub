@@ -1,10 +1,10 @@
 // Per-save export / import for OpenTaiko's Saves.db3, operating on a sql.js Database.
 //
 // A save spreads across the `saves` row plus child tables keyed by SaveId. Export pulls
-// one save (by SaveId) into a portable JSON document. Import either MERGES into an
-// existing save when the archive's SaveUID matches one already present, or ADDs the save
-// as a new entry otherwise (or when the archive has no SaveUID). Everything runs against
-// the passed-in sql.js Database so the exact same schema the game uses is honored.
+// one save (by SaveId) into a portable JSON document. Import MERGES a document into the
+// save the user picked (one import button per slot), so an archive from another machine
+// works even though its SaveUID matches nothing locally. Everything runs against the
+// passed-in sql.js Database so the exact same schema the game uses is honored.
 //
 // Merging is idempotent by design: every field is combined with a rule that yields the
 // same result when applied twice (highest score, highest counter, union of unlocks), so
@@ -19,6 +19,7 @@ const SAVE_COLS = [
     'CurrentMedals', 'TotalEarnedMedals', 'TotalPlaycount', 'AIBattleModePlaycount',
     'AIBattleModeWins', 'PlayerNameplateRarityInt', 'PlayerNameplateId', 'SelectedHitsounds', 'SaveUID'
 ];
+
 // Cumulative counters merged with MAX so importing never regresses progress
 const COUNTER_COLS = new Set([
     'CurrentMedals', 'TotalEarnedMedals', 'TotalPlaycount', 'AIBattleModePlaycount', 'AIBattleModeWins'
@@ -232,14 +233,6 @@ const applyChildren = (db, saveId, save, merge) => {
     unionInsert(db, 'unlocked_songs', 'Asset', save.unlockedSongs ?? [], saveId);
 };
 
-const freeSlot = (db) => {
-    const used = new Set(
-        rows(db, 'SELECT CurrentSlot FROM saves WHERE CurrentSlot IS NOT NULL').map((r) => Number(r.CurrentSlot))
-    );
-    for (let s = 0; s < 5; s++) if (!used.has(s)) return s;
-    return null; // all 5 active slots taken → import as a reserve save (NULL slot)
-};
-
 // Moves a save to a target active slot (0-4). When another save already holds the
 // target slot, the two swap places. A slotted save can never be parked to reserve:
 // the game requires all 5 slots to exist and stay unique, so the only way out of a
@@ -272,44 +265,37 @@ export const rebindSlot = (db, saveId, targetSlot) => {
     };
 };
 
-// Imports a portable save document into `db`. `newUid` is used when the archive has no
-// SaveUID (pass crypto.randomUUID() from the caller so this stays environment-agnostic).
-// Returns { mode: 'merge'|'add', name, slot }.
-export const importSave = (db, portable, newUid) => {
+// Merges a portable save document into ONE chosen save. The archive's SaveUID is not
+// used to find the destination: a save exported on another machine never matches a
+// local id, so the user picks the target save instead (one import button per slot).
+//
+// The merge rules are unchanged and idempotent: highest score wins per chart, counters
+// take the highest value, unlocks and triggers are unioned, so progress is never
+// regressed and re-importing the same file changes nothing.
+//
+// The destination keeps its own identity (its slot and its SaveUID), so importing the
+// same archive into two slots cannot produce two saves sharing a uuid, which the game
+// uses to key per-save data. `fallbackUid` is only used when the destination has no uid
+// yet (pass crypto.randomUUID() so this stays environment-agnostic).
+// Returns { name, slot, targetName }.
+export const importSaveInto = (db, portable, targetSaveId, fallbackUid) => {
     const save = portable.save ?? {};
     const saveCols = columns(db, 'saves');
-    const hasUid = saveCols.includes('SaveUID');
-    const importedUid = (save.SaveUID ?? '').trim();
+    const target = one(db, 'SELECT SaveId, PlayerName, CurrentSlot FROM saves WHERE SaveId=?', [targetSaveId]);
+    if (!target) throw new Error(`Save ${targetSaveId} not found`);
 
-    // Merge only when the archive UID matches an existing save
-    let target = null;
-    if (hasUid && importedUid) {
-        target = one(db, 'SELECT SaveId, PlayerName FROM saves WHERE SaveUID=?', [importedUid]);
+    mergeSaveRow(db, targetSaveId, save);
+    if (saveCols.includes('SaveUID')) {
+        const current = one(db, 'SELECT SaveUID FROM saves WHERE SaveId=?', [targetSaveId]);
+        if (!(current?.SaveUID ?? '').trim()) {
+            db.run('UPDATE saves SET SaveUID=? WHERE SaveId=?', [fallbackUid, targetSaveId]);
+        }
     }
+    applyChildren(db, targetSaveId, portable, true);
 
-    if (target) {
-        mergeSaveRow(db, target.SaveId, save);
-        applyChildren(db, target.SaveId, portable, true);
-        const slotRow = one(db, 'SELECT CurrentSlot FROM saves WHERE SaveId=?', [target.SaveId]);
-        return { mode: 'merge', name: save.PlayerName ?? target.PlayerName, slot: slotRow?.CurrentSlot ?? null };
-    }
-
-    // Add as a new save
-    const slot = freeSlot(db);
-    const insertCols = SAVE_COLS.filter((c) => saveCols.includes(c) && c !== 'SaveUID' && c in save);
-    const colList = [...insertCols];
-    const valParams = insertCols.map((c) => save[c]);
-    if (hasUid) {
-        colList.push('SaveUID');
-        valParams.push(importedUid || newUid);
-    }
-    colList.push('CurrentSlot');
-    valParams.push(slot);
-    db.run(
-        `INSERT INTO saves (${colList.join(',')}) VALUES (${colList.map(() => '?').join(',')})`,
-        valParams
-    );
-    const newId = Number(one(db, 'SELECT last_insert_rowid() AS id').id);
-    applyChildren(db, newId, portable, false);
-    return { mode: 'add', name: save.PlayerName ?? 'Player', slot };
+    return {
+        name: save.PlayerName ?? target.PlayerName,
+        slot: target.CurrentSlot === null || target.CurrentSlot === undefined ? null : Number(target.CurrentSlot),
+        targetName: target.PlayerName
+    };
 };

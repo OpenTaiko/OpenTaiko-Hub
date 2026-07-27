@@ -73,9 +73,9 @@
     "picker": {
       "title": "Choose a build to install",
       "install": "Install",
-      "stable_desc": "Official release, downloaded from GitHub. Skins and songs are managed by the Hub.",
-      "indev_desc": "Built on your machine from the in-development branch (requires the .NET SDK 8). Ships with its own skins and characters.",
-      "prerelease_desc": "Pre-release version, downloaded from GitHub."
+      "stable_desc": "Official GitHub release.",
+      "indev_desc": "Built locally from the dev branch (needs the .NET SDK 8).",
+      "prerelease_desc": "Pre-release from GitHub."
     }
   },
   "home": {
@@ -144,10 +144,10 @@
   "saves": {
     "tab": "Saves",
     "title": "Save data",
-    "description": "Export a save (a slot, identified by its player name) with all of its data (scores, unlocks, coins and progress), or import one. A save with a matching unique id is merged; otherwise it is added as a new save.",
+    "description": "Export a save, or import one into a slot. Imported saves are merged.",
     "current_version": "Save database version:",
     "no_saves": "No save data yet (launch the game once to create it).",
-    "import": "Import a save",
+    "import": "Import",
     "export": "Export",
     "hint": "Do not import while the game is running.",
     "col": {
@@ -159,22 +159,22 @@
     "slot_n": "Slot {n}",
     "success": {
       "export": "Exported the save \"{name}\".",
-      "merge": "Merged the imported data into the existing save \"{name}\".",
-      "add": "Added \"{name}\" as a new save in slot {slot}.",
-      "add_reserve": "Added \"{name}\" as a reserve save (all 5 slots are in use, activate it from within the game).",
       "rebind": "Moved the save \"{name}\".",
-      "rebind_swap": "Swapped the saves \"{a}\" and \"{b}\"."
+      "rebind_swap": "Swapped the saves \"{a}\" and \"{b}\".",
+      "imported_into": "Imported \"{name}\" into {slot}."
     },
     "error": {
       "no_db": "This instance has no save database yet.",
       "load": "Could not read the save database.",
-      "invalid_file": "The selected file is not a valid OpenTaiko save export.",
-      "older": "This save ({imported}) is older than the instance's save database ({current}); import was cancelled to avoid compatibility issues.",
+      "invalid_file": "Not a valid OpenTaiko save file.",
+      "older": "This save ({imported}) is older than the database ({current}). Import cancelled.",
       "export": "Failed to export the save: {error}",
       "import": "Failed to import the save: {error}",
       "rebind": "Failed to change the save slot: {error}"
     },
-    "rebind_hint": "Change the slot of this save (an occupied slot swaps the two saves)."
+    "rebind_hint": "Change slot (swaps with the occupant).",
+    "confirm_title": "Import save",
+    "confirm_import": "Merge \"{imported}\" into {slot} (\"{current}\")?"
   },
   "hub": {
     "status": {
@@ -269,7 +269,7 @@
       "download_nb": "Downloaded song {nb} out of {total}"
     },
     "duplicates": {
-      "banner": "{count} folder(s) in \"{instance}\" hold no charts but exist in the shared library, so the game shows them as duplicate empty boxes. Remove them?",
+      "banner": "{count} empty duplicate folder(s) in \"{instance}\". Remove them?",
       "button": "Clean up",
       "success": "Removed {count} duplicate folder(s).",
       "error": "Failed to remove the duplicate folders: {error}"

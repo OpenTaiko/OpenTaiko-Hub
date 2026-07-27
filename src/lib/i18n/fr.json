@@ -73,9 +73,9 @@
     "picker": {
       "title": "Choisir un build à installer",
       "install": "Installer",
-      "stable_desc": "Version officielle, téléchargée depuis GitHub. Les skins et les chansons sont gérés par le Hub.",
-      "indev_desc": "Compilé sur votre machine depuis la branche en développement (nécessite le .NET SDK 8). Livré avec ses propres skins et personnages.",
-      "prerelease_desc": "Version préliminaire, téléchargée depuis GitHub."
+      "stable_desc": "Version officielle GitHub.",
+      "indev_desc": "Compilé localement depuis la branche de dev (nécessite le .NET SDK 8).",
+      "prerelease_desc": "Préversion GitHub."
     }
   },
   "home": {
@@ -144,10 +144,10 @@
   "saves": {
     "tab": "Sauvegardes",
     "title": "Données de sauvegarde",
-    "description": "Exportez une sauvegarde (un emplacement, identifié par son nom de joueur) avec toutes ses données (scores, déblocages, pièces et progression), ou importez-en une. Une sauvegarde dont l'identifiant unique correspond est fusionnée ; sinon elle est ajoutée comme nouvelle sauvegarde.",
+    "description": "Exportez une sauvegarde, ou importez-en une dans un emplacement. Les sauvegardes importées sont fusionnées.",
     "current_version": "Version de la base de sauvegarde :",
     "no_saves": "Aucune donnée de sauvegarde pour l'instant (lancez le jeu une fois pour la créer).",
-    "import": "Importer une sauvegarde",
+    "import": "Importer",
     "export": "Exporter",
     "hint": "N'importez pas pendant que le jeu est en cours d'exécution.",
     "col": {
@@ -159,22 +159,22 @@
     "slot_n": "Emplacement {n}",
     "success": {
       "export": "Sauvegarde « {name} » exportée.",
-      "merge": "Données importées fusionnées dans la sauvegarde existante « {name} ».",
-      "add": "« {name} » ajoutée comme nouvelle sauvegarde à l'emplacement {slot}.",
-      "add_reserve": "« {name} » ajoutée comme sauvegarde de réserve (les 5 emplacements sont utilisés, activez-la depuis le jeu).",
       "rebind": "Sauvegarde « {name} » déplacée.",
-      "rebind_swap": "Sauvegardes « {a} » et « {b} » échangées."
+      "rebind_swap": "Sauvegardes « {a} » et « {b} » échangées.",
+      "imported_into": "« {name} » importée dans {slot}."
     },
     "error": {
       "no_db": "Cette instance n'a pas encore de base de sauvegarde.",
       "load": "Impossible de lire la base de sauvegarde.",
-      "invalid_file": "Le fichier sélectionné n'est pas un export de sauvegarde OpenTaiko valide.",
-      "older": "Cette sauvegarde ({imported}) est plus ancienne que la base de sauvegarde de l'instance ({current}) ; l'import a été annulé pour éviter des problèmes de compatibilité.",
+      "invalid_file": "Fichier de sauvegarde OpenTaiko invalide.",
+      "older": "Cette sauvegarde ({imported}) est plus ancienne que la base ({current}). Import annulé.",
       "export": "Échec de l'export de la sauvegarde : {error}",
       "import": "Échec de l'import de la sauvegarde : {error}",
       "rebind": "Échec du changement d'emplacement : {error}"
     },
-    "rebind_hint": "Changer l'emplacement de cette sauvegarde (un emplacement occupé échange les deux sauvegardes)."
+    "rebind_hint": "Changer d'emplacement (échange avec l'occupant).",
+    "confirm_title": "Importer une sauvegarde",
+    "confirm_import": "Fusionner « {imported} » dans {slot} (« {current} ») ?"
   },
   "hub": {
     "status": {
@@ -269,7 +269,7 @@
       "download_nb": "Chanson {nb} sur {total} téléchargée"
     },
     "duplicates": {
-      "banner": "{count} dossier(s) de « {instance} » ne contiennent aucun chart mais existent dans la bibliothèque partagée ; le jeu les affiche donc en double, vides. Les supprimer ?",
+      "banner": "{count} dossier(s) vides en double dans « {instance} ». Les supprimer ?",
       "button": "Nettoyer",
       "success": "{count} dossier(s) en double supprimé(s).",
       "error": "Échec de la suppression des dossiers en double : {error}"

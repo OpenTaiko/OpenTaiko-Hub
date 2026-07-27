@@ -73,9 +73,9 @@
     "picker": {
       "title": "Kies een build om te installeren",
       "install": "Installeren",
-      "stable_desc": "Officiële release, gedownload van GitHub. Skins en nummers worden door de Hub beheerd.",
-      "indev_desc": "Op je eigen machine gebouwd vanaf de ontwikkelbranch (vereist de .NET SDK 8). Bevat eigen skins en personages.",
-      "prerelease_desc": "Voorlopige versie, gedownload van GitHub."
+      "stable_desc": "Officiële GitHub-release.",
+      "indev_desc": "Lokaal gebouwd vanaf de dev-branch (vereist de .NET SDK 8).",
+      "prerelease_desc": "Voorlopige versie van GitHub."
     }
   },
   "home": {
@@ -144,10 +144,10 @@
   "saves": {
     "tab": "Opslag",
     "title": "Opgeslagen gegevens",
-    "description": "Exporteer een save (een slot, herkend aan de spelersnaam) met al zijn gegevens (scores, ontgrendelingen, munten en voortgang), of importeer er een. Een save met een overeenkomende unieke id wordt samengevoegd; anders wordt hij als nieuwe save toegevoegd.",
+    "description": "Exporteer een save of importeer er een in een slot. Geïmporteerde saves worden samengevoegd.",
     "current_version": "Versie van de save-database:",
     "no_saves": "Nog geen opgeslagen gegevens (start het spel één keer om ze aan te maken).",
-    "import": "Save importeren",
+    "import": "Importeren",
     "export": "Exporteren",
     "hint": "Importeer niet terwijl het spel draait.",
     "col": {
@@ -159,22 +159,22 @@
     "slot_n": "Slot {n}",
     "success": {
       "export": "Save \"{name}\" geëxporteerd.",
-      "merge": "Geïmporteerde gegevens samengevoegd met de bestaande save \"{name}\".",
-      "add": "\"{name}\" toegevoegd als nieuwe save in slot {slot}.",
-      "add_reserve": "\"{name}\" toegevoegd als reserve-save (alle 5 slots zijn in gebruik, activeer hem in het spel).",
       "rebind": "Save \"{name}\" verplaatst.",
-      "rebind_swap": "Saves \"{a}\" en \"{b}\" omgewisseld."
+      "rebind_swap": "Saves \"{a}\" en \"{b}\" omgewisseld.",
+      "imported_into": "\"{name}\" geïmporteerd in {slot}."
     },
     "error": {
       "no_db": "Deze instantie heeft nog geen save-database.",
       "load": "Kon de save-database niet lezen.",
-      "invalid_file": "Het geselecteerde bestand is geen geldige OpenTaiko-save-export.",
-      "older": "Deze save ({imported}) is ouder dan de save-database van de instantie ({current}); de import is geannuleerd om compatibiliteitsproblemen te voorkomen.",
+      "invalid_file": "Geen geldig OpenTaiko-savebestand.",
+      "older": "Deze save ({imported}) is ouder dan de database ({current}). Import geannuleerd.",
       "export": "Kon de save niet exporteren: {error}",
       "import": "Kon de save niet importeren: {error}",
       "rebind": "Kon het save-slot niet wijzigen: {error}"
     },
-    "rebind_hint": "Wijzig het slot van deze save (een bezet slot wisselt de twee saves om)."
+    "rebind_hint": "Slot wijzigen (wisselt met de bezetter).",
+    "confirm_title": "Save importeren",
+    "confirm_import": "\"{imported}\" samenvoegen met {slot} (\"{current}\")?"
   },
   "hub": {
     "status": {
@@ -269,7 +269,7 @@
       "download_nb": "Nummer {nb} van {total} gedownload"
     },
     "duplicates": {
-      "banner": "{count} map(pen) in \"{instance}\" bevatten geen charts maar bestaan al in de gedeelde bibliotheek, dus het spel toont ze als dubbele, lege vakken. Verwijderen?",
+      "banner": "{count} lege dubbele map(pen) in \"{instance}\". Verwijderen?",
       "button": "Opruimen",
       "success": "{count} dubbele map(pen) verwijderd.",
       "error": "Kon de dubbele mappen niet verwijderen: {error}"

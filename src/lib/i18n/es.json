@@ -73,9 +73,9 @@
     "picker": {
       "title": "Elige una versión para instalar",
       "install": "Instalar",
-      "stable_desc": "Versión oficial, descargada desde GitHub. Los skins y las canciones los gestiona el Hub.",
-      "indev_desc": "Compilada en tu máquina desde la rama en desarrollo (requiere el .NET SDK 8). Incluye sus propios skins y personajes.",
-      "prerelease_desc": "Versión preliminar, descargada desde GitHub."
+      "stable_desc": "Versión oficial de GitHub.",
+      "indev_desc": "Compilada localmente desde la rama de desarrollo (requiere el .NET SDK 8).",
+      "prerelease_desc": "Versión preliminar de GitHub."
     }
   },
   "home": {
@@ -144,10 +144,10 @@
   "saves": {
     "tab": "Partidas",
     "title": "Datos de partida",
-    "description": "Exporta una partida (una ranura, identificada por su nombre de jugador) con todos sus datos (puntuaciones, desbloqueos, monedas y progreso), o importa una. Una partida con un id único coincidente se fusiona; de lo contrario se añade como nueva partida.",
+    "description": "Exporta una partida, o importa una en una ranura. Las partidas importadas se fusionan.",
     "current_version": "Versión de la base de datos de partidas:",
     "no_saves": "Aún no hay datos de partida (inicia el juego una vez para crearlos).",
-    "import": "Importar una partida",
+    "import": "Importar",
     "export": "Exportar",
     "hint": "No importes mientras el juego esté en ejecución.",
     "col": {
@@ -159,22 +159,22 @@
     "slot_n": "Ranura {n}",
     "success": {
       "export": "Partida «{name}» exportada.",
-      "merge": "Datos importados fusionados en la partida existente «{name}».",
-      "add": "«{name}» añadida como nueva partida en la ranura {slot}.",
-      "add_reserve": "«{name}» añadida como partida de reserva (las 5 ranuras están en uso: actívala desde el juego).",
       "rebind": "Partida «{name}» movida.",
-      "rebind_swap": "Partidas «{a}» y «{b}» intercambiadas."
+      "rebind_swap": "Partidas «{a}» y «{b}» intercambiadas.",
+      "imported_into": "«{name}» importada en {slot}."
     },
     "error": {
       "no_db": "Esta instancia aún no tiene base de datos de partidas.",
       "load": "No se pudo leer la base de datos de partidas.",
-      "invalid_file": "El archivo seleccionado no es una exportación de partida de OpenTaiko válida.",
-      "older": "Esta partida ({imported}) es más antigua que la base de datos de partidas de la instancia ({current}); se canceló la importación para evitar problemas de compatibilidad.",
+      "invalid_file": "Archivo de partida de OpenTaiko no válido.",
+      "older": "Esta partida ({imported}) es más antigua que la base de datos ({current}). Import cancelado.",
       "export": "No se pudo exportar la partida: {error}",
       "import": "No se pudo importar la partida: {error}",
       "rebind": "No se pudo cambiar la ranura: {error}"
     },
-    "rebind_hint": "Cambia la ranura de esta partida (una ranura ocupada intercambia las dos partidas)."
+    "rebind_hint": "Cambiar de ranura (intercambia con el ocupante).",
+    "confirm_title": "Importar partida",
+    "confirm_import": "¿Fusionar «{imported}» en {slot} («{current}»)?"
   },
   "hub": {
     "status": {
@@ -269,7 +269,7 @@
       "download_nb": "Canción descargada: {nb} de {total}"
     },
     "duplicates": {
-      "banner": "{count} carpeta(s) de «{instance}» no contienen charts pero existen en la biblioteca compartida, así que el juego las muestra como cajas vacías duplicadas. ¿Eliminarlas?",
+      "banner": "{count} carpeta(s) vacías duplicadas en «{instance}». ¿Eliminarlas?",
       "button": "Limpiar",
       "success": "Se eliminaron {count} carpeta(s) duplicada(s).",
       "error": "No se pudieron eliminar las carpetas duplicadas: {error}"

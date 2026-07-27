@@ -9,14 +9,14 @@
     // or newer than, the instance's current save database.
     import { getContext } from 'svelte';
     import { readFile, writeFile, exists } from '@tauri-apps/plugin-fs';
-    import { save as saveDialog, open as openDialog } from '@tauri-apps/plugin-dialog';
+    import { save as saveDialog, open as openDialog, confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
     import { path } from '@tauri-apps/api';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
     import { getSQL } from '$lib/utils/sqljs.js';
     import { compareVersions } from '$lib/utils/versions.js';
-    import { readDbVersion, listSaves, exportSave, importSave, rebindSlot } from '$lib/utils/savesdb.js';
+    import { readDbVersion, listSaves, exportSave, importSaveInto, rebindSlot } from '$lib/utils/savesdb.js';
     import { activeInstance } from '$lib/stores/instances.js';
 
     const { TriggerError, TriggerSuccess, TriggerWarning } = getContext('toast');
@@ -115,7 +115,14 @@
         }
     };
 
-    const Import = async () => {
+    const SlotLabel = (entry) => entry.slot === null
+        ? get(_)('saves.slot_reserve')
+        : get(_)('saves.slot_n', { values: { n: entry.slot + 1 } });
+
+    // Imports an archive into one chosen save. The destination is picked by the user
+    // rather than derived from the archive's unique id, so a save exported on another
+    // machine can be brought into any slot. The data is merged, never regressed.
+    const Import = async (entry) => {
         if (busy || !instance) return;
         const inst = instance;
         let db = null;
@@ -138,6 +145,19 @@
                 return;
             }
 
+            // Confirm which save receives the import, so a mis-clicked row is caught
+            const confirmed = await confirmDialog(
+                get(_)('saves.confirm_import', {
+                    values: {
+                        slot: SlotLabel(entry),
+                        current: entry.name,
+                        imported: portable.save.PlayerName ?? '?'
+                    }
+                }),
+                { title: get(_)('saves.confirm_title') }
+            );
+            if (!confirmed) return;
+
             busy = true;
             const p = await dbPath(inst);
             if (!(await exists(p))) {
@@ -157,17 +177,13 @@
                 return;
             }
 
-            const result = importSave(db, portable, crypto.randomUUID());
+            const result = importSaveInto(db, portable, entry.saveId, crypto.randomUUID());
             await writeFile(p, db.export());
-            await Load(inst);
-
-            if (result.mode === 'merge') {
-                TriggerSuccess(get(_)('saves.success.merge', { values: { name: result.name } }));
-            } else if (result.slot === null) {
-                TriggerWarning(get(_)('saves.success.add_reserve', { values: { name: result.name } }));
-            } else {
-                TriggerSuccess(get(_)('saves.success.add', { values: { name: result.name, slot: result.slot } }));
-            }
+            // Silent reload: refreshes the names without the layout shifting
+            await Load(inst, true);
+            TriggerSuccess(get(_)('saves.success.imported_into', {
+                values: { name: result.name, slot: SlotLabel(entry) }
+            }));
         } catch (error) {
             TriggerError(get(_)('saves.error.import', { values: { error } }));
         } finally {
@@ -242,9 +258,6 @@
             <button type="button" class="button-blue button-main" disabled={busy} on:click={() => Load(instance)}>
                 <i class="fa-solid fa-rotate"></i> {$_('common.reload')}
             </button>
-            <button type="button" class="button-blue button-main" disabled={busy} on:click={Import}>
-                <i class="fa-solid fa-file-import"></i> {$_('saves.import')}
-            </button>
         </div>
 
         {#if loadError}
@@ -285,9 +298,12 @@
                             </select>
                         </td>
                         <td class="uid-cell" title={entry.saveUid}>{entry.saveUid ? entry.saveUid.slice(0, 8) : '—'}</td>
-                        <td class="text-right">
+                        <td class="text-right whitespace-nowrap">
                             <button type="button" class="button-green button-main" disabled={busy} on:click={() => Export(entry)}>
                                 <i class="fa-solid fa-file-export"></i> {$_('saves.export')}
+                            </button>
+                            <button type="button" class="button-blue button-main" disabled={busy} on:click={() => Import(entry)}>
+                                <i class="fa-solid fa-file-import"></i> {$_('saves.import')}
                             </button>
                         </td>
                     </tr>
