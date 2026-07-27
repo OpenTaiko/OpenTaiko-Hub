@@ -5,6 +5,10 @@
 // existing save when the archive's SaveUID matches one already present, or ADDs the save
 // as a new entry otherwise (or when the archive has no SaveUID). Everything runs against
 // the passed-in sql.js Database so the exact same schema the game uses is honored.
+//
+// Merging is idempotent by design: every field is combined with a rule that yields the
+// same result when applied twice (highest score, highest counter, union of unlocks), so
+// re-importing the same archive can never inflate or otherwise alter the save.
 
 export const DEFAULT_DB_VERSION = 'v0.6.0.0';
 
@@ -155,7 +159,9 @@ const mergeBestPlays = (db, targetId, plays) => {
         }
         if (bpCols.includes('ClearStatus')) merged.ClearStatus = Math.max(Number(existing.ClearStatus ?? -1), Number(play.ClearStatus ?? -1));
         if (bpCols.includes('TowerBestFloor')) merged.TowerBestFloor = Math.max(Number(existing.TowerBestFloor ?? 0), Number(play.TowerBestFloor ?? 0));
-        if (bpCols.includes('PlayCount')) merged.PlayCount = Number(existing.PlayCount ?? 0) + Number(play.PlayCount ?? 0);
+        // Highest wins rather than a sum: importing the same archive twice must not
+        // keep inflating the count. Every other merged field is idempotent the same way.
+        if (bpCols.includes('PlayCount')) merged.PlayCount = Math.max(Number(existing.PlayCount ?? 0), Number(play.PlayCount ?? 0));
         const setCols = Object.keys(merged);
         if (setCols.length > 0) {
             db.run(
