@@ -161,7 +161,9 @@
       "export": "Spielstand „{name}“ exportiert.",
       "rebind": "Spielstand „{name}“ verschoben.",
       "rebind_swap": "Spielstände „{a}“ und „{b}“ getauscht.",
-      "imported_into": "„{name}“ in {slot} importiert."
+      "imported_into": "„{name}“ in {slot} importiert.",
+      "created": "Spielstand „{name}“ erstellt.",
+      "deleted": "Spielstand „{name}“ gelöscht."
     },
     "error": {
       "no_db": "Diese Instanz hat noch keine Spielstand-Datenbank.",
@@ -170,11 +172,18 @@
       "older": "Dieser Spielstand ({imported}) ist älter als die Datenbank ({current}). Import abgebrochen.",
       "export": "Spielstand konnte nicht exportiert werden: {error}",
       "import": "Spielstand konnte nicht importiert werden: {error}",
-      "rebind": "Slot-Wechsel fehlgeschlagen: {error}"
+      "rebind": "Slot-Wechsel fehlgeschlagen: {error}",
+      "create": "Spielstand konnte nicht erstellt werden: {error}",
+      "delete": "Spielstand konnte nicht gelöscht werden: {error}"
     },
     "rebind_hint": "Slot wechseln (tauscht mit dem Belegten).",
     "confirm_title": "Spielstand importieren",
-    "confirm_import": "„{imported}“ in {slot} („{current}“) zusammenführen?"
+    "confirm_import": "„{imported}“ in {slot} („{current}“) zusammenführen?",
+    "create": "Neuer Spielstand",
+    "new_name": "Neuer Spieler",
+    "delete": "Löschen",
+    "confirm_delete_title": "Spielstand löschen",
+    "confirm_delete": "Den Spielstand „{name}“ löschen? Das lässt sich nicht rückgängig machen."
   },
   "hub": {
     "status": {

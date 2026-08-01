@@ -161,7 +161,9 @@
       "export": "セーブ「{name}」を書き出しました。",
       "rebind": "セーブ「{name}」を移動しました。",
       "rebind_swap": "セーブ「{a}」と「{b}」を入れ替えました。",
-      "imported_into": "「{name}」を {slot} に読み込みました。"
+      "imported_into": "「{name}」を {slot} に読み込みました。",
+      "created": "セーブ「{name}」を作成しました。",
+      "deleted": "セーブ「{name}」を削除しました。"
     },
     "error": {
       "no_db": "このインスタンスにはまだセーブデータベースがありません。",
@@ -170,11 +172,18 @@
       "older": "このセーブ（{imported}）はデータベース（{current}）より古いため、読み込みを中止しました。",
       "export": "セーブの書き出しに失敗しました：{error}",
       "import": "セーブの読み込みに失敗しました：{error}",
-      "rebind": "セーブスロットの変更に失敗しました：{error}"
+      "rebind": "セーブスロットの変更に失敗しました：{error}",
+      "create": "セーブの作成に失敗しました：{error}",
+      "delete": "セーブの削除に失敗しました：{error}"
     },
     "rebind_hint": "スロットを変更（使用中なら入れ替え）。",
     "confirm_title": "セーブの読み込み",
-    "confirm_import": "「{imported}」を {slot}（「{current}」）に統合しますか？"
+    "confirm_import": "「{imported}」を {slot}（「{current}」）に統合しますか？",
+    "create": "新規セーブ",
+    "new_name": "新しいプレイヤー",
+    "delete": "セーブを削除",
+    "confirm_delete_title": "セーブの削除",
+    "confirm_delete": "セーブ「{name}」を削除しますか？元に戻せません。"
   },
   "hub": {
     "status": {

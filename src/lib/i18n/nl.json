@@ -161,7 +161,9 @@
       "export": "Save \"{name}\" geëxporteerd.",
       "rebind": "Save \"{name}\" verplaatst.",
       "rebind_swap": "Saves \"{a}\" en \"{b}\" omgewisseld.",
-      "imported_into": "\"{name}\" geïmporteerd in {slot}."
+      "imported_into": "\"{name}\" geïmporteerd in {slot}.",
+      "created": "Save \"{name}\" aangemaakt.",
+      "deleted": "Save \"{name}\" verwijderd."
     },
     "error": {
       "no_db": "Deze instantie heeft nog geen save-database.",
@@ -170,11 +172,18 @@
       "older": "Deze save ({imported}) is ouder dan de database ({current}). Import geannuleerd.",
       "export": "Kon de save niet exporteren: {error}",
       "import": "Kon de save niet importeren: {error}",
-      "rebind": "Kon het save-slot niet wijzigen: {error}"
+      "rebind": "Kon het save-slot niet wijzigen: {error}",
+      "create": "Kon de save niet aanmaken: {error}",
+      "delete": "Kon de save niet verwijderen: {error}"
     },
     "rebind_hint": "Slot wijzigen (wisselt met de bezetter).",
     "confirm_title": "Save importeren",
-    "confirm_import": "\"{imported}\" samenvoegen met {slot} (\"{current}\")?"
+    "confirm_import": "\"{imported}\" samenvoegen met {slot} (\"{current}\")?",
+    "create": "Nieuwe save",
+    "new_name": "Nieuwe speler",
+    "delete": "Verwijderen",
+    "confirm_delete_title": "Save verwijderen",
+    "confirm_delete": "De save \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt."
   },
   "hub": {
     "status": {

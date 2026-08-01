@@ -161,7 +161,9 @@
       "export": "已匯出存檔「{name}」。",
       "rebind": "已移動存檔「{name}」。",
       "rebind_swap": "已交換存檔「{a}」和「{b}」。",
-      "imported_into": "已將「{name}」匯入到 {slot}。"
+      "imported_into": "已將「{name}」匯入到 {slot}。",
+      "created": "已建立存檔「{name}」。",
+      "deleted": "已刪除存檔「{name}」。"
     },
     "error": {
       "no_db": "此實例尚無存檔資料庫。",
@@ -170,11 +172,18 @@
       "older": "此存檔（{imported}）比資料庫（{current}）舊，已取消匯入。",
       "export": "匯出存檔失敗：{error}",
       "import": "匯入存檔失敗：{error}",
-      "rebind": "更改存檔槽位失敗：{error}"
+      "rebind": "更改存檔槽位失敗：{error}",
+      "create": "建立存檔失敗：{error}",
+      "delete": "刪除存檔失敗：{error}"
     },
     "rebind_hint": "更改槽位（佔用時會交換）。",
     "confirm_title": "匯入存檔",
-    "confirm_import": "要將「{imported}」合併到 {slot}（「{current}」）嗎？"
+    "confirm_import": "要將「{imported}」合併到 {slot}（「{current}」）嗎？",
+    "create": "新建存檔",
+    "new_name": "新玩家",
+    "delete": "刪除存檔",
+    "confirm_delete_title": "刪除存檔",
+    "confirm_delete": "要刪除存檔「{name}」嗎？此操作無法復原。"
   },
   "hub": {
     "status": {

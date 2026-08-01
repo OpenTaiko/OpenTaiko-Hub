@@ -161,7 +161,9 @@
       "export": "Exported the save \"{name}\".",
       "rebind": "Moved the save \"{name}\".",
       "rebind_swap": "Swapped the saves \"{a}\" and \"{b}\".",
-      "imported_into": "Imported \"{name}\" into {slot}."
+      "imported_into": "Imported \"{name}\" into {slot}.",
+      "created": "Created the save \"{name}\".",
+      "deleted": "Deleted the save \"{name}\"."
     },
     "error": {
       "no_db": "This instance has no save database yet.",
@@ -170,11 +172,18 @@
       "older": "This save ({imported}) is older than the database ({current}). Import cancelled.",
       "export": "Failed to export the save: {error}",
       "import": "Failed to import the save: {error}",
-      "rebind": "Failed to change the save slot: {error}"
+      "rebind": "Failed to change the save slot: {error}",
+      "create": "Failed to create the save: {error}",
+      "delete": "Failed to delete the save: {error}"
     },
     "rebind_hint": "Change slot (swaps with the occupant).",
     "confirm_title": "Import save",
-    "confirm_import": "Merge \"{imported}\" into {slot} (\"{current}\")?"
+    "confirm_import": "Merge \"{imported}\" into {slot} (\"{current}\")?",
+    "create": "New save",
+    "new_name": "New player",
+    "delete": "Delete save",
+    "confirm_delete_title": "Delete save",
+    "confirm_delete": "Delete the save \"{name}\"? This cannot be undone."
   },
   "hub": {
     "status": {

@@ -161,7 +161,9 @@
       "export": "세이브 \"{name}\"을(를) 내보냈습니다.",
       "rebind": "세이브 \"{name}\"을(를) 이동했습니다.",
       "rebind_swap": "세이브 \"{a}\"와 \"{b}\"를 서로 바꿨습니다.",
-      "imported_into": "\"{name}\"을(를) {slot}에 가져왔습니다."
+      "imported_into": "\"{name}\"을(를) {slot}에 가져왔습니다.",
+      "created": "세이브 \"{name}\"을(를) 만들었습니다.",
+      "deleted": "세이브 \"{name}\"을(를) 삭제했습니다."
     },
     "error": {
       "no_db": "이 인스턴스에는 아직 세이브 데이터베이스가 없습니다.",
@@ -170,11 +172,18 @@
       "older": "이 세이브({imported})는 데이터베이스({current})보다 오래되어 가져오기를 취소했습니다.",
       "export": "세이브 내보내기에 실패했습니다: {error}",
       "import": "세이브 가져오기에 실패했습니다: {error}",
-      "rebind": "세이브 슬롯 변경에 실패했습니다: {error}"
+      "rebind": "세이브 슬롯 변경에 실패했습니다: {error}",
+      "create": "세이브를 만들지 못했습니다: {error}",
+      "delete": "세이브를 삭제하지 못했습니다: {error}"
     },
     "rebind_hint": "슬롯 변경(사용 중이면 교체).",
     "confirm_title": "세이브 가져오기",
-    "confirm_import": "\"{imported}\"을(를) {slot}(\"{current}\")에 병합할까요?"
+    "confirm_import": "\"{imported}\"을(를) {slot}(\"{current}\")에 병합할까요?",
+    "create": "새 세이브",
+    "new_name": "새 플레이어",
+    "delete": "삭제",
+    "confirm_delete_title": "세이브 삭제",
+    "confirm_delete": "세이브 \"{name}\"을(를) 삭제할까요? 되돌릴 수 없습니다."
   },
   "hub": {
     "status": {

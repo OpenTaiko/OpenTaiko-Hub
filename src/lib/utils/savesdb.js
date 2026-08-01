@@ -233,6 +233,49 @@ const applyChildren = (db, saveId, save, merge) => {
     unionInsert(db, 'unlocked_songs', 'Asset', save.unlockedSongs ?? [], saveId);
 };
 
+// Creates an empty save as a reserve entry (no slot), mirroring what the game's own
+// template rows look like. It stays out of the 5 playable slots until the user binds
+// it to one, which swaps it with that slot's occupant.
+// Returns { saveId, name }.
+export const createSave = (db, playerName, newUid) => {
+    const saveCols = columns(db, 'saves');
+    const cols = ['PlayerName'];
+    const values = [playerName];
+    if (saveCols.includes('SaveUID')) {
+        cols.push('SaveUID');
+        values.push(newUid);
+    }
+    // CurrentSlot stays NULL: a new save is always a reserve save
+    cols.push('CurrentSlot');
+    values.push(null);
+    db.run(
+        `INSERT INTO saves (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`,
+        values
+    );
+    const saveId = Number(one(db, 'SELECT last_insert_rowid() AS id').id);
+    return { saveId, name: playerName };
+};
+
+// Deletes a reserve save and everything attached to it. Saves bound to one of the 5
+// playable slots are refused: the game needs those slots to exist, so a save must be
+// moved out of its slot (by a swap) before it can be removed.
+// Returns { deleted, name }.
+export const deleteSave = (db, saveId) => {
+    const saveRow = one(db, 'SELECT SaveId, PlayerName, CurrentSlot FROM saves WHERE SaveId=?', [saveId]);
+    if (!saveRow) throw new Error(`Save ${saveId} not found`);
+    if (saveRow.CurrentSlot !== null && saveRow.CurrentSlot !== undefined) {
+        return { deleted: false, name: saveRow.PlayerName };
+    }
+    for (const table of [
+        'best_plays', 'active_triggers', 'dan_titles', 'nameplate_titles',
+        'unlocked_characters', 'unlocked_puchicharas', 'unlocked_songs', 'global_counters'
+    ]) {
+        if (tableExists(db, table)) db.run(`DELETE FROM ${table} WHERE SaveId=?`, [saveId]);
+    }
+    db.run('DELETE FROM saves WHERE SaveId=?', [saveId]);
+    return { deleted: true, name: saveRow.PlayerName };
+};
+
 // Moves a save to a target active slot (0-4). When another save already holds the
 // target slot, the two swap places. A slotted save can never be parked to reserve:
 // the game requires all 5 slots to exist and stay unique, so the only way out of a

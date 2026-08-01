@@ -161,7 +161,9 @@
       "export": "Partida «{name}» exportada.",
       "rebind": "Partida «{name}» movida.",
       "rebind_swap": "Partidas «{a}» y «{b}» intercambiadas.",
-      "imported_into": "«{name}» importada en {slot}."
+      "imported_into": "«{name}» importada en {slot}.",
+      "created": "Partida «{name}» creada.",
+      "deleted": "Partida «{name}» eliminada."
     },
     "error": {
       "no_db": "Esta instancia aún no tiene base de datos de partidas.",
@@ -170,11 +172,18 @@
       "older": "Esta partida ({imported}) es más antigua que la base de datos ({current}). Import cancelado.",
       "export": "No se pudo exportar la partida: {error}",
       "import": "No se pudo importar la partida: {error}",
-      "rebind": "No se pudo cambiar la ranura: {error}"
+      "rebind": "No se pudo cambiar la ranura: {error}",
+      "create": "No se pudo crear la partida: {error}",
+      "delete": "No se pudo eliminar la partida: {error}"
     },
     "rebind_hint": "Cambiar de ranura (intercambia con el ocupante).",
     "confirm_title": "Importar partida",
-    "confirm_import": "¿Fusionar «{imported}» en {slot} («{current}»)?"
+    "confirm_import": "¿Fusionar «{imported}» en {slot} («{current}»)?",
+    "create": "Nueva partida",
+    "new_name": "Nuevo jugador",
+    "delete": "Eliminar",
+    "confirm_delete_title": "Eliminar partida",
+    "confirm_delete": "¿Eliminar la partida «{name}»? No se puede deshacer."
   },
   "hub": {
     "status": {

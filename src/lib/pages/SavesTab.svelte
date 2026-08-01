@@ -16,7 +16,7 @@
 
     import { getSQL } from '$lib/utils/sqljs.js';
     import { compareVersions } from '$lib/utils/versions.js';
-    import { readDbVersion, listSaves, exportSave, importSaveInto, rebindSlot } from '$lib/utils/savesdb.js';
+    import { readDbVersion, listSaves, exportSave, importSaveInto, rebindSlot, createSave, deleteSave } from '$lib/utils/savesdb.js';
     import { activeInstance } from '$lib/stores/instances.js';
 
     const { TriggerError, TriggerSuccess, TriggerWarning } = getContext('toast');
@@ -118,6 +118,55 @@
     const SlotLabel = (entry) => entry.slot === null
         ? get(_)('saves.slot_reserve')
         : get(_)('saves.slot_n', { values: { n: entry.slot + 1 } });
+
+    // Runs a write against the instance DB and reloads the list without a layout shift
+    const WithDb = async (action) => {
+        if (busy || !instance) return null;
+        const inst = instance;
+        let db = null;
+        busy = true;
+        try {
+            const p = await dbPath(inst);
+            if (!(await exists(p))) {
+                TriggerError(get(_)('saves.error.no_db'));
+                return null;
+            }
+            const SQL = await getSQL();
+            db = new SQL.Database(await readFile(p));
+            const result = await action(db);
+            if (result?.write !== false) await writeFile(p, db.export());
+            await Load(inst, true);
+            return result;
+        } finally {
+            db?.close();
+            busy = false;
+        }
+    };
+
+    const CreateSave = async () => {
+        try {
+            const result = await WithDb((db) => createSave(db, get(_)('saves.new_name'), crypto.randomUUID()));
+            if (result) TriggerSuccess(get(_)('saves.success.created', { values: { name: result.name } }));
+        } catch (error) {
+            TriggerError(get(_)('saves.error.create', { values: { error } }));
+        }
+    };
+
+    const DeleteSave = async (entry) => {
+        // Only reserve saves can go: the game needs its 5 slots to stay filled
+        if (entry.slot !== null) return;
+        const confirmed = await confirmDialog(
+            get(_)('saves.confirm_delete', { values: { name: entry.name } }),
+            { title: get(_)('saves.confirm_delete_title'), kind: 'warning' }
+        );
+        if (!confirmed) return;
+        try {
+            const result = await WithDb((db) => deleteSave(db, entry.saveId));
+            if (result?.deleted) TriggerSuccess(get(_)('saves.success.deleted', { values: { name: result.name } }));
+        } catch (error) {
+            TriggerError(get(_)('saves.error.delete', { values: { error } }));
+        }
+    };
 
     // Imports an archive into one chosen save. The destination is picked by the user
     // rather than derived from the archive's unique id, so a save exported on another
@@ -258,6 +307,9 @@
             <button type="button" class="button-blue button-main" disabled={busy} on:click={() => Load(instance)}>
                 <i class="fa-solid fa-rotate"></i> {$_('common.reload')}
             </button>
+            <button type="button" class="button-green button-main" disabled={busy} on:click={CreateSave}>
+                <i class="fa-solid fa-plus"></i> {$_('saves.create')}
+            </button>
         </div>
 
         {#if loadError}
@@ -305,6 +357,13 @@
                             <button type="button" class="button-blue button-main" disabled={busy} on:click={() => Import(entry)}>
                                 <i class="fa-solid fa-file-import"></i> {$_('saves.import')}
                             </button>
+                            <!-- Deleting is offered for reserve saves only: the game
+                                 needs its 5 playable slots to stay filled -->
+                            {#if entry.slot === null}
+                                <button type="button" class="button-red button-main" disabled={busy} title={$_('saves.delete')} aria-label={$_('saves.delete')} on:click={() => DeleteSave(entry)}>
+                                    <i class="fa-solid fa-xmark"></i>
+                                </button>
+                            {/if}
                         </td>
                     </tr>
                     {/each}

@@ -161,7 +161,9 @@
       "export": "Sauvegarde « {name} » exportée.",
       "rebind": "Sauvegarde « {name} » déplacée.",
       "rebind_swap": "Sauvegardes « {a} » et « {b} » échangées.",
-      "imported_into": "« {name} » importée dans {slot}."
+      "imported_into": "« {name} » importée dans {slot}.",
+      "created": "Sauvegarde « {name} » créée.",
+      "deleted": "Sauvegarde « {name} » supprimée."
     },
     "error": {
       "no_db": "Cette instance n'a pas encore de base de sauvegarde.",
@@ -170,11 +172,18 @@
       "older": "Cette sauvegarde ({imported}) est plus ancienne que la base ({current}). Import annulé.",
       "export": "Échec de l'export de la sauvegarde : {error}",
       "import": "Échec de l'import de la sauvegarde : {error}",
-      "rebind": "Échec du changement d'emplacement : {error}"
+      "rebind": "Échec du changement d'emplacement : {error}",
+      "create": "Échec de la création : {error}",
+      "delete": "Échec de la suppression : {error}"
     },
     "rebind_hint": "Changer d'emplacement (échange avec l'occupant).",
     "confirm_title": "Importer une sauvegarde",
-    "confirm_import": "Fusionner « {imported} » dans {slot} (« {current} ») ?"
+    "confirm_import": "Fusionner « {imported} » dans {slot} (« {current} ») ?",
+    "create": "Nouvelle sauvegarde",
+    "new_name": "Nouveau joueur",
+    "delete": "Supprimer",
+    "confirm_delete_title": "Supprimer la sauvegarde",
+    "confirm_delete": "Supprimer la sauvegarde « {name} » ? Action irréversible."
   },
   "hub": {
     "status": {
