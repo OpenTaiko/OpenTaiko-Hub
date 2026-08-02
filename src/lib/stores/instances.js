@@ -50,36 +50,85 @@ const persist = async () => {
     await writeTextFile(await registryPath(), JSON.stringify(data, null, 2));
 };
 
+// Decides the instance list and the selected instance from what was stored plus what
+// is on disk. Kept pure (all IO passed in) so the upgrade paths can be tested.
+//
+// The registry lives in the shared app config folder, so it can already exist (written
+// by another Hub build using the same identifier) while this install's own game folder
+// has never been added. Adoption therefore runs on every load, not only when the
+// registry is missing, which is what made an existing OpenTaiko install invisible after
+// updating the Hub.
+export const resolveInstances = async ({ storedList, storedActiveId, legacyPath, pathExists, makeInstance }) => {
+    let list = Array.isArray(storedList) ? storedList : [];
+
+    let adopted = null;
+    const known = new Set(list.map((inst) => normalizePath(inst.path)));
+    if (legacyPath && !known.has(normalizePath(legacyPath)) && (await pathExists(legacyPath))) {
+        adopted = makeInstance(legacyPath);
+        list = [...list, adopted];
+    }
+
+    // A freshly adopted folder is this install's own game, so select it. Otherwise keep
+    // the stored selection, falling back to an instance that still exists on disk.
+    let active = adopted ?? list.find((inst) => inst.id === storedActiveId) ?? null;
+    if (!active && list.length > 0) {
+        for (const inst of list) {
+            if (await pathExists(inst.path)) {
+                active = inst;
+                break;
+            }
+        }
+        active ??= list[0];
+    }
+
+    return { list, activeId: active?.id ?? null, adopted: !!adopted };
+};
+
 export const loadInstances = async () => {
+    let storedList = [];
+    let storedActiveId = null;
+    let registryFound = false;
     try {
         const content = await readTextFile(await registryPath());
         const data = JSON.parse(content);
-        const list = Array.isArray(data.instances) ? data.instances : [];
-        instances.set(list);
-        const active = list.find((inst) => inst.id === data.activeId) ?? list[0] ?? null;
-        activeInstanceId.set(active?.id ?? null);
+        storedList = Array.isArray(data.instances) ? data.instances : [];
+        storedActiveId = data.activeId ?? null;
+        registryFound = true;
     } catch {
-        // First run of 0.2 (or fresh install): adopt the legacy single-instance folder
-        const list = [];
-        try {
-            const legacyPath = await GetLegacyInstancePath();
-            if (await exists(legacyPath)) {
-                list.push({
-                    id: crypto.randomUUID(),
-                    name: 'OpenTaiko',
-                    path: legacyPath,
-                    channel: 'stable',
-                    experimental: null,
-                    createdAt: new Date().toISOString()
-                });
-            }
-        } catch (error) {
-            console.error('Legacy instance detection failed:', error);
-        }
-        instances.set(list);
-        activeInstanceId.set(list[0]?.id ?? null);
-        await persist();
+        // No registry yet: first run of 0.2, or a fresh install
     }
+
+    let legacyPath = null;
+    try {
+        legacyPath = await GetLegacyInstancePath();
+    } catch (error) {
+        console.error('Legacy instance detection failed:', error);
+    }
+
+    const resolved = await resolveInstances({
+        storedList,
+        storedActiveId,
+        legacyPath,
+        pathExists: async (p) => {
+            try {
+                return await exists(p);
+            } catch {
+                return false;
+            }
+        },
+        makeInstance: (path) => ({
+            id: crypto.randomUUID(),
+            name: 'OpenTaiko',
+            path,
+            channel: 'stable',
+            experimental: null,
+            createdAt: new Date().toISOString()
+        })
+    });
+
+    instances.set(resolved.list);
+    activeInstanceId.set(resolved.activeId);
+    if (!registryFound || resolved.adopted || resolved.activeId !== storedActiveId) await persist();
     instancesReady.set(true);
 };
 

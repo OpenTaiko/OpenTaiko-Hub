@@ -3,6 +3,10 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.2.1] - 2026-08-03 (Alpha)
+
+- [Fix] Fix local instance missing in the instances list when updating the Hub to 0.2 (can still be added with Attach Existing Instance but it is not an intuitive method)
+
 ## [0.2.0] - 2026-08-02 (Alpha)
 
 - [Feat] Multiple OpenTaiko instances: create new instances (OpenTaiko-[uuid] folders), attach existing installs, and switch between them from the new instance bar
