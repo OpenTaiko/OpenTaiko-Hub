@@ -4,8 +4,16 @@ import { isVersionBelow } from './versions.js';
 
 export const repoOwner = '0AuBSQ';//'OpenTaiko';
 export const repoName = 'OpenTaiko';//OpenTaiko-Dev-Mirror';
-export const INDEV_BRANCH = '0.6.1-skinning-characters';
-export const INDEV_LABEL = 'InDev 0.6.1';
+// Branch builds of a version that is not released yet. Each entry is listed only while
+// its `version` is still unreleased, so a branch drops off the list on its release day
+// without touching instances already built from it. Add future InDev branches here.
+const INDEV_BUILDS = [
+    { branch: '0.6.1-skinning-characters', label: 'InDev 0.6.1', version: '0.6.1' }
+];
+
+// Fallbacks for instances recorded before the branch was stored on them
+export const INDEV_BRANCH = INDEV_BUILDS[0].branch;
+export const INDEV_LABEL = INDEV_BUILDS[0].label;
 
 export const fetchLatestRelease = async () => {
     const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
@@ -15,12 +23,17 @@ export const fetchLatestRelease = async () => {
     return await response.json();
 };
 
-// Experimental build sources: prereleases, plus the "InDev 0.6.1" branch build while
-// the latest stable release is older than 0.6.1.
+// Experimental build sources: prereleases, plus any branch build whose target version
+// has not been released yet. Listing a branch needs a known latest release, so nothing
+// is offered when it cannot be fetched.
 export const fetchExperimentalOptions = async (latestTag) => {
     const options = [];
-    if (latestTag && isVersionBelow(latestTag, '0.6.1')) {
-        options.push({ kind: 'indev', branch: INDEV_BRANCH, label: INDEV_LABEL });
+    if (latestTag) {
+        for (const build of INDEV_BUILDS) {
+            if (isVersionBelow(latestTag, build.version)) {
+                options.push({ kind: 'indev', branch: build.branch, label: build.label });
+            }
+        }
     }
     try {
         const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases?per_page=15`);
