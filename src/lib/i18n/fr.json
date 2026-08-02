@@ -1,0 +1,546 @@
+{
+  "common": {
+    "fetch_error": "Erreur de récupération",
+    "retry": "Réessayer",
+    "reload": "Recharger",
+    "cancel": "Annuler"
+  },
+  "dl": {
+    "error": {
+      "failed_abort": "Échec du téléchargement, abandon"
+    },
+    "warn": {
+      "failed_retry": "Échec du téléchargement, nouvelle tentative... ({attempt}/{max})"
+    }
+  },
+  "nav": {
+    "home": "Accueil",
+    "songlist": "Chansons",
+    "skins": "Skins",
+    "docs": "Docs",
+    "tools": "Outils",
+    "secrets": "Secrets",
+    "information": "Informations",
+    "links": "Liens",
+    "themes": "Thèmes OpTk Hub",
+    "tooltip": {
+      "home": "Gérez OpenTaiko et l'OpenTaiko Hub.",
+      "songlist": "Mettez à jour vos chansons OpenTaiko et téléchargez les plus récentes.",
+      "skins": "Obtenez les derniers skins OpenTaiko et les ressources associées.",
+      "docs": "Parcourez la documentation incluse dans le build OpenTaiko sélectionné.",
+      "tools": "Des outils pour améliorer votre expérience OpenTaiko.",
+      "secrets": "???",
+      "information": "Pour consulter les changelogs, la documentation, ou en cas de problème.",
+      "links": "Découvrez les réseaux sociaux et les sites web d'OpenTaiko !",
+      "themes": "Changez le thème de l'OpenTaiko Hub.",
+      "github": "Voir le code source de l'OpenTaiko Hub."
+    }
+  },
+  "instances": {
+    "label": "Instance",
+    "manage": "Gérer",
+    "title": "Instances OpenTaiko",
+    "none": "Aucune instance OpenTaiko pour le moment. Utilisez \"Gérer\" pour en créer une nouvelle ou attacher un dossier existant.",
+    "active": "Active",
+    "set_active": "Sélectionner",
+    "attach": "Attacher un dossier existant",
+    "create": "Créer une nouvelle instance",
+    "create_name_placeholder": "Nom de la nouvelle instance...",
+    "detach": "Détacher",
+    "detach_note": "Détacher retire seulement l'instance de cette liste ; aucun fichier n'est supprimé.",
+    "open_folder": "Ouvrir le dossier",
+    "col": {
+      "name": "Nom",
+      "path": "Dossier",
+      "channel": "Type",
+      "version": "Version",
+      "actions": "Actions"
+    },
+    "channel": {
+      "stable": "Stable",
+      "experimental": "Expérimental",
+      "empty": "Aucun build"
+    },
+    "error": {
+      "attach_failed": "Échec de l'attachement du dossier : {error}",
+      "create_failed": "Échec de la création de l'instance : {error}"
+    },
+    "success": {
+      "attached": "\"{name}\" attachée",
+      "created": "\"{name}\" créée",
+      "detached": "\"{name}\" détachée"
+    },
+    "picker": {
+      "title": "Choisir un build à installer",
+      "install": "Installer",
+      "stable_desc": "Version officielle GitHub.",
+      "indev_desc": "Compilé localement depuis la branche de dev (nécessite le .NET SDK 8).",
+      "prerelease_desc": "Préversion GitHub."
+    }
+  },
+  "home": {
+    "label": {
+      "current_version": "Version actuelle d'OpenTaiko :",
+      "latest_version": "Dernière version d'OpenTaiko :",
+      "latest_experimental": "Dernier build expérimental :",
+      "current_os": "Système d'exploitation actuel :",
+      "no_version_found": "Aucune version valide d'OpenTaiko trouvée"
+    },
+    "button": {
+      "reload": "Recharger",
+      "download": "Télécharger OpenTaiko",
+      "download_stable": "Télécharger le build Stable",
+      "download_experimental": "Télécharger le build Expérimental",
+      "launch": "Lancer OpenTaiko",
+      "explorer": "Ouvrir dans l'explorateur",
+      "update": "Mettre à jour OpenTaiko",
+      "redownload": "Retélécharger OpenTaiko",
+      "rebuild": "Recompiler",
+      "retry": "Réessayer",
+      "install": "Installer un build..."
+    },
+    "warn": {
+      "skin_update": "(La mise à jour nécessitera une mise à jour du skin)"
+    },
+    "hint": {
+      "first_start": "Pensez à télécharger un skin (onglet \"Skins\") et des chansons (onglet \"Chansons\") avant de lancer le jeu pour la première fois !",
+      "experimental": "Les builds expérimentaux incluent déjà les skins et les personnages, vous pouvez jouer immédiatement !"
+    },
+    "experimental": {
+      "unavailable": "Aucun build expérimental n'est actuellement disponible",
+      "requires_dotnet": "La compilation des versions expérimentales nécessite le .NET SDK 8. Veuillez l'installer depuis https://dotnet.microsoft.com/download/dotnet/8.0 puis réessayer.",
+      "update_available": "Un nouveau build expérimental est disponible !",
+      "up_to_date": "Ce build expérimental est à jour.",
+      "stage": {
+        "check_sdk": "Vérification du .NET SDK...",
+        "fetch": "Récupération des informations de la branche...",
+        "download": "Téléchargement du code source...",
+        "extract": "Extraction du code source...",
+        "build": "Compilation d'OpenTaiko (cela peut prendre plusieurs minutes)...",
+        "install": "Installation du build..."
+      }
+    },
+    "error": {
+      "launch": "Erreur lors du lancement de l'application : {error}",
+      "already_downloading": "Un téléchargement est déjà en cours",
+      "fetch_release": "Échec de la récupération de la dernière version d'OpenTaiko : {error}",
+      "download_failed": "Échec du téléchargement d'OpenTaiko : {error}",
+      "incomplete_build": "Le build installé est incomplet (fichiers du jeu manquants), veuillez le réinstaller."
+    },
+    "success": {
+      "unzipping": "Téléchargement terminé, décompression en cours...",
+      "installing": "Décompression terminée, installation en cours...",
+      "installed": "Téléchargement et installation terminés"
+    },
+    "tab": {
+      "overview": "Vue d'ensemble"
+    }
+  },
+  "docs": {
+    "title": "Documentation",
+    "not_found": "Ce build d'OpenTaiko n'inclut pas de documentation locale.",
+    "not_found_hint": "Mettez à jour ou recompilez cette instance pour obtenir un build livré avec sa documentation."
+  },
+  "saves": {
+    "tab": "Sauvegardes",
+    "title": "Données de sauvegarde",
+    "description": "Exportez une sauvegarde, ou importez-en une dans un emplacement. Les sauvegardes importées sont fusionnées.",
+    "current_version": "Version de la base de sauvegarde :",
+    "no_saves": "Aucune donnée de sauvegarde pour l'instant (lancez le jeu une fois pour la créer).",
+    "import": "Importer",
+    "export": "Exporter",
+    "hint": "N'importez pas pendant que le jeu est en cours d'exécution.",
+    "col": {
+      "player": "Joueur",
+      "slot": "Emplacement",
+      "uid": "Identifiant unique"
+    },
+    "slot_reserve": "Réserve",
+    "slot_n": "Emplacement {n}",
+    "success": {
+      "export": "Sauvegarde « {name} » exportée.",
+      "rebind": "Sauvegarde « {name} » déplacée.",
+      "rebind_swap": "Sauvegardes « {a} » et « {b} » échangées.",
+      "imported_into": "« {name} » importée dans {slot}.",
+      "created": "Sauvegarde « {name} » créée.",
+      "deleted": "Sauvegarde « {name} » supprimée."
+    },
+    "error": {
+      "no_db": "Cette instance n'a pas encore de base de sauvegarde.",
+      "load": "Impossible de lire la base de sauvegarde.",
+      "invalid_file": "Fichier de sauvegarde OpenTaiko invalide.",
+      "export": "Échec de l'export de la sauvegarde : {error}",
+      "import": "Échec de l'import de la sauvegarde : {error}",
+      "rebind": "Échec du changement d'emplacement : {error}",
+      "create": "Échec de la création : {error}",
+      "delete": "Échec de la suppression : {error}",
+      "newer": "Cette sauvegarde ({imported}) est plus récente que la base ({current}). Mettez le jeu à jour."
+    },
+    "rebind_hint": "Changer d'emplacement (échange avec l'occupant).",
+    "confirm_title": "Importer une sauvegarde",
+    "confirm_import": "Fusionner « {imported} » dans {slot} (« {current} ») ?",
+    "create": "Nouvelle sauvegarde",
+    "new_name": "Nouveau joueur",
+    "delete": "Supprimer",
+    "confirm_delete_title": "Supprimer la sauvegarde",
+    "confirm_delete": "Supprimer la sauvegarde « {name} » ? Action irréversible."
+  },
+  "hub": {
+    "status": {
+      "outdated": "Votre installation de l'OpenTaiko Hub n'est pas à jour.",
+      "up_to_date": "Votre installation de l'OpenTaiko Hub est à jour !",
+      "checking": "Recherche de mises à jour...",
+      "fetch_failed": "Échec de la vérification des mises à jour."
+    },
+    "button": {
+      "update": "Mettre à jour l'OpenTaiko Hub vers {version}"
+    },
+    "warn": {
+      "outdated_toast": "Votre installation de l'OpenTaiko Hub n'est pas à jour.<br>Veuillez cliquer sur le bouton \"Mettre à jour l'OpenTaiko Hub\"."
+    },
+    "error": {
+      "fetch": "Échec de la récupération de la dernière version de l'OpenTaiko Hub : {error}"
+    }
+  },
+  "songs": {
+    "col": {
+      "name": "Nom de la chanson",
+      "folder": "Dossier",
+      "difficulties": "Difficultés",
+      "charter": "Charteur : ",
+      "size": "Taille",
+      "status": "Statut"
+    },
+    "filter": {
+      "song": "Rechercher une chanson...",
+      "folder": "Rechercher un dossier..."
+    },
+    "status": {
+      "scanning": "Analyse...",
+      "not_downloaded": "Non téléchargée",
+      "up_to_date": "À jour",
+      "outdated": "Obsolète"
+    },
+    "button": {
+      "bulk_download": "Tout télécharger",
+      "download": "Télécharger",
+      "redownload": "Retélécharger",
+      "update": "Mettre à jour",
+      "open_folder": "Ouvrir le dossier des chansons"
+    },
+    "view": {
+      "list": "Liste",
+      "tree": "Arborescence"
+    },
+    "scan": {
+      "progress": "Analyse des chansons... ({count} trouvées)",
+      "done": "{count} chansons dans la bibliothèque"
+    },
+    "tree": {
+      "soundtrack": "Bande-son OpenTaiko",
+      "custom": "Personnalisé",
+      "songs_count": "{count} chansons",
+      "empty": "Aucune chanson trouvée dans la bibliothèque pour le moment.",
+      "spicy": "Épicé",
+      "sweet": "Doux"
+    },
+    "migrate": {
+      "banner": "{count} dossier(s) de chansons trouvé(s) dans « {instance} ». Les transférer vers la bibliothèque de chansons partagée ?",
+      "button": "Transférer les chansons",
+      "later": "Plus tard",
+      "modal_title": "Transférer les chansons de « {instance} »",
+      "summary_new": "{count} nouveau(x) dossier(s) de chanson seront ajoutés à la bibliothèque partagée.",
+      "summary_identical": "{count} dossier(s) de chanson identiques seront retirés de cette instance.",
+      "nothing": "Cette instance n'a aucun chart à transférer.",
+      "conflicts_title": "Conflits ({count})",
+      "conflicts_hint": "Ces chansons existent déjà dans la bibliothèque partagée avec un contenu différent. Choisissez la version à conserver.",
+      "col_global": "Bibliothèque partagée",
+      "col_instance": "Cette instance",
+      "bulk_keep_global": "Tout garder du partagé",
+      "bulk_use_instance": "Tout prendre de l'instance",
+      "hash": "Empreinte",
+      "edited": "Modifié le",
+      "apply": "Appliquer",
+      "applied": "Transfert terminé : {moved} ajoutés, {replaced} remplacés, {discarded} écartés.",
+      "error": "Échec du transfert des chansons : {error}"
+    },
+    "metadata": {
+      "updated": "{count} dossier(s) de genre mis à jour (box.def / preimages)"
+    },
+    "experimental_note": "L'instance sélectionnée est un build expérimental : elle inclut ses propres chansons et n'utilise pas la bibliothèque de chansons partagée.",
+    "error": {
+      "scanning": "Impossible de télécharger des chansons pendant l'analyse des dossiers locaux",
+      "scan_failed": "Échec de l'analyse de la bibliothèque de chansons : {error}"
+    },
+    "success": {
+      "all_up_to_date": "Toutes les chansons sont déjà à jour",
+      "download_complete": "Téléchargement terminé",
+      "download_nb": "Chanson {nb} sur {total} téléchargée"
+    },
+    "duplicates": {
+      "banner": "{count} dossier(s) vides en double dans « {instance} ». Les supprimer ?",
+      "button": "Nettoyer",
+      "success": "{count} dossier(s) en double supprimé(s).",
+      "error": "Échec de la suppression des dossiers en double : {error}"
+    }
+  },
+  "assets": {
+    "tab": {
+      "skins": "Skins",
+      "characters": "Personnages",
+      "puchicharas": "Puchicharas"
+    },
+    "col": {
+      "asset": "Ressource",
+      "version": "Version",
+      "resolution": "Résolution",
+      "author": "Auteur",
+      "size": "Taille",
+      "status": "Statut"
+    },
+    "button": {
+      "bulk_download": "Tout télécharger"
+    },
+    "type": {
+      "skins": "Skins",
+      "characters": "Personnages",
+      "puchicharas": "Puchicharas"
+    },
+    "experimental": {
+      "blocked_title": "Non disponible pour les builds expérimentaux",
+      "blocked_text": "Les builds expérimentaux incluent déjà leurs propres skins, personnages et puchicharas."
+    },
+    "error": {
+      "scanning": "Impossible de télécharger des {type} pendant l'analyse des dossiers locaux",
+      "zip_not_found": "Le paquet du skin est introuvable sur le serveur. Veuillez réessayer dans 5 minutes. Si le problème persiste, veuillez contacter l'équipe OpenTaiko."
+    },
+    "success": {
+      "all_up_to_date": "Tous les {type} sont déjà à jour",
+      "download_complete": "Téléchargement terminé",
+      "download_nb": "{type} : {nb} sur {total} téléchargé(s)"
+    }
+  },
+  "asset_cell": {
+    "scanning": "Analyse...",
+    "not_downloaded": "Non téléchargé",
+    "button": {
+      "download": "Télécharger",
+      "redownload": "Retélécharger",
+      "update": "Mettre à jour"
+    }
+  },
+  "hof": {
+    "website_link": "Voir sur le site web d'OpenTaiko",
+    "no_scores": "Aucun score enregistré pour le moment.",
+    "max_list_points": "Points de liste max",
+    "col": {
+      "rank": "Rang",
+      "player": "Joueur",
+      "score": "Score",
+      "grade": "Grade",
+      "good": "Good",
+      "ok": "OK",
+      "bad": "Bad",
+      "list_points": "Pts liste",
+      "video": "Vidéo",
+      "status": "Statut"
+    },
+    "video_link": "Regarder",
+    "close": "Fermer",
+    "status": {
+      "perfect": "Perfect",
+      "full_combo": "Full Combo",
+      "clear": "Clear"
+    }
+  },
+  "version_chip": {
+    "incompatible": "Non compatible avec la version actuelle d'OpenTaiko",
+    "outdated": "Peut-être obsolète, à utiliser avec prudence"
+  },
+  "player": {
+    "play": "lecture",
+    "pause": "pause"
+  },
+  "info": {
+    "tab": {
+      "changelog_game": "Changelogs (Jeu)",
+      "changelog_hub": "Changelogs (Hub)",
+      "documentation": "Documentation",
+      "troubleshooting": "Dépannage",
+      "credits": "Crédits"
+    },
+    "legend": {
+      "title": "Au cas où vous seriez un peu perdu...",
+      "feat": "Signifie \"Feature\" (fonctionnalité). Utilisé pour les ajouts de fonctionnalités.",
+      "enhancement": "Mise à jour d'une fonctionnalité existante.",
+      "fix": "Devrait se passer d'explication.",
+      "fix_note": "(Note : [Fix] et [BugFix] sont utilisés de manière interchangeable.)",
+      "chore": "Changements qui ne sont ni une correction de bug, ni un ajout de fonctionnalité.",
+      "i18n": "Signifie internationalisation.",
+      "theme": "Pour les ajouts et modifications de thèmes de l'OpenTaiko Hub."
+    },
+    "troubleshoot": {
+      "title": "Support / Rapport de bug",
+      "intro": "Si vous rencontrez un problème ou cherchez de l'aide à propos d'OpenTaiko, veuillez consulter les liens suivants :",
+      "discord": "Le canal #support du Discord d'OpenTaiko",
+      "github": "La section issues de GitHub",
+      "note": "Note : Pensez à faire vos propres recherches avant de demander, le problème a peut-être déjà été traité ; pensez aussi à consulter le canal #often_asked_question du Discord."
+    },
+    "versioning": {
+      "title": "Versionnage des skins / ressources",
+      "compat": "Tous les nombres jusqu'au numéro de mise à jour mineure (ex. v[0.6.0].2) doivent correspondre entre un skin et une version du jeu pour être compatibles.",
+      "optional": "Ce n'est pas obligatoire pour certaines mises à jour de ressources (personnage/puchichara), car elles ne suivent pas nécessairement le versionnage strict des skins.",
+      "revision": "Le numéro de révision (ex. v0.6.0.[2]) est incrémenté à chaque mise à jour du jeu/skin qui n'implique pas de changements obligatoires, et n'a pas besoin de correspondre.",
+      "example": "Exemple : un skin avec le numéro de version 0.6.1.3 fonctionnera avec toute version d'OpenTaiko à partir de 0.6.1.0 et cessera d'être compatible à partir de 0.6.2.0.",
+      "wip": "Cette section sera complétée dans de futures mises à jour de l'OpenTaiko Hub en fonction des problèmes rencontrés."
+    },
+    "error": {
+      "changelog": "Échec du chargement du changelog.",
+      "credits": "Échec du chargement des crédits.",
+      "generic": "Erreur : {error}"
+    }
+  },
+  "links": {
+    "section": {
+      "socials": "Réseaux sociaux/GitHub",
+      "websites": "Sites web"
+    },
+    "discord_en": "Serveur Discord officiel anglophone",
+    "discord_ja": "Serveur Discord officiel japonais",
+    "youtube": "Chaîne YouTube officielle",
+    "bluesky": "Compte Bluesky officiel",
+    "twitter": "Compte Twitter/X officiel",
+    "source_main": "Code source principal d'OpenTaiko",
+    "source_hub": "Code source de l'OpenTaiko Hub",
+    "github_org": "Organisation GitHub",
+    "website": "Site web officiel d'OpenTaiko",
+    "blog": "Blog officiel d'OpenTaiko",
+    "wiki": "Wiki officiel d'OpenTaiko"
+  },
+  "tools": {
+    "tab": {
+      "charting": "Charting",
+      "lyrics": "Paroles",
+      "submit": "Soumettez votre contenu !"
+    },
+    "charting": {
+      "primary": "Ressources principales :",
+      "tutorial": {
+        "title": "Tutoriel de création de charts .TJA",
+        "subtitle": "Tutoriel de charting par ugyuu."
+      },
+      "peepo_dl": "Télécharger PeepoDrumKit :",
+      "additional": "Ressources supplémentaires :"
+    },
+    "lyrics": {
+      "dl": "Éditeur de paroles"
+    },
+    "submit": {
+      "soundtrack": "Bande-son OpenTaiko"
+    },
+    "card": {
+      "peepo_origin": {
+        "subtitle": "Dernière version originale",
+        "text": "La version originale de samyuu, pour des charts classiques sans les fonctionnalités expérimentales."
+      },
+      "peepo_optk": {
+        "subtitle": "Dernière version de l'équipe OpenTaiko",
+        "text": "La version poursuivie par Komi et les membres de l'équipe OpenTaiko, ajoutant les fonctionnalités expérimentales prises en charge par OpenTaiko et améliorant l'édition classique."
+      },
+      "peepo_preview": {
+        "subtitle": "Dernière version de l'équipe OpenTaiko (aperçu)",
+        "text": "Aperçu de la prochaine version de l'équipe OpenTaiko par IID, ajoutant davantage de fonctionnalités expérimentales."
+      },
+      "peepo_sdl3": {
+        "subtitle": "Dernière version de l'équipe OpenTaiko (port SDL3)",
+        "text": "Le port SDL3 multiplateforme de Steve-xmh, avec des fonctionnalités sélectionnées par IID pour les prochaines versions de l'équipe OpenTaiko."
+      },
+      "tja_tools": {
+        "title": "TJA Tools",
+        "subtitle": "Fork de WHMHammer",
+        "text": "Visualisez vos charts et consultez leurs statistiques en un clin d'œil !"
+      },
+      "arrow_vortex": {
+        "title": "Arrow Vortex",
+        "subtitle": "Dernière version officielle",
+        "text": "L'outil recommandé pour synchroniser vos charts sans souci !"
+      },
+      "subtitle_edit": {
+        "title": "Subtitle Edit",
+        "subtitle": "Dernière version officielle",
+        "text": "L'outil recommandé pour créer des fichiers VTT pour vos charts !"
+      },
+      "submission": {
+        "title": "Formulaire de soumission de chansons",
+        "subtitle": "Pour vos chansons",
+        "text": "Vous pouvez soumettre vos chansons ici pour la bande-son d'OpenTaiko ! Les charts sont généralement créés sous 2 semaines si la chanson est acceptée."
+      },
+      "suggestion": {
+        "title": "Formulaire de suggestion de chansons",
+        "subtitle": "Pour d'autres artistes",
+        "text": "Vous pouvez recommander ici des artistes dont vous pensez que les chansons conviendraient à OpenTaiko !"
+      }
+    }
+  },
+  "themes": {
+    "title": "Sélectionnez un thème.",
+    "title_debug": "Sélectionnez un thème. (MODE DEBUG ACTIVÉ)",
+    "optgroup": {
+      "optk": "Thèmes OpenTaiko Hub :",
+      "skeleton": "Thèmes prédéfinis Skeleton :"
+    },
+    "preview": {
+      "title": "Bienvenue dans l'onglet Thèmes de l'OpenTaiko Hub !",
+      "color": "Aperçu des couleurs",
+      "accents": "Accents du thème :",
+      "accent_primary": "Accent principal",
+      "accent_secondary": "Accent secondaire",
+      "accent_tertiary": "Accent tertiaire",
+      "buttons": "Couleurs des boutons :",
+      "btn_action": "Action",
+      "btn_download": "Téléchargement",
+      "btn_repeat": "Répétition",
+      "btn_error": "Destructif/Erreur",
+      "notifs": "Notifications :",
+      "notif_success": "Succès",
+      "notif_warning": "Avertissement",
+      "notif_error": "Erreur"
+    },
+    "credits": {
+      "title": "Crédits des thèmes",
+      "text": "Tous les crédits des thèmes sont disponibles ici :"
+    },
+    "mode": {
+      "dark": "Sombre",
+      "light": "Clair",
+      "current": "Mode actuel : {mode}"
+    },
+    "debug": {
+      "disable_btn": "Désactiver le mode debug"
+    },
+    "error": {
+      "theme_json": "Le fichier theme.json (ou le dossier settings) n'existe pas ou est corrompu !<br>Veuillez réinstaller l'OpenTaiko Hub pour corriger cela.",
+      "thememode_json": "Le fichier thememode.json (ou le dossier settings) n'existe pas ou est corrompu !<br>Veuillez réinstaller l'OpenTaiko Hub pour corriger cela."
+    },
+    "warn": {
+      "same_theme": "Le thème sélectionné est identique au thème actuel.",
+      "same_theme_debug": "DEBUG : Le thème sélectionné est identique au thème actuel."
+    },
+    "success": {
+      "debug_disabled": "<b>Le mode debug a été désactivé.</b><br><p class=\"smalltext\">(Note : Vous devez changer la valeur \"debugMode\" pour désactiver complètement le mode debug !)</p>"
+    }
+  },
+  "lang": {
+    "label": "Language",
+    "en": "English",
+    "ja": "日本語",
+    "zh_Hans": "中文 (简体)",
+    "zh_Hant": "中文 (繁體)",
+    "fr": "Français",
+    "es": "Español",
+    "de": "Deutsch",
+    "nl": "Nederlands",
+    "ko": "한국어",
+    "ru": "Русский"
+  }
+}

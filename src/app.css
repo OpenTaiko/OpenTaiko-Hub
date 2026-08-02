@@ -371,3 +371,32 @@ button.play:active {@apply bg-primary-600 !important;}
     .button-gray:hover {@apply bg-cyan-950 text-neutral-200 !important;}
     .button-red:hover {@apply bg-error-500 text-black !important;}
 }
+/* Scrollbars
+   Without explicit styling the WebView draws them in a colour that blends into the
+   themed background, making them effectively invisible. surface-500 sits mid-way
+   between light and dark palettes, so the thumb stays visible on every theme. */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--color-surface-500) / 0.75) rgb(var(--color-surface-500) / 0.18);
+}
+::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+}
+::-webkit-scrollbar-track {
+    background: rgb(var(--color-surface-500) / 0.18);
+    border-radius: 6px;
+}
+::-webkit-scrollbar-thumb {
+    background: rgb(var(--color-surface-500) / 0.75);
+    border-radius: 6px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: rgb(var(--color-primary-500) / 0.9);
+    background-clip: content-box;
+}
+::-webkit-scrollbar-corner {
+    background: transparent;
+}

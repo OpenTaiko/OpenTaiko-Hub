@@ -27,6 +27,16 @@ tauri-plugin-store = "~2.4.2"
 tauri-plugin-upload = "~2.4.0"
 zip = "4.2.0"
 tokio = "1.51.1"
+tauri-plugin-dialog = "2"
+pelite = "0.10"
+md-5 = "0.10"
+sha1 = "0.10"
+hex = "0.4"
+encoding_rs = "0.8"
+memchr = "2"
+
+[dev-dependencies]
+tempfile = "3"
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

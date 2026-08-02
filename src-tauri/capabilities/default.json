@@ -6,6 +6,10 @@
     "permissions": [
       "os:default",
       "core:app:allow-set-app-theme",
-      "core:app:allow-version"
+      "core:app:allow-version",
+      "dialog:default",
+      "dialog:allow-open",
+      "dialog:allow-save",
+      "dialog:allow-confirm"
     ]
   }

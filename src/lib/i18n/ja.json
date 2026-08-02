@@ -2,246 +2,434 @@
   "common": {
     "fetch_error": "取得エラー",
     "retry": "再試行",
-    "reload": "再読み込み"
+    "reload": "再読み込み",
+    "cancel": "キャンセル"
   },
   "dl": {
-    "error": { "failed_abort": "ダウンロードに失敗しました。中止します。" },
-    "warn":  { "failed_retry": "ダウンロードに失敗しました。再試行中... ({attempt}/{max})" }
+    "error": {
+      "failed_abort": "ダウンロードに失敗しました。中止します。"
+    },
+    "warn": {
+      "failed_retry": "ダウンロードに失敗しました。再試行中... ({attempt}/{max})"
+    }
   },
   "nav": {
-    "home":        "ホーム",
-    "songlist":    "曲一覧",
-    "skins":       "スキン",
-    "tools":       "ツール",
-    "secrets":     "シークレット",
+    "home": "ホーム",
+    "songlist": "曲一覧",
+    "skins": "スキン",
+    "docs": "ドキュメント",
+    "tools": "ツール",
+    "secrets": "シークレット",
     "information": "情報",
-    "links":       "リンク",
-    "themes":      "Hubテーマ",
+    "links": "リンク",
+    "themes": "Hubテーマ",
     "tooltip": {
-      "home":        "OpenTaikoとOpenTaiko Hubを管理します。",
-      "songlist":    "OpenTaikoの曲を更新し、最新の曲をダウンロードします。",
-      "skins":       "最新のOpenTaikoスキンと関連アセットを取得します。",
-      "tools":       "OpenTaikoの体験を向上させるツールです。",
-      "secrets":     "???",
+      "home": "OpenTaikoとOpenTaiko Hubを管理します。",
+      "songlist": "OpenTaikoの曲を更新し、最新の曲をダウンロードします。",
+      "skins": "最新のOpenTaikoスキンと関連アセットを取得します。",
+      "docs": "選択中のOpenTaikoビルドに含まれるドキュメントを閲覧します。",
+      "tools": "OpenTaikoの体験を向上させるツールです。",
+      "secrets": "???",
       "information": "更新履歴、ドキュメント、またはトラブルシューティングの参照に。",
-      "links":       "OpenTaikoのSNSとウェブサイトをチェック！",
-      "themes":      "OpenTaiko Hubのテーマを変更します。",
-      "github":      "OpenTaiko HubのソースコードをGitHubで見る。"
+      "links": "OpenTaikoのSNSとウェブサイトをチェック！",
+      "themes": "OpenTaiko Hubのテーマを変更します。",
+      "github": "OpenTaiko HubのソースコードをGitHubで見る。"
+    }
+  },
+  "instances": {
+    "label": "インスタンス",
+    "manage": "管理",
+    "title": "OpenTaikoインスタンス",
+    "none": "OpenTaikoのインスタンスがまだありません。「管理」から新規作成するか、既存のフォルダを登録してください。",
+    "active": "アクティブ",
+    "set_active": "選択",
+    "attach": "既存のフォルダを登録",
+    "create": "新しいインスタンスを作成",
+    "create_name_placeholder": "新しいインスタンス名...",
+    "detach": "登録解除",
+    "detach_note": "登録解除してもインスタンスがこの一覧から削除されるだけで、ファイルは削除されません。",
+    "open_folder": "フォルダを開く",
+    "col": {
+      "name": "名前",
+      "path": "フォルダ",
+      "channel": "種類",
+      "version": "バージョン",
+      "actions": "操作"
+    },
+    "channel": {
+      "stable": "安定版",
+      "experimental": "実験版",
+      "empty": "ビルドなし"
+    },
+    "error": {
+      "attach_failed": "フォルダの登録に失敗しました：{error}",
+      "create_failed": "インスタンスの作成に失敗しました：{error}"
+    },
+    "success": {
+      "attached": "「{name}」を登録しました",
+      "created": "「{name}」を作成しました",
+      "detached": "「{name}」の登録を解除しました"
+    },
+    "picker": {
+      "title": "インストールするビルドを選択",
+      "install": "インストール",
+      "stable_desc": "GitHub の公式リリース。",
+      "indev_desc": "開発ブランチからローカルでビルド（.NET SDK 8 が必要）。",
+      "prerelease_desc": "GitHub のプレリリース版。"
     }
   },
   "home": {
     "label": {
-      "current_version":  "現在のOpenTaikoバージョン：",
-      "latest_version":   "最新のOpenTaikoバージョン：",
-      "current_os":       "現在のOS：",
+      "current_version": "現在のOpenTaikoバージョン：",
+      "latest_version": "最新のOpenTaikoバージョン：",
+      "latest_experimental": "最新の実験版ビルド：",
+      "current_os": "現在のOS：",
       "no_version_found": "有効なOpenTaikoバージョンが見つかりません"
     },
     "button": {
-      "reload":     "再読み込み",
-      "download":   "OpenTaikoをダウンロード",
-      "launch":     "OpenTaikoを起動",
-      "explorer":   "エクスプローラーで開く",
-      "update":     "OpenTaikoを更新",
+      "reload": "再読み込み",
+      "download": "OpenTaikoをダウンロード",
+      "download_stable": "安定版をダウンロード",
+      "download_experimental": "実験版をダウンロード",
+      "launch": "OpenTaikoを起動",
+      "explorer": "エクスプローラーで開く",
+      "update": "OpenTaikoを更新",
       "redownload": "OpenTaikoを再ダウンロード",
-      "retry":      "再試行"
+      "rebuild": "再ビルド",
+      "retry": "再試行",
+      "install": "ビルドをインストール..."
     },
-    "warn":  { "skin_update": "（更新にはスキンの更新が必要です）" },
-    "hint":  { "first_start": "初めてゲームを起動する前に、スキン（「スキン」タブ）と曲（「曲一覧」タブ）をダウンロードしてください！" },
+    "warn": {
+      "skin_update": "（更新にはスキンの更新が必要です）"
+    },
+    "hint": {
+      "first_start": "初めてゲームを起動する前に、スキン（「スキン」タブ）と曲（「曲一覧」タブ）をダウンロードしてください！",
+      "experimental": "実験版にはスキンとキャラクターが最初から含まれているため、すぐにプレイできます！"
+    },
+    "experimental": {
+      "unavailable": "現在利用可能な実験版ビルドはありません",
+      "requires_dotnet": "実験版のビルドには .NET SDK 8 が必要です。https://dotnet.microsoft.com/download/dotnet/8.0 からインストールして再試行してください。",
+      "update_available": "新しい実験版ビルドが利用可能です！",
+      "up_to_date": "この実験版ビルドは最新の状態です。",
+      "stage": {
+        "check_sdk": ".NET SDKを確認中...",
+        "fetch": "ブランチ情報を取得中...",
+        "download": "ソースコードをダウンロード中...",
+        "extract": "ソースコードを解凍中...",
+        "build": "OpenTaikoをビルド中（数分かかる場合があります）...",
+        "install": "ビルドをインストール中..."
+      }
+    },
     "error": {
-      "launch":              "アプリの起動に失敗しました：{error}",
+      "launch": "アプリの起動に失敗しました：{error}",
       "already_downloading": "すでにダウンロード中です",
-      "fetch_release":       "最新のOpenTaikoリリースの取得に失敗しました：{error}",
-      "download_failed":     "OpenTaikoのダウンロードに失敗しました：{error}"
+      "fetch_release": "最新のOpenTaikoリリースの取得に失敗しました：{error}",
+      "download_failed": "OpenTaikoのダウンロードに失敗しました：{error}",
+      "incomplete_build": "インストールされたビルドは不完全です（ゲームファイルが不足しています）。再インストールしてください。"
     },
     "success": {
-      "unzipping":  "ダウンロード完了、解凍中...",
+      "unzipping": "ダウンロード完了、解凍中...",
       "installing": "解凍完了、インストール中...",
-      "installed":  "ダウンロードとインストールが完了しました"
+      "installed": "ダウンロードとインストールが完了しました"
+    },
+    "tab": {
+      "overview": "概要"
     }
+  },
+  "docs": {
+    "title": "ドキュメント",
+    "not_found": "このOpenTaikoビルドにはローカルドキュメントが含まれていません。",
+    "not_found_hint": "ドキュメントが同梱されたビルドを入手するには、このインスタンスを更新または再ビルドしてください。"
+  },
+  "saves": {
+    "tab": "セーブ",
+    "title": "セーブデータ",
+    "description": "セーブを書き出す、またはスロットに読み込みます。読み込んだセーブは統合されます。",
+    "current_version": "セーブデータベースのバージョン：",
+    "no_saves": "セーブデータがまだありません（一度ゲームを起動すると作成されます）。",
+    "import": "読み込み",
+    "export": "書き出す",
+    "hint": "ゲームの実行中は読み込まないでください。",
+    "col": {
+      "player": "プレイヤー",
+      "slot": "スロット",
+      "uid": "固有ID"
+    },
+    "slot_reserve": "予備",
+    "slot_n": "スロット {n}",
+    "success": {
+      "export": "セーブ「{name}」を書き出しました。",
+      "rebind": "セーブ「{name}」を移動しました。",
+      "rebind_swap": "セーブ「{a}」と「{b}」を入れ替えました。",
+      "imported_into": "「{name}」を {slot} に読み込みました。",
+      "created": "セーブ「{name}」を作成しました。",
+      "deleted": "セーブ「{name}」を削除しました。"
+    },
+    "error": {
+      "no_db": "このインスタンスにはまだセーブデータベースがありません。",
+      "load": "セーブデータベースを読み込めませんでした。",
+      "invalid_file": "有効な OpenTaiko セーブファイルではありません。",
+      "export": "セーブの書き出しに失敗しました：{error}",
+      "import": "セーブの読み込みに失敗しました：{error}",
+      "rebind": "セーブスロットの変更に失敗しました：{error}",
+      "create": "セーブの作成に失敗しました：{error}",
+      "delete": "セーブの削除に失敗しました：{error}",
+      "newer": "このセーブ（{imported}）はデータベース（{current}）より新しいため、先にゲームを更新してください。"
+    },
+    "rebind_hint": "スロットを変更（使用中なら入れ替え）。",
+    "confirm_title": "セーブの読み込み",
+    "confirm_import": "「{imported}」を {slot}（「{current}」）に統合しますか？",
+    "create": "新規セーブ",
+    "new_name": "新しいプレイヤー",
+    "delete": "セーブを削除",
+    "confirm_delete_title": "セーブの削除",
+    "confirm_delete": "セーブ「{name}」を削除しますか？元に戻せません。"
   },
   "hub": {
     "status": {
-      "outdated":     "OpenTaiko Hubのインストールは最新ではありません。",
-      "up_to_date":   "OpenTaiko Hubは最新の状態です！",
-      "checking":     "更新を確認中...",
+      "outdated": "OpenTaiko Hubのインストールは最新ではありません。",
+      "up_to_date": "OpenTaiko Hubは最新の状態です！",
+      "checking": "更新を確認中...",
       "fetch_failed": "更新の確認に失敗しました。"
     },
-    "button": { "update": "OpenTaiko Hubを{version}に更新" },
-    "warn":   { "outdated_toast": "OpenTaiko Hubのインストールは最新ではありません。<br>「OpenTaiko Hubを更新」ボタンをクリックしてください。" },
-    "error":  { "fetch": "最新のOpenTaiko Hubリリースの取得に失敗しました：{error}" }
+    "button": {
+      "update": "OpenTaiko Hubを{version}に更新"
+    },
+    "warn": {
+      "outdated_toast": "OpenTaiko Hubのインストールは最新ではありません。<br>「OpenTaiko Hubを更新」ボタンをクリックしてください。"
+    },
+    "error": {
+      "fetch": "最新のOpenTaiko Hubリリースの取得に失敗しました：{error}"
+    }
   },
   "songs": {
     "col": {
-      "name":   "曲名",
+      "name": "曲名",
       "folder": "フォルダ",
       "difficulties": "難易度",
       "charter": "譜面作成：",
-      "size":   "サイズ",
+      "size": "サイズ",
       "status": "状態"
     },
     "filter": {
-      "song":   "曲を検索...",
+      "song": "曲を検索...",
       "folder": "フォルダを検索..."
     },
     "status": {
-      "scanning":       "スキャン中...",
+      "scanning": "スキャン中...",
       "not_downloaded": "未ダウンロード",
-      "up_to_date":     "最新",
-      "outdated":       "古い"
+      "up_to_date": "最新",
+      "outdated": "古い"
     },
     "button": {
       "bulk_download": "一括ダウンロード",
-      "download":      "ダウンロード",
-      "redownload":    "再ダウンロード",
-      "update":        "更新"
+      "download": "ダウンロード",
+      "redownload": "再ダウンロード",
+      "update": "更新",
+      "open_folder": "曲フォルダを開く"
     },
-    "error":   { "scanning": "ローカルフォルダーのスキャン中は曲をダウンロードできません" },
+    "view": {
+      "list": "リスト",
+      "tree": "ツリー"
+    },
+    "scan": {
+      "progress": "曲をスキャン中...（{count}曲見つかりました）",
+      "done": "ライブラリに{count}曲あります"
+    },
+    "tree": {
+      "soundtrack": "OpenTaiko サウンドトラック",
+      "custom": "カスタム",
+      "songs_count": "{count}曲",
+      "empty": "ライブラリにはまだ曲がありません。",
+      "spicy": "辛口",
+      "sweet": "甘口"
+    },
+    "migrate": {
+      "banner": "「{instance}」内に {count} 個の曲フォルダが見つかりました。共有曲ライブラリに移動しますか？",
+      "button": "曲を移動",
+      "later": "あとで",
+      "modal_title": "「{instance}」から曲を移動",
+      "summary_new": "{count} 個の新しい曲フォルダが共有ライブラリに追加されます。",
+      "summary_identical": "{count} 個の同一の曲フォルダがこのインスタンスから削除されます。",
+      "nothing": "このインスタンスに移動できる譜面はありません。",
+      "conflicts_title": "競合 ({count})",
+      "conflicts_hint": "これらの曲は内容の異なるものが共有ライブラリに既に存在します。どちらの版を残すか選択してください。",
+      "col_global": "共有ライブラリ",
+      "col_instance": "このインスタンス",
+      "bulk_keep_global": "すべて共有を維持",
+      "bulk_use_instance": "すべてインスタンスを使用",
+      "hash": "ハッシュ",
+      "edited": "最終編集",
+      "apply": "適用",
+      "applied": "移動完了：追加 {moved} 件、置換 {replaced} 件、破棄 {discarded} 件。",
+      "error": "曲の移動に失敗しました：{error}"
+    },
+    "metadata": {
+      "updated": "{count}個のジャンルフォルダを更新しました（box.def / preimages）"
+    },
+    "experimental_note": "選択中のインスタンスは実験版ビルドです。専用の曲が同梱されており、共有曲ライブラリは使用しません。",
+    "error": {
+      "scanning": "ローカルフォルダーのスキャン中は曲をダウンロードできません",
+      "scan_failed": "曲ライブラリのスキャンに失敗しました：{error}"
+    },
     "success": {
-      "all_up_to_date":   "すべての曲は最新の状態です",
+      "all_up_to_date": "すべての曲は最新の状態です",
       "download_complete": "ダウンロード完了",
-      "download_nb":       "曲 {nb}/{total} をダウンロードしました"
+      "download_nb": "曲 {nb}/{total} をダウンロードしました"
+    },
+    "duplicates": {
+      "banner": "「{instance}」に空の重複フォルダが {count} 個あります。削除しますか？",
+      "button": "整理する",
+      "success": "{count} 個の重複フォルダを削除しました。",
+      "error": "重複フォルダの削除に失敗しました：{error}"
     }
   },
   "assets": {
     "tab": {
-      "skins":       "スキン",
-      "characters":  "キャラクター",
+      "skins": "スキン",
+      "characters": "キャラクター",
       "puchicharas": "プチキャラ"
     },
     "col": {
-      "asset":      "アセット",
-      "version":    "バージョン",
+      "asset": "アセット",
+      "version": "バージョン",
       "resolution": "解像度",
-      "author":     "作者",
-      "size":       "サイズ",
-      "status":     "状態"
+      "author": "作者",
+      "size": "サイズ",
+      "status": "状態"
     },
-    "button": { "bulk_download": "一括ダウンロード" },
+    "button": {
+      "bulk_download": "一括ダウンロード"
+    },
     "type": {
-      "skins":       "スキン",
-      "characters":  "キャラクター",
+      "skins": "スキン",
+      "characters": "キャラクター",
       "puchicharas": "プチキャラ"
     },
+    "experimental": {
+      "blocked_title": "実験版ビルドでは利用できません",
+      "blocked_text": "実験版ビルドには専用のスキン、キャラクター、プチキャラがすでに含まれています。"
+    },
     "error": {
-      "scanning":      "ローカルフォルダーのスキャン中は{type}をダウンロードできません",
+      "scanning": "ローカルフォルダーのスキャン中は{type}をダウンロードできません",
       "zip_not_found": "スキンパッケージがサーバーに見つかりませんでした。5分後に再試行してください。問題が解決しない場合は、OpenTaikoチームにお問い合わせください。"
     },
     "success": {
-      "all_up_to_date":   "{type}はすべて最新の状態です",
+      "all_up_to_date": "{type}はすべて最新の状態です",
       "download_complete": "ダウンロード完了",
-      "download_nb":       "{type} {nb}/{total} をダウンロードしました"
+      "download_nb": "{type} {nb}/{total} をダウンロードしました"
     }
   },
   "asset_cell": {
-    "scanning":       "スキャン中...",
+    "scanning": "スキャン中...",
     "not_downloaded": "未ダウンロード",
     "button": {
-      "download":   "ダウンロード",
+      "download": "ダウンロード",
       "redownload": "再ダウンロード",
-      "update":     "更新"
+      "update": "更新"
     }
   },
   "hof": {
-    "website_link":    "OpenTaikoウェブサイトで見る",
-    "no_scores":       "まだスコアが記録されていません。",
+    "website_link": "OpenTaikoウェブサイトで見る",
+    "no_scores": "まだスコアが記録されていません。",
     "max_list_points": "最大リストポイント",
     "col": {
-      "rank":        "順位",
-      "player":      "プレイヤー",
-      "score":       "スコア",
-      "grade":       "評価",
-      "good":        "良",
-      "ok":          "可",
-      "bad":         "不可",
+      "rank": "順位",
+      "player": "プレイヤー",
+      "score": "スコア",
+      "grade": "評価",
+      "good": "良",
+      "ok": "可",
+      "bad": "不可",
       "list_points": "リストPt",
-      "video":       "動画",
-      "status":      "クリア状態"
+      "video": "動画",
+      "status": "クリア状態"
     },
     "video_link": "視聴",
-    "close":      "閉じる",
+    "close": "閉じる",
     "status": {
-      "perfect":    "全良",
+      "perfect": "全良",
       "full_combo": "フルコンボ",
-      "clear":      "クリア"
+      "clear": "クリア"
     }
   },
   "version_chip": {
     "incompatible": "現在のOpenTaikoバージョンと互換性がありません",
-    "outdated":     "古い可能性があります。注意して使用してください"
+    "outdated": "古い可能性があります。注意して使用してください"
   },
   "player": {
-    "play":  "再生",
+    "play": "再生",
     "pause": "一時停止"
   },
   "info": {
     "tab": {
-      "changelog_game":  "更新履歴（ゲーム）",
-      "changelog_hub":   "更新履歴（Hub）",
-      "documentation":   "ドキュメント",
+      "changelog_game": "更新履歴（ゲーム）",
+      "changelog_hub": "更新履歴（Hub）",
+      "documentation": "ドキュメント",
       "troubleshooting": "トラブルシューティング",
-      "credits":         "クレジット"
+      "credits": "クレジット"
     },
     "legend": {
-      "title":       "よくわからない場合は...",
-      "feat":        "「Feature」（機能）の略です。機能追加に使用されます。",
+      "title": "よくわからない場合は...",
+      "feat": "「Feature」（機能）の略です。機能追加に使用されます。",
       "enhancement": "既存の機能への更新。",
-      "fix":         "自明です。",
-      "fix_note":    "（注：[Fix]と[BugFix]は同じ意味で使用されます。）",
-      "chore":       "バグ修正でも機能追加でもない変更。",
-      "i18n":        "「internationalization」（国際化）の略です。",
-      "theme":       "OpenTaiko Hubのテーマ追加と変更について。"
+      "fix": "自明です。",
+      "fix_note": "（注：[Fix]と[BugFix]は同じ意味で使用されます。）",
+      "chore": "バグ修正でも機能追加でもない変更。",
+      "i18n": "「internationalization」（国際化）の略です。",
+      "theme": "OpenTaiko Hubのテーマ追加と変更について。"
     },
     "troubleshoot": {
-      "title":   "サポート / バグ報告",
-      "intro":   "OpenTaikoに関する問題が発生した場合やサポートが必要な場合は、以下のリンクをご参照ください：",
+      "title": "サポート / バグ報告",
+      "intro": "OpenTaikoに関する問題が発生した場合やサポートが必要な場合は、以下のリンクをご参照ください：",
       "discord": "OpenTaiko公式Discordの#supportチャンネル",
-      "github":  "GitHubのissuesセクション",
-      "note":    "注意：質問する前に自分で調べてください。問題はすでに対処済みの可能性があります。Discordの#often_asked_questionチャンネルも確認してください。"
+      "github": "GitHubのissuesセクション",
+      "note": "注意：質問する前に自分で調べてください。問題はすでに対処済みの可能性があります。Discordの#often_asked_questionチャンネルも確認してください。"
     },
     "versioning": {
-      "title":    "スキン / アセットのバージョン管理",
-      "compat":   "マイナーアップデート番号まで（例：v[0.6.0].2）のすべての番号が、スキンとゲームバージョン間で一致している必要があります。",
+      "title": "スキン / アセットのバージョン管理",
+      "compat": "マイナーアップデート番号まで（例：v[0.6.0].2）のすべての番号が、スキンとゲームバージョン間で一致している必要があります。",
       "optional": "一部のアセット（キャラクター/プチキャラ）の更新では、スキンのように厳密なバージョン管理に従わないため、必須ではありません。",
       "revision": "リビジョン番号（例：v0.6.0.[2]）は、必須の変更を含まない各ゲーム/スキン更新で増分され、一致する必要はありません。",
-      "example":  "例：バージョン番号0.6.1.3のスキンは、OpenTaikoバージョン0.6.1.0から動作し、0.6.2.0から互換性がなくなります。",
-      "wip":      "このセクションは、今後のOpenTaiko Hub更新で見つかった問題に応じて完成される予定です。"
+      "example": "例：バージョン番号0.6.1.3のスキンは、OpenTaikoバージョン0.6.1.0から動作し、0.6.2.0から互換性がなくなります。",
+      "wip": "このセクションは、今後のOpenTaiko Hub更新で見つかった問題に応じて完成される予定です。"
     },
     "error": {
       "changelog": "更新履歴の読み込みに失敗しました。",
-      "credits":   "クレジット情報の読み込みに失敗しました。",
-      "generic":   "エラー：{error}"
+      "credits": "クレジット情報の読み込みに失敗しました。",
+      "generic": "エラー：{error}"
     }
   },
   "links": {
     "section": {
-      "socials":  "SNS/GitHub",
+      "socials": "SNS/GitHub",
       "websites": "ウェブサイト"
     },
-    "discord_en":  "公式英語Discordサーバー",
-    "discord_ja":  "公式日本語Discordサーバー",
-    "youtube":     "公式YouTubeチャンネル",
-    "bluesky":     "公式Blueskyアカウント",
-    "twitter":     "公式Twitter/Xアカウント",
+    "discord_en": "公式英語Discordサーバー",
+    "discord_ja": "公式日本語Discordサーバー",
+    "youtube": "公式YouTubeチャンネル",
+    "bluesky": "公式Blueskyアカウント",
+    "twitter": "公式Twitter/Xアカウント",
     "source_main": "OpenTaikoメインソースコード",
-    "source_hub":  "OpenTaiko Hubソースコード",
-    "github_org":  "GitHub Organization",
-    "website":     "OpenTaiko公式ウェブサイト",
-    "blog":        "OpenTaiko公式ブログ",
-    "wiki":        "OpenTaiko公式Wiki"
+    "source_hub": "OpenTaiko Hubソースコード",
+    "github_org": "GitHub Organization",
+    "website": "OpenTaiko公式ウェブサイト",
+    "blog": "OpenTaiko公式ブログ",
+    "wiki": "OpenTaiko公式Wiki"
   },
   "tools": {
     "tab": {
       "charting": "譜面作成",
-      "lyrics":   "歌詞",
-      "submit":   "コンテンツを投稿！"
+      "lyrics": "歌詞",
+      "submit": "コンテンツを投稿！"
     },
     "charting": {
-      "primary":   "主要リソース：",
+      "primary": "主要リソース：",
       "tutorial": {
-        "title":    "太鼓 .TJA 譜面作成チュートリアル",
+        "title": "太鼓 .TJA 譜面作成チュートリアル",
         "subtitle": "ugyuu氏による譜面作成チュートリアル"
       },
-      "peepo_dl":  "PeepoDrumKitをダウンロード：",
+      "peepo_dl": "PeepoDrumKitをダウンロード：",
       "additional": "その他のリソース："
     },
     "lyrics": {
@@ -251,63 +439,108 @@
       "soundtrack": "OpenTaikoサウンドトラック"
     },
     "card": {
-      "peepo_origin":     { "subtitle": "原作最新版",   "text": "原作者samyuu氏による版本。実験的機能なしの通常譜面に使用します。" },
-      "peepo_optk":       { "subtitle": "OpenTaikoチーム最新版", "text": "Komi氏とOpenTaikoチームが継続している版本。OpenTaikoがサポートする実験的機能や通常譜面の編集が強化されています。" },
-      "peepo_preview":    { "subtitle": "OpenTaikoチーム最新版（プレビュー）", "text": "IID氏による次のOpenTaikoチーム版のプレビュー。より多くの実験的機能が追加されます。" },
-      "peepo_sdl3":       { "subtitle": "OpenTaikoチーム最新版（SDL3ポート）", "text": "Steve-xmh氏によるクロスプラットフォームのSDL3ポートで、IID氏が未来のOpenTaikoチーム版のために選択した機能を備えています。" },
-      "tja_tools":        { "title": "TJA Tools",    "subtitle": "WHMHammer's fork", "text": "譜面を視覚化し、統計情報をリアルタイムで確認できます！" },
-      "arrow_vortex":     { "title": "Arrow Vortex", "subtitle": "公式最新版",   "text": "譜面を簡単に同期できる推奨ツールです！" },
-      "subtitle_edit":    { "title": "Subtitle Edit", "subtitle": "公式最新版",  "text": "譜面用のVTTファイルを作成するための推奨ツールです！" },
-      "submission":       { "title": "曲投稿フォーム", "subtitle": "自作の曲", "text": "OpenTaikoサウンドトラックに曲を投稿できます！採用された場合、通常2週間以内に譜面が作成されます。" },
-      "suggestion":       { "title": "曲提案フォーム", "subtitle": "他のアーティストの曲", "text": "OpenTaikoに合うと思うアーティストをここで提案できます！" }
+      "peepo_origin": {
+        "subtitle": "原作最新版",
+        "text": "原作者samyuu氏による版本。実験的機能なしの通常譜面に使用します。"
+      },
+      "peepo_optk": {
+        "subtitle": "OpenTaikoチーム最新版",
+        "text": "Komi氏とOpenTaikoチームが継続している版本。OpenTaikoがサポートする実験的機能や通常譜面の編集が強化されています。"
+      },
+      "peepo_preview": {
+        "subtitle": "OpenTaikoチーム最新版（プレビュー）",
+        "text": "IID氏による次のOpenTaikoチーム版のプレビュー。より多くの実験的機能が追加されます。"
+      },
+      "peepo_sdl3": {
+        "subtitle": "OpenTaikoチーム最新版（SDL3ポート）",
+        "text": "Steve-xmh氏によるクロスプラットフォームのSDL3ポートで、IID氏が未来のOpenTaikoチーム版のために選択した機能を備えています。"
+      },
+      "tja_tools": {
+        "title": "TJA Tools",
+        "subtitle": "WHMHammer's fork",
+        "text": "譜面を視覚化し、統計情報をリアルタイムで確認できます！"
+      },
+      "arrow_vortex": {
+        "title": "Arrow Vortex",
+        "subtitle": "公式最新版",
+        "text": "譜面を簡単に同期できる推奨ツールです！"
+      },
+      "subtitle_edit": {
+        "title": "Subtitle Edit",
+        "subtitle": "公式最新版",
+        "text": "譜面用のVTTファイルを作成するための推奨ツールです！"
+      },
+      "submission": {
+        "title": "曲投稿フォーム",
+        "subtitle": "自作の曲",
+        "text": "OpenTaikoサウンドトラックに曲を投稿できます！採用された場合、通常2週間以内に譜面が作成されます。"
+      },
+      "suggestion": {
+        "title": "曲提案フォーム",
+        "subtitle": "他のアーティストの曲",
+        "text": "OpenTaikoに合うと思うアーティストをここで提案できます！"
+      }
     }
   },
   "themes": {
-    "title":       "テーマを選択してください。",
+    "title": "テーマを選択してください。",
     "title_debug": "テーマを選択してください。（デバッグモードON）",
     "optgroup": {
-      "optk":     "OpenTaiko Hubテーマ：",
+      "optk": "OpenTaiko Hubテーマ：",
       "skeleton": "Skeletonプリセットテーマ："
     },
     "preview": {
-      "title":            "OpenTaiko Hubテーマタブへようこそ！",
-      "color":            "カラープレビュー",
-      "accents":          "テーマアクセント：",
-      "accent_primary":   "プライマリアクセント",
+      "title": "OpenTaiko Hubテーマタブへようこそ！",
+      "color": "カラープレビュー",
+      "accents": "テーマアクセント：",
+      "accent_primary": "プライマリアクセント",
       "accent_secondary": "セカンダリアクセント",
-      "accent_tertiary":  "ターシャリアクセント",
-      "buttons":          "ボタンカラー：",
-      "btn_action":       "アクション",
-      "btn_download":     "ダウンロード",
-      "btn_repeat":       "繰り返し",
-      "btn_error":        "破壊的/エラー",
-      "notifs":           "通知：",
-      "notif_success":    "成功",
-      "notif_warning":    "警告",
-      "notif_error":      "エラー"
+      "accent_tertiary": "ターシャリアクセント",
+      "buttons": "ボタンカラー：",
+      "btn_action": "アクション",
+      "btn_download": "ダウンロード",
+      "btn_repeat": "繰り返し",
+      "btn_error": "破壊的/エラー",
+      "notifs": "通知：",
+      "notif_success": "成功",
+      "notif_warning": "警告",
+      "notif_error": "エラー"
     },
     "credits": {
       "title": "テーマクレジット",
-      "text":  "テーマのクレジットはこちらからご覧いただけます："
+      "text": "テーマのクレジットはこちらからご覧いただけます："
     },
     "mode": {
-      "dark":    "ダーク",
-      "light":   "ライト",
+      "dark": "ダーク",
+      "light": "ライト",
       "current": "現在のモード：{mode}"
     },
-    "debug": { "disable_btn": "デバッグモードを無効にする" },
+    "debug": {
+      "disable_btn": "デバッグモードを無効にする"
+    },
     "error": {
-      "theme_json":     "theme.jsonファイル（または設定フォルダー）が存在しないか破損しています！<br>OpenTaiko Hubを再インストールして修正してください。",
+      "theme_json": "theme.jsonファイル（または設定フォルダー）が存在しないか破損しています！<br>OpenTaiko Hubを再インストールして修正してください。",
       "thememode_json": "thememode.jsonファイル（または設定フォルダー）が存在しないか破損しています！<br>OpenTaiko Hubを再インストールして修正してください。"
     },
-    "warn":    { "same_theme": "選択されたテーマは現在のテーマと同じです。", "same_theme_debug": "DEBUG：選択されたテーマは現在のテーマと同じです。" },
-    "success": { "debug_disabled": "<b>デバッグモードが無効になりました。</b><br><p class=\"smalltext\">（注意：デバッグモードを完全に無効にするには「debugMode」の値を変更する必要があります！）</p>" }
+    "warn": {
+      "same_theme": "選択されたテーマは現在のテーマと同じです。",
+      "same_theme_debug": "DEBUG：選択されたテーマは現在のテーマと同じです。"
+    },
+    "success": {
+      "debug_disabled": "<b>デバッグモードが無効になりました。</b><br><p class=\"smalltext\">（注意：デバッグモードを完全に無効にするには「debugMode」の値を変更する必要があります！）</p>"
+    }
   },
   "lang": {
     "label": "言語",
-    "en":    "English",
-    "ja":    "日本語",
+    "en": "English",
+    "ja": "日本語",
     "zh_Hans": "中文 (简体)",
-    "zh_Hant": "中文 (繁體)"
+    "zh_Hant": "中文 (繁體)",
+    "fr": "Français",
+    "es": "Español",
+    "de": "Deutsch",
+    "nl": "Nederlands",
+    "ko": "한국어",
+    "ru": "Русский"
   }
 }

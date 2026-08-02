@@ -2,246 +2,434 @@
   "common": {
     "fetch_error": "获取错误",
     "retry": "重试",
-    "reload": "重新加载"
+    "reload": "重新加载",
+    "cancel": "取消"
   },
   "dl": {
-    "error": { "failed_abort": "下载失败，正在中止" },
-    "warn":  { "failed_retry": "下载失败，正在重试... ({attempt}/{max})" }
+    "error": {
+      "failed_abort": "下载失败，正在中止"
+    },
+    "warn": {
+      "failed_retry": "下载失败，正在重试... ({attempt}/{max})"
+    }
   },
   "nav": {
-    "home":        "主页",
-    "songlist":    "歌曲列表",
-    "skins":       "皮肤",
-    "tools":       "工具",
-    "secrets":     "秘密",
+    "home": "主页",
+    "songlist": "歌曲列表",
+    "skins": "皮肤",
+    "docs": "文档",
+    "tools": "工具",
+    "secrets": "秘密",
     "information": "信息",
-    "links":       "链接",
-    "themes":      "Hub 主题",
+    "links": "链接",
+    "themes": "Hub 主题",
     "tooltip": {
-      "home":        "管理 OpenTaiko 和 OpenTaiko Hub。",
-      "songlist":    "更新 OpenTaiko 歌曲并下载最新歌曲。",
-      "skins":       "获取最新的 OpenTaiko 皮肤和相关资源。",
-      "tools":       "可以提升 OpenTaiko 体验的工具。",
-      "secrets":     "???",
+      "home": "管理 OpenTaiko 和 OpenTaiko Hub。",
+      "songlist": "更新 OpenTaiko 歌曲并下载最新歌曲。",
+      "skins": "获取最新的 OpenTaiko 皮肤和相关资源。",
+      "docs": "浏览所选 OpenTaiko 构建中包含的文档。",
+      "tools": "可以提升 OpenTaiko 体验的工具。",
+      "secrets": "???",
       "information": "查看更新日志、文档或故障排除。",
-      "links":       "查看 OpenTaiko 的社交媒体和网站！",
-      "themes":      "更改 OpenTaiko Hub 的主题。",
-      "github":      "查看 OpenTaiko Hub 源代码。"
+      "links": "查看 OpenTaiko 的社交媒体和网站！",
+      "themes": "更改 OpenTaiko Hub 的主题。",
+      "github": "查看 OpenTaiko Hub 源代码。"
+    }
+  },
+  "instances": {
+    "label": "实例",
+    "manage": "管理",
+    "title": "OpenTaiko 实例",
+    "none": "尚无 OpenTaiko 实例。请使用「管理」创建新实例或关联现有文件夹。",
+    "active": "使用中",
+    "set_active": "选择",
+    "attach": "关联现有文件夹",
+    "create": "创建新实例",
+    "create_name_placeholder": "新实例名称...",
+    "detach": "解除关联",
+    "detach_note": "解除关联仅会将实例从此列表中移除，不会删除任何文件。",
+    "open_folder": "打开文件夹",
+    "col": {
+      "name": "名称",
+      "path": "文件夹",
+      "channel": "类型",
+      "version": "版本",
+      "actions": "操作"
+    },
+    "channel": {
+      "stable": "稳定版",
+      "experimental": "实验版",
+      "empty": "无构建"
+    },
+    "error": {
+      "attach_failed": "关联文件夹失败：{error}",
+      "create_failed": "创建实例失败：{error}"
+    },
+    "success": {
+      "attached": "已关联「{name}」",
+      "created": "已创建「{name}」",
+      "detached": "已解除关联「{name}」"
+    },
+    "picker": {
+      "title": "选择要安装的版本",
+      "install": "安装",
+      "stable_desc": "GitHub 官方发布版。",
+      "indev_desc": "从开发分支本地构建（需要 .NET SDK 8）。",
+      "prerelease_desc": "GitHub 预发布版。"
     }
   },
   "home": {
     "label": {
-      "current_version":  "当前 OpenTaiko 版本：",
-      "latest_version":   "最新 OpenTaiko 版本：",
-      "current_os":       "当前操作系统：",
+      "current_version": "当前 OpenTaiko 版本：",
+      "latest_version": "最新 OpenTaiko 版本：",
+      "latest_experimental": "最新实验版构建：",
+      "current_os": "当前操作系统：",
       "no_version_found": "未找到有效的 OpenTaiko 版本"
     },
     "button": {
-      "reload":     "重新加载",
-      "download":   "下载 OpenTaiko",
-      "launch":     "启动 OpenTaiko",
-      "explorer":   "在 资源管理器 中打开",
-      "update":     "更新 OpenTaiko",
+      "reload": "重新加载",
+      "download": "下载 OpenTaiko",
+      "download_stable": "下载稳定版",
+      "download_experimental": "下载实验版",
+      "launch": "启动 OpenTaiko",
+      "explorer": "在 资源管理器 中打开",
+      "update": "更新 OpenTaiko",
       "redownload": "重装 OpenTaiko",
-      "retry":      "重试"
+      "rebuild": "重新构建",
+      "retry": "重试",
+      "install": "安装版本..."
     },
-    "warn":  { "skin_update": "（更新需要同步更新皮肤文件）" },
-    "hint":  { "first_start": "在第一次启动游戏前，请确保在「皮肤」页面下载皮肤，在「歌曲列表」页面下载歌曲！" },
+    "warn": {
+      "skin_update": "（更新需要同步更新皮肤文件）"
+    },
+    "hint": {
+      "first_start": "在第一次启动游戏前，请确保在「皮肤」页面下载皮肤，在「歌曲列表」页面下载歌曲！",
+      "experimental": "实验版已包含皮肤和角色，可以立即开始游玩！"
+    },
+    "experimental": {
+      "unavailable": "当前没有可用的实验版构建",
+      "requires_dotnet": "构建实验版需要 .NET SDK 8。请从 https://dotnet.microsoft.com/download/dotnet/8.0 安装后重试。",
+      "update_available": "有新的实验版构建可用！",
+      "up_to_date": "此实验版构建已是最新。",
+      "stage": {
+        "check_sdk": "正在检查 .NET SDK...",
+        "fetch": "正在获取分支信息...",
+        "download": "正在下载源代码...",
+        "extract": "正在解压源代码...",
+        "build": "正在构建 OpenTaiko（可能需要几分钟）...",
+        "install": "正在安装构建..."
+      }
+    },
     "error": {
-      "launch":              "执行应用程序时出错：{error}",
+      "launch": "执行应用程序时出错：{error}",
       "already_downloading": "已经在下载中",
-      "fetch_release":       "获取最新 OpenTaiko 版本失败：{error}",
-      "download_failed":     "下载 OpenTaiko 失败：{error}"
+      "fetch_release": "获取最新 OpenTaiko 版本失败：{error}",
+      "download_failed": "下载 OpenTaiko 失败：{error}",
+      "incomplete_build": "已安装的版本不完整（缺少游戏文件），请重新安装。"
     },
     "success": {
-      "unzipping":  "下载完成，正在解压...",
+      "unzipping": "下载完成，正在解压...",
       "installing": "解压完成，正在安装...",
-      "installed":  "下载和安装完成"
+      "installed": "下载和安装完成"
+    },
+    "tab": {
+      "overview": "概览"
     }
+  },
+  "docs": {
+    "title": "文档",
+    "not_found": "此 OpenTaiko 构建不包含本地文档。",
+    "not_found_hint": "请更新或重新构建此实例，以获取附带文档的构建。"
+  },
+  "saves": {
+    "tab": "存档",
+    "title": "存档数据",
+    "description": "导出存档，或将存档导入到某个槽位。导入的存档会被合并。",
+    "current_version": "存档数据库版本：",
+    "no_saves": "尚无存档数据（启动一次游戏即可创建）。",
+    "import": "导入",
+    "export": "导出",
+    "hint": "请勿在游戏运行时导入。",
+    "col": {
+      "player": "玩家",
+      "slot": "槽位",
+      "uid": "唯一 id"
+    },
+    "slot_reserve": "备用",
+    "slot_n": "槽位 {n}",
+    "success": {
+      "export": "已导出存档“{name}”。",
+      "rebind": "已移动存档“{name}”。",
+      "rebind_swap": "已交换存档“{a}”和“{b}”。",
+      "imported_into": "已将“{name}”导入到 {slot}。",
+      "created": "已创建存档“{name}”。",
+      "deleted": "已删除存档“{name}”。"
+    },
+    "error": {
+      "no_db": "此实例尚无存档数据库。",
+      "load": "无法读取存档数据库。",
+      "invalid_file": "不是有效的 OpenTaiko 存档文件。",
+      "export": "导出存档失败：{error}",
+      "import": "导入存档失败：{error}",
+      "rebind": "更改存档槽位失败：{error}",
+      "create": "创建存档失败：{error}",
+      "delete": "删除存档失败：{error}",
+      "newer": "此存档（{imported}）比数据库（{current}）新，请先更新游戏。"
+    },
+    "rebind_hint": "更改槽位（占用时会交换）。",
+    "confirm_title": "导入存档",
+    "confirm_import": "要将“{imported}”合并到 {slot}（“{current}”）吗？",
+    "create": "新建存档",
+    "new_name": "新玩家",
+    "delete": "删除存档",
+    "confirm_delete_title": "删除存档",
+    "confirm_delete": "要删除存档“{name}”吗？此操作无法撤销。"
   },
   "hub": {
     "status": {
-      "outdated":     "您的 OpenTaiko Hub 安装不是最新版本。",
-      "up_to_date":   "您的 OpenTaiko Hub 安装是最新版本！",
-      "checking":     "正在检查更新...",
+      "outdated": "您的 OpenTaiko Hub 安装不是最新版本。",
+      "up_to_date": "您的 OpenTaiko Hub 安装是最新版本！",
+      "checking": "正在检查更新...",
       "fetch_failed": "检查更新失败。"
     },
-    "button": { "update": "将 OpenTaiko Hub 更新至 {version}" },
-    "warn":   { "outdated_toast": "您的 OpenTaiko Hub 安装不是最新版本。<br>请点击「更新 OpenTaiko Hub」按钮。" },
-    "error":  { "fetch": "获取最新 OpenTaiko Hub 版本失败：{error}" }
+    "button": {
+      "update": "将 OpenTaiko Hub 更新至 {version}"
+    },
+    "warn": {
+      "outdated_toast": "您的 OpenTaiko Hub 安装不是最新版本。<br>请点击「更新 OpenTaiko Hub」按钮。"
+    },
+    "error": {
+      "fetch": "获取最新 OpenTaiko Hub 版本失败：{error}"
+    }
   },
   "songs": {
     "col": {
-      "name":   "歌曲名称",
+      "name": "歌曲名称",
       "folder": "分区",
       "difficulties": "难度",
       "charter": "谱面作者：",
-      "size":   "大小",
+      "size": "大小",
       "status": "状态"
     },
     "filter": {
-      "song":   "搜索歌曲...",
+      "song": "搜索歌曲...",
       "folder": "搜索分区..."
     },
     "status": {
-      "scanning":       "正在扫描...",
+      "scanning": "正在扫描...",
       "not_downloaded": "未下载",
-      "up_to_date":     "最新",
-      "outdated":       "已过时"
+      "up_to_date": "最新",
+      "outdated": "已过时"
     },
     "button": {
       "bulk_download": "批量下载",
-      "download":      "下载",
-      "redownload":    "重新下载",
-      "update":        "更新"
+      "download": "下载",
+      "redownload": "重新下载",
+      "update": "更新",
+      "open_folder": "打开歌曲文件夹"
     },
-    "error":   { "scanning": "正在扫描本地文件夹，无法下载歌曲" },
+    "view": {
+      "list": "列表",
+      "tree": "树状"
+    },
+    "scan": {
+      "progress": "正在扫描歌曲...（已找到 {count} 首）",
+      "done": "曲库中共有 {count} 首歌曲"
+    },
+    "tree": {
+      "soundtrack": "OpenTaiko 音轨",
+      "custom": "自定义",
+      "songs_count": "{count} 首歌曲",
+      "empty": "曲库中尚未找到歌曲。",
+      "spicy": "辣口",
+      "sweet": "甜口"
+    },
+    "migrate": {
+      "banner": "在“{instance}”中找到 {count} 个歌曲文件夹。是否移动到共享曲库？",
+      "button": "移动歌曲",
+      "later": "稍后",
+      "modal_title": "从“{instance}”移动歌曲",
+      "summary_new": "将有 {count} 个新的歌曲文件夹被添加到共享曲库。",
+      "summary_identical": "将从此实例中移除 {count} 个完全相同的歌曲文件夹。",
+      "nothing": "此实例没有可移动的谱面。",
+      "conflicts_title": "冲突（{count}）",
+      "conflicts_hint": "这些歌曲在共享曲库中已存在但内容不同。请选择要保留的版本。",
+      "col_global": "共享曲库",
+      "col_instance": "此实例",
+      "bulk_keep_global": "全部保留共享",
+      "bulk_use_instance": "全部使用实例",
+      "hash": "哈希",
+      "edited": "编辑时间",
+      "apply": "应用",
+      "applied": "移动完成：新增 {moved}，替换 {replaced}，丢弃 {discarded}。",
+      "error": "移动歌曲失败：{error}"
+    },
+    "metadata": {
+      "updated": "已更新 {count} 个曲风文件夹（box.def / preimages）"
+    },
+    "experimental_note": "所选实例为实验版构建：它自带歌曲，不使用共享曲库。",
+    "error": {
+      "scanning": "正在扫描本地文件夹，无法下载歌曲",
+      "scan_failed": "扫描曲库失败：{error}"
+    },
     "success": {
-      "all_up_to_date":    "所有歌曲均已是最新",
+      "all_up_to_date": "所有歌曲均已是最新",
       "download_complete": "下载完成",
-      "download_nb":       "已下载第 {nb}/{total} 首歌曲"
+      "download_nb": "已下载第 {nb}/{total} 首歌曲"
+    },
+    "duplicates": {
+      "banner": "“{instance}”中有 {count} 个空的重复文件夹。要删除吗？",
+      "button": "清理",
+      "success": "已删除 {count} 个重复文件夹。",
+      "error": "删除重复文件夹失败：{error}"
     }
   },
   "assets": {
     "tab": {
-      "skins":       "皮肤",
-      "characters":  "角色",
+      "skins": "皮肤",
+      "characters": "角色",
       "puchicharas": "迷你角色"
     },
     "col": {
-      "asset":      "资源",
-      "version":    "版本",
+      "asset": "资源",
+      "version": "版本",
       "resolution": "分辨率",
-      "author":     "作者",
-      "size":       "大小",
-      "status":     "状态"
+      "author": "作者",
+      "size": "大小",
+      "status": "状态"
     },
-    "button": { "bulk_download": "批量下载" },
+    "button": {
+      "bulk_download": "批量下载"
+    },
     "type": {
-      "skins":       "皮肤",
-      "characters":  "角色",
+      "skins": "皮肤",
+      "characters": "角色",
       "puchicharas": "迷你角色"
     },
+    "experimental": {
+      "blocked_title": "不适用于实验版构建",
+      "blocked_text": "实验版构建已包含自带的皮肤、角色和迷你角色。"
+    },
     "error": {
-      "scanning":      "正在扫描本地文件夹，无法下载{type}",
+      "scanning": "正在扫描本地文件夹，无法下载{type}",
       "zip_not_found": "在服务器上找不到皮肤包。请在5分钟后重试。如果问题仍然存在，请联系OpenTaiko团队。"
     },
     "success": {
-      "all_up_to_date":    "所有{type}均已是最新",
+      "all_up_to_date": "所有{type}均已是最新",
       "download_complete": "下载完成",
-      "download_nb":       "已下载{type} {nb}/{total}"
+      "download_nb": "已下载{type} {nb}/{total}"
     }
   },
   "asset_cell": {
-    "scanning":       "正在扫描...",
+    "scanning": "正在扫描...",
     "not_downloaded": "未下载",
     "button": {
-      "download":   "下载",
+      "download": "下载",
       "redownload": "重新下载",
-      "update":     "更新"
+      "update": "更新"
     }
   },
   "hof": {
-    "website_link":    "在OpenTaiko官网查看",
-    "no_scores":       "暂无分数记录。",
+    "website_link": "在OpenTaiko官网查看",
+    "no_scores": "暂无分数记录。",
     "max_list_points": "最高列表分",
     "col": {
-      "rank":        "排名",
-      "player":      "玩家",
-      "score":       "分数",
-      "grade":       "评级",
-      "good":        "良",
-      "ok":          "可",
-      "bad":         "不可",
+      "rank": "排名",
+      "player": "玩家",
+      "score": "分数",
+      "grade": "评级",
+      "good": "良",
+      "ok": "可",
+      "bad": "不可",
       "list_points": "列表分",
-      "video":       "视频",
-      "status":      "通关状态"
+      "video": "视频",
+      "status": "通关状态"
     },
     "video_link": "观看",
-    "close":      "关闭",
+    "close": "关闭",
     "status": {
-      "perfect":    "全良",
+      "perfect": "全良",
       "full_combo": "全连",
-      "clear":      "通关"
+      "clear": "通关"
     }
   },
   "version_chip": {
     "incompatible": "与当前 OpenTaiko 版本不兼容",
-    "outdated":     "可能已过时，请谨慎使用"
+    "outdated": "可能已过时，请谨慎使用"
   },
   "player": {
-    "play":  "播放",
+    "play": "播放",
     "pause": "暂停"
   },
   "info": {
     "tab": {
-      "changelog_game":  "更新日志（游戏）",
-      "changelog_hub":   "更新日志（Hub）",
-      "documentation":   "文档",
+      "changelog_game": "更新日志（游戏）",
+      "changelog_hub": "更新日志（Hub）",
+      "documentation": "文档",
       "troubleshooting": "故障排除",
-      "credits":         "鸣谢"
+      "credits": "鸣谢"
     },
     "legend": {
-      "title":       "如果你有点困惑...",
-      "feat":        "代表“功能”，用于新增功能。",
+      "title": "如果你有点困惑...",
+      "feat": "代表“功能”，用于新增功能。",
       "enhancement": "对现有功能的更新。",
-      "fix":         "顾名思义",
-      "fix_note":    "（注：[Fix] 和 [BugFix] 可互换使用。）",
-      "chore":       "既不是错误修复也不是功能添加的更改。",
-      "i18n":        "代表国际化（internationalization）。",
-      "theme":       "关于 OpenTaiko Hub 主题添加和更改。"
+      "fix": "顾名思义",
+      "fix_note": "（注：[Fix] 和 [BugFix] 可互换使用。）",
+      "chore": "既不是错误修复也不是功能添加的更改。",
+      "i18n": "代表国际化（internationalization）。",
+      "theme": "关于 OpenTaiko Hub 主题添加和更改。"
     },
     "troubleshoot": {
-      "title":   "支持 / 错误报告",
-      "intro":   "如果您遇到问题或正在寻求关于 OpenTaiko 的支持，请参考以下链接：",
+      "title": "支持 / 错误报告",
+      "intro": "如果您遇到问题或正在寻求关于 OpenTaiko 的支持，请参考以下链接：",
       "discord": "OpenTaiko Discord 的 #support 频道",
-      "github":  "GitHub issues 区",
-      "note":    "注意：在提问前请先自行研究，问题可能已经有过解答。也请查看 Discord 的 #often_asked_question 频道。"
+      "github": "GitHub issues 区",
+      "note": "注意：在提问前请先自行研究，问题可能已经有过解答。也请查看 Discord 的 #often_asked_question 频道。"
     },
     "versioning": {
-      "title":    "皮肤 / 资源版本管理",
-      "compat":   "直到次要版本号（例如 v[0.6.0].2）的所有数字需要在皮肤和游戏版本之间匹配才能兼容。",
+      "title": "皮肤 / 资源版本管理",
+      "compat": "直到次要版本号（例如 v[0.6.0].2）的所有数字需要在皮肤和游戏版本之间匹配才能兼容。",
       "optional": "对于一些资源（角色/小角色）的更新，由于它们不一定遵循皮肤的严格版本规则，因此并非必须匹配。",
       "revision": "修订号（例如 v0.6.0.[2]）在不包含必要更改的每次游戏/皮肤更新中递增，不需要匹配。",
-      "example":  "示例：版本号为 0.6.1.3 的皮肤将适用于从 0.6.1.0 开始的任何 OpenTaiko 版本，并从 0.6.2.0 起不再兼容。",
-      "wip":      "本节将在未来的 OpenTaiko Hub 更新中根据发现的问题进行完善。"
+      "example": "示例：版本号为 0.6.1.3 的皮肤将适用于从 0.6.1.0 开始的任何 OpenTaiko 版本，并从 0.6.2.0 起不再兼容。",
+      "wip": "本节将在未来的 OpenTaiko Hub 更新中根据发现的问题进行完善。"
     },
     "error": {
       "changelog": "加载更新日志失败。",
-      "credits":   "加载鸣谢信息失败。",
-      "generic":   "错误：{error}"
+      "credits": "加载鸣谢信息失败。",
+      "generic": "错误：{error}"
     }
   },
   "links": {
     "section": {
-      "socials":  "社交媒体/GitHub",
+      "socials": "社交媒体/GitHub",
       "websites": "网站"
     },
-    "discord_en":  "官方英语 Discord 服务器",
-    "discord_ja":  "官方日语 Discord 服务器",
-    "youtube":     "官方 YouTube 频道",
-    "bluesky":     "官方 Bluesky 账号",
-    "twitter":     "官方 Twitter/X 账号",
+    "discord_en": "官方英语 Discord 服务器",
+    "discord_ja": "官方日语 Discord 服务器",
+    "youtube": "官方 YouTube 频道",
+    "bluesky": "官方 Bluesky 账号",
+    "twitter": "官方 Twitter/X 账号",
     "source_main": "OpenTaiko 主源代码",
-    "source_hub":  "OpenTaiko Hub 源代码",
-    "github_org":  "GitHub 组织",
-    "website":     "OpenTaiko 官方网站",
-    "blog":        "OpenTaiko 官方博客",
-    "wiki":        "OpenTaiko 官方 Wiki"
+    "source_hub": "OpenTaiko Hub 源代码",
+    "github_org": "GitHub 组织",
+    "website": "OpenTaiko 官方网站",
+    "blog": "OpenTaiko 官方博客",
+    "wiki": "OpenTaiko 官方 Wiki"
   },
   "tools": {
     "tab": {
       "charting": "谱面制作",
-      "lyrics":   "歌词",
-      "submit":   "提交你的内容！"
+      "lyrics": "歌词",
+      "submit": "提交你的内容！"
     },
     "charting": {
-      "primary":   "主要资源：",
+      "primary": "主要资源：",
       "tutorial": {
-        "title":    "太鼓 .TJA 谱面制作教程",
+        "title": "太鼓 .TJA 谱面制作教程",
         "subtitle": "ugyuu 的谱面制作教程"
       },
-      "peepo_dl":  "下载 PeepoDrumKit：",
+      "peepo_dl": "下载 PeepoDrumKit：",
       "additional": "其他资源："
     },
     "lyrics": {
@@ -251,63 +439,108 @@
       "soundtrack": "OpenTaiko 原声带"
     },
     "card": {
-      "peepo_origin":     { "subtitle": "原作者最新版",   "text": "原作者 samyuu 的版本，用于没有实验性功能的普通谱面。" },
-      "peepo_optk":       { "subtitle": "OpenTaiko 团队最新版", "text": "由 Komi 和 OpenTaiko 团队继续维护的版本，增加了 OpenTaiko 支持的实验性功能，并强化了普通谱面的编辑功能。" },
-      "peepo_preview":    { "subtitle": "OpenTaiko 团队最新版（预览）", "text": "IID 维护的下个 OpenTaiko 团队版本的预览版本。增加了更多实验性功能。" },
-      "peepo_sdl3":       { "subtitle": "OpenTaiko 团队最新版（SDL3 版）", "text": "Steve-xmh 移植至 SDL3 的跨平台版本，由 IID 筛选功能作为未来的 OpenTaiko 团队版本。" },
-      "tja_tools":        { "title": "TJA Tools",    "subtitle": "WHMHammer 的分支", "text": "随时可视化谱面并查看统计信息！" },
-      "arrow_vortex":     { "title": "Arrow Vortex", "subtitle": "官方最新版",   "text": "轻松同步谱面的推荐工具！" },
-      "subtitle_edit":    { "title": "Subtitle Edit", "subtitle": "官方最新版",  "text": "为谱面制作 VTT 文件的推荐工具！" },
-      "submission":       { "title": "歌曲投稿表单", "subtitle": "自作歌曲", "text": "你可以在这里为 OpenTaiko 原声带投稿！如果歌曲被接受，通常在 2 周内完成谱面制作。" },
-      "suggestion":       { "title": "歌曲建议表单", "subtitle": "其他艺术家的歌曲", "text": "你可以在这里推荐你认为适合 OpenTaiko 的艺术家！" }
+      "peepo_origin": {
+        "subtitle": "原作者最新版",
+        "text": "原作者 samyuu 的版本，用于没有实验性功能的普通谱面。"
+      },
+      "peepo_optk": {
+        "subtitle": "OpenTaiko 团队最新版",
+        "text": "由 Komi 和 OpenTaiko 团队继续维护的版本，增加了 OpenTaiko 支持的实验性功能，并强化了普通谱面的编辑功能。"
+      },
+      "peepo_preview": {
+        "subtitle": "OpenTaiko 团队最新版（预览）",
+        "text": "IID 维护的下个 OpenTaiko 团队版本的预览版本。增加了更多实验性功能。"
+      },
+      "peepo_sdl3": {
+        "subtitle": "OpenTaiko 团队最新版（SDL3 版）",
+        "text": "Steve-xmh 移植至 SDL3 的跨平台版本，由 IID 筛选功能作为未来的 OpenTaiko 团队版本。"
+      },
+      "tja_tools": {
+        "title": "TJA Tools",
+        "subtitle": "WHMHammer 的分支",
+        "text": "随时可视化谱面并查看统计信息！"
+      },
+      "arrow_vortex": {
+        "title": "Arrow Vortex",
+        "subtitle": "官方最新版",
+        "text": "轻松同步谱面的推荐工具！"
+      },
+      "subtitle_edit": {
+        "title": "Subtitle Edit",
+        "subtitle": "官方最新版",
+        "text": "为谱面制作 VTT 文件的推荐工具！"
+      },
+      "submission": {
+        "title": "歌曲投稿表单",
+        "subtitle": "自作歌曲",
+        "text": "你可以在这里为 OpenTaiko 原声带投稿！如果歌曲被接受，通常在 2 周内完成谱面制作。"
+      },
+      "suggestion": {
+        "title": "歌曲建议表单",
+        "subtitle": "其他艺术家的歌曲",
+        "text": "你可以在这里推荐你认为适合 OpenTaiko 的艺术家！"
+      }
     }
   },
   "themes": {
-    "title":       "请选择主题。",
+    "title": "请选择主题。",
     "title_debug": "请选择主题。（调试模式已开启）",
     "optgroup": {
-      "optk":     "OpenTaiko Hub 主题：",
+      "optk": "OpenTaiko Hub 主题：",
       "skeleton": "Skeleton 预设主题："
     },
     "preview": {
-      "title":            "欢迎来到 OpenTaiko Hub 主题标签！",
-      "color":            "颜色预览",
-      "accents":          "主题强调色：",
-      "accent_primary":   "主要强调色",
+      "title": "欢迎来到 OpenTaiko Hub 主题标签！",
+      "color": "颜色预览",
+      "accents": "主题强调色：",
+      "accent_primary": "主要强调色",
       "accent_secondary": "次要强调色",
-      "accent_tertiary":  "第三强调色",
-      "buttons":          "按钮颜色：",
-      "btn_action":       "操作",
-      "btn_download":     "下载",
-      "btn_repeat":       "重复",
-      "btn_error":        "破坏性/错误",
-      "notifs":           "通知：",
-      "notif_success":    "成功",
-      "notif_warning":    "警告",
-      "notif_error":      "错误"
+      "accent_tertiary": "第三强调色",
+      "buttons": "按钮颜色：",
+      "btn_action": "操作",
+      "btn_download": "下载",
+      "btn_repeat": "重复",
+      "btn_error": "破坏性/错误",
+      "notifs": "通知：",
+      "notif_success": "成功",
+      "notif_warning": "警告",
+      "notif_error": "错误"
     },
     "credits": {
       "title": "主题鸣谢",
-      "text":  "所有主题鸣谢可在此处查看："
+      "text": "所有主题鸣谢可在此处查看："
     },
     "mode": {
-      "dark":    "深色",
-      "light":   "浅色",
+      "dark": "深色",
+      "light": "浅色",
       "current": "当前模式：{mode}"
     },
-    "debug": { "disable_btn": "禁用调试模式" },
+    "debug": {
+      "disable_btn": "禁用调试模式"
+    },
     "error": {
-      "theme_json":     "theme.json 文件（或设置文件夹）不存在或已损坏！<br>请重新安装 OpenTaiko Hub 以修复此问题。",
+      "theme_json": "theme.json 文件（或设置文件夹）不存在或已损坏！<br>请重新安装 OpenTaiko Hub 以修复此问题。",
       "thememode_json": "thememode.json 文件（或设置文件夹）不存在或已损坏！<br>请重新安装 OpenTaiko Hub 以修复此问题。"
     },
-    "warn":    { "same_theme": "所选主题与当前主题相同。", "same_theme_debug": "调试：所选主题与当前主题相同。" },
-    "success": { "debug_disabled": "<b>调试模式已禁用。</b><br><p class=\"smalltext\">（注意：您需要更改「debugMode」值才能完全禁用调试模式！）</p>" }
+    "warn": {
+      "same_theme": "所选主题与当前主题相同。",
+      "same_theme_debug": "调试：所选主题与当前主题相同。"
+    },
+    "success": {
+      "debug_disabled": "<b>调试模式已禁用。</b><br><p class=\"smalltext\">（注意：您需要更改「debugMode」值才能完全禁用调试模式！）</p>"
+    }
   },
   "lang": {
     "label": "语言",
-    "en":    "English",
-    "ja":    "日本語",
-    "zh_CN": "中文 (简体)",
-    "zh_TW": "中文 (繁體)"
+    "en": "English",
+    "ja": "日本語",
+    "zh_Hans": "中文 (简体)",
+    "zh_Hant": "中文 (繁體)",
+    "fr": "Français",
+    "es": "Español",
+    "de": "Deutsch",
+    "nl": "Nederlands",
+    "ko": "한국어",
+    "ru": "Русский"
   }
 }

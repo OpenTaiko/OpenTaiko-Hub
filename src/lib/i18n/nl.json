@@ -1,0 +1,546 @@
+{
+  "common": {
+    "fetch_error": "Ophaalfout",
+    "retry": "Opnieuw proberen",
+    "reload": "Herladen",
+    "cancel": "Annuleren"
+  },
+  "dl": {
+    "error": {
+      "failed_abort": "Download mislukt, wordt afgebroken"
+    },
+    "warn": {
+      "failed_retry": "Download mislukt, opnieuw proberen... ({attempt}/{max})"
+    }
+  },
+  "nav": {
+    "home": "Home",
+    "songlist": "Songlijst",
+    "skins": "Skins",
+    "docs": "Docs",
+    "tools": "Tools",
+    "secrets": "Geheimen",
+    "information": "Informatie",
+    "links": "Links",
+    "themes": "OpTk Hub-thema's",
+    "tooltip": {
+      "home": "Beheer OpenTaiko en de OpenTaiko Hub.",
+      "songlist": "Werk je OpenTaiko-nummers bij en download de nieuwste.",
+      "skins": "Download de nieuwste OpenTaiko-skins en bijbehorende assets.",
+      "docs": "Blader door de documentatie van de geselecteerde OpenTaiko-build.",
+      "tools": "Tools die je OpenTaiko-ervaring kunnen verbeteren.",
+      "secrets": "???",
+      "information": "Voor changelogs, documentatie of probleemoplossing.",
+      "links": "Bekijk de socials en websites van OpenTaiko!",
+      "themes": "Verander het thema van de OpenTaiko Hub.",
+      "github": "Bekijk de broncode van de OpenTaiko Hub."
+    }
+  },
+  "instances": {
+    "label": "Instantie",
+    "manage": "Beheren",
+    "title": "OpenTaiko-instanties",
+    "none": "Nog geen OpenTaiko-instantie. Gebruik \"Beheren\" om een nieuwe aan te maken of een bestaande map te koppelen.",
+    "active": "Actief",
+    "set_active": "Selecteren",
+    "attach": "Bestaande map koppelen",
+    "create": "Nieuwe instantie aanmaken",
+    "create_name_placeholder": "Naam nieuwe instantie...",
+    "detach": "Loskoppelen",
+    "detach_note": "Loskoppelen verwijdert de instantie alleen uit deze lijst; er worden geen bestanden verwijderd.",
+    "open_folder": "Map openen",
+    "col": {
+      "name": "Naam",
+      "path": "Map",
+      "channel": "Type",
+      "version": "Versie",
+      "actions": "Acties"
+    },
+    "channel": {
+      "stable": "Stabiel",
+      "experimental": "Experimenteel",
+      "empty": "Geen build"
+    },
+    "error": {
+      "attach_failed": "Koppelen van de map mislukt: {error}",
+      "create_failed": "Aanmaken van de instantie mislukt: {error}"
+    },
+    "success": {
+      "attached": "\"{name}\" gekoppeld",
+      "created": "\"{name}\" aangemaakt",
+      "detached": "\"{name}\" losgekoppeld"
+    },
+    "picker": {
+      "title": "Kies een build om te installeren",
+      "install": "Installeren",
+      "stable_desc": "Officiële GitHub-release.",
+      "indev_desc": "Lokaal gebouwd vanaf de dev-branch (vereist de .NET SDK 8).",
+      "prerelease_desc": "Voorlopige versie van GitHub."
+    }
+  },
+  "home": {
+    "label": {
+      "current_version": "Huidige OpenTaiko-versie:",
+      "latest_version": "Nieuwste OpenTaiko-versie:",
+      "latest_experimental": "Nieuwste experimentele build:",
+      "current_os": "Huidig besturingssysteem:",
+      "no_version_found": "Geen geldige OpenTaiko-versie gevonden"
+    },
+    "button": {
+      "reload": "Herladen",
+      "download": "OpenTaiko downloaden",
+      "download_stable": "Stabiel downloaden",
+      "download_experimental": "Experimenteel downloaden",
+      "launch": "OpenTaiko starten",
+      "explorer": "Openen in Verkenner",
+      "update": "OpenTaiko bijwerken",
+      "redownload": "OpenTaiko opnieuw downloaden",
+      "rebuild": "Opnieuw bouwen",
+      "retry": "Opnieuw proberen",
+      "install": "Een build installeren..."
+    },
+    "warn": {
+      "skin_update": "(Na het bijwerken is ook een skin-update nodig)"
+    },
+    "hint": {
+      "first_start": "Download eerst een skin (tabblad \"Skins\") en nummers (tabblad \"Songlijst\") voordat je het spel voor het eerst start!",
+      "experimental": "Experimentele builds bevatten al skins en personages, je kunt meteen spelen!"
+    },
+    "experimental": {
+      "unavailable": "Er is momenteel geen experimentele build beschikbaar",
+      "requires_dotnet": "Voor het bouwen van experimentele versies is de .NET SDK 8 vereist. Installeer deze via https://dotnet.microsoft.com/download/dotnet/8.0 en probeer het opnieuw.",
+      "update_available": "Er is een nieuwe experimentele build beschikbaar!",
+      "up_to_date": "Deze experimentele build is up-to-date.",
+      "stage": {
+        "check_sdk": "De .NET SDK controleren...",
+        "fetch": "Branch-informatie ophalen...",
+        "download": "De broncode downloaden...",
+        "extract": "De broncode uitpakken...",
+        "build": "OpenTaiko bouwen (dit kan enkele minuten duren)...",
+        "install": "De build installeren..."
+      }
+    },
+    "error": {
+      "launch": "Fout bij het starten van de app: {error}",
+      "already_downloading": "Er wordt al gedownload",
+      "fetch_release": "Ophalen van de nieuwste OpenTaiko-release mislukt: {error}",
+      "download_failed": "Downloaden van OpenTaiko mislukt: {error}",
+      "incomplete_build": "De geïnstalleerde build is onvolledig (ontbrekende spelbestanden), installeer opnieuw."
+    },
+    "success": {
+      "unzipping": "Download voltooid, nu uitpakken...",
+      "installing": "Uitpakken voltooid, nu installeren...",
+      "installed": "Download en installatie voltooid"
+    },
+    "tab": {
+      "overview": "Overzicht"
+    }
+  },
+  "docs": {
+    "title": "Documentatie",
+    "not_found": "Deze OpenTaiko-build bevat geen lokale documentatie.",
+    "not_found_hint": "Werk deze instantie bij of bouw hem opnieuw om een build met documentatie te krijgen."
+  },
+  "saves": {
+    "tab": "Opslag",
+    "title": "Opgeslagen gegevens",
+    "description": "Exporteer een save of importeer er een in een slot. Geïmporteerde saves worden samengevoegd.",
+    "current_version": "Versie van de save-database:",
+    "no_saves": "Nog geen opgeslagen gegevens (start het spel één keer om ze aan te maken).",
+    "import": "Importeren",
+    "export": "Exporteren",
+    "hint": "Importeer niet terwijl het spel draait.",
+    "col": {
+      "player": "Speler",
+      "slot": "Slot",
+      "uid": "Unieke id"
+    },
+    "slot_reserve": "Reserve",
+    "slot_n": "Slot {n}",
+    "success": {
+      "export": "Save \"{name}\" geëxporteerd.",
+      "rebind": "Save \"{name}\" verplaatst.",
+      "rebind_swap": "Saves \"{a}\" en \"{b}\" omgewisseld.",
+      "imported_into": "\"{name}\" geïmporteerd in {slot}.",
+      "created": "Save \"{name}\" aangemaakt.",
+      "deleted": "Save \"{name}\" verwijderd."
+    },
+    "error": {
+      "no_db": "Deze instantie heeft nog geen save-database.",
+      "load": "Kon de save-database niet lezen.",
+      "invalid_file": "Geen geldig OpenTaiko-savebestand.",
+      "export": "Kon de save niet exporteren: {error}",
+      "import": "Kon de save niet importeren: {error}",
+      "rebind": "Kon het save-slot niet wijzigen: {error}",
+      "create": "Kon de save niet aanmaken: {error}",
+      "delete": "Kon de save niet verwijderen: {error}",
+      "newer": "Deze save ({imported}) is nieuwer dan de database ({current}). Werk eerst het spel bij."
+    },
+    "rebind_hint": "Slot wijzigen (wisselt met de bezetter).",
+    "confirm_title": "Save importeren",
+    "confirm_import": "\"{imported}\" samenvoegen met {slot} (\"{current}\")?",
+    "create": "Nieuwe save",
+    "new_name": "Nieuwe speler",
+    "delete": "Verwijderen",
+    "confirm_delete_title": "Save verwijderen",
+    "confirm_delete": "De save \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt."
+  },
+  "hub": {
+    "status": {
+      "outdated": "Je OpenTaiko Hub-installatie is verouderd.",
+      "up_to_date": "Je OpenTaiko Hub-installatie is up-to-date!",
+      "checking": "Controleren op updates...",
+      "fetch_failed": "Controleren op updates mislukt."
+    },
+    "button": {
+      "update": "OpenTaiko Hub bijwerken naar {version}"
+    },
+    "warn": {
+      "outdated_toast": "Je OpenTaiko Hub-installatie is verouderd.<br>Klik op de knop \"OpenTaiko Hub bijwerken\"."
+    },
+    "error": {
+      "fetch": "Ophalen van de nieuwste OpenTaiko Hub-release mislukt: {error}"
+    }
+  },
+  "songs": {
+    "col": {
+      "name": "Titel",
+      "folder": "Map",
+      "difficulties": "Moeilijkheidsgraden",
+      "charter": "Charter: ",
+      "size": "Grootte",
+      "status": "Status"
+    },
+    "filter": {
+      "song": "Nummer zoeken...",
+      "folder": "Map zoeken..."
+    },
+    "status": {
+      "scanning": "Scannen...",
+      "not_downloaded": "Niet gedownload",
+      "up_to_date": "Up-to-date",
+      "outdated": "Verouderd"
+    },
+    "button": {
+      "bulk_download": "Bulkdownload",
+      "download": "Downloaden",
+      "redownload": "Opnieuw downloaden",
+      "update": "Bijwerken",
+      "open_folder": "Muziekmap openen"
+    },
+    "view": {
+      "list": "Lijst",
+      "tree": "Boomstructuur"
+    },
+    "scan": {
+      "progress": "Nummers scannen... ({count} gevonden)",
+      "done": "{count} nummers in de bibliotheek"
+    },
+    "tree": {
+      "soundtrack": "OpenTaiko-soundtrack",
+      "custom": "Aangepast",
+      "songs_count": "{count} nummers",
+      "empty": "Nog geen nummers gevonden in de bibliotheek.",
+      "spicy": "Pittig",
+      "sweet": "Zoet"
+    },
+    "migrate": {
+      "banner": "{count} muziekmap(pen) gevonden in \"{instance}\". Overzetten naar de gedeelde muziekbibliotheek?",
+      "button": "Nummers overzetten",
+      "later": "Later",
+      "modal_title": "Nummers overzetten uit \"{instance}\"",
+      "summary_new": "{count} nieuwe muziekmap(pen) worden toegevoegd aan de gedeelde bibliotheek.",
+      "summary_identical": "{count} identieke muziekmap(pen) worden uit deze instantie verwijderd.",
+      "nothing": "Deze instantie heeft geen charts om over te zetten.",
+      "conflicts_title": "Conflicten ({count})",
+      "conflicts_hint": "Deze nummers bestaan al in de gedeelde bibliotheek met andere inhoud. Kies welke versie je wilt behouden.",
+      "col_global": "Gedeelde bibliotheek",
+      "col_instance": "Deze instantie",
+      "bulk_keep_global": "Overal gedeelde houden",
+      "bulk_use_instance": "Overal instantie gebruiken",
+      "hash": "Hash",
+      "edited": "Bewerkt",
+      "apply": "Toepassen",
+      "applied": "Overzetten voltooid: {moved} toegevoegd, {replaced} vervangen, {discarded} verworpen.",
+      "error": "Kon de nummers niet overzetten: {error}"
+    },
+    "metadata": {
+      "updated": "{count} genremap(pen) bijgewerkt (box.def / preimages)"
+    },
+    "experimental_note": "De geselecteerde instantie is een experimentele build: deze bevat eigen nummers en gebruikt de gedeelde muziekbibliotheek niet.",
+    "error": {
+      "scanning": "Kan geen nummers downloaden terwijl lokale mappen worden gescand",
+      "scan_failed": "Scannen van de muziekbibliotheek mislukt: {error}"
+    },
+    "success": {
+      "all_up_to_date": "Alle nummers zijn al up-to-date",
+      "download_complete": "Download voltooid",
+      "download_nb": "Nummer {nb} van {total} gedownload"
+    },
+    "duplicates": {
+      "banner": "{count} lege dubbele map(pen) in \"{instance}\". Verwijderen?",
+      "button": "Opruimen",
+      "success": "{count} dubbele map(pen) verwijderd.",
+      "error": "Kon de dubbele mappen niet verwijderen: {error}"
+    }
+  },
+  "assets": {
+    "tab": {
+      "skins": "Skins",
+      "characters": "Personages",
+      "puchicharas": "Puchicharas"
+    },
+    "col": {
+      "asset": "Asset",
+      "version": "Versie",
+      "resolution": "Resolutie",
+      "author": "Auteur",
+      "size": "Grootte",
+      "status": "Status"
+    },
+    "button": {
+      "bulk_download": "Bulkdownload"
+    },
+    "type": {
+      "skins": "skins",
+      "characters": "personages",
+      "puchicharas": "puchicharas"
+    },
+    "experimental": {
+      "blocked_title": "Niet beschikbaar voor experimentele builds",
+      "blocked_text": "Experimentele builds bevatten al hun eigen skins, personages en puchicharas."
+    },
+    "error": {
+      "scanning": "Kan geen {type} downloaden terwijl lokale mappen worden gescand",
+      "zip_not_found": "Het skinpakket kon niet op de server worden gevonden. Probeer het over 5 minuten opnieuw. Als het probleem aanhoudt, neem dan contact op met het OpenTaiko-team."
+    },
+    "success": {
+      "all_up_to_date": "Alle {type} zijn al up-to-date",
+      "download_complete": "Download voltooid",
+      "download_nb": "{nb} van {total} {type} gedownload"
+    }
+  },
+  "asset_cell": {
+    "scanning": "Scannen...",
+    "not_downloaded": "Niet gedownload",
+    "button": {
+      "download": "Downloaden",
+      "redownload": "Opnieuw downloaden",
+      "update": "Bijwerken"
+    }
+  },
+  "hof": {
+    "website_link": "Bekijken op de OpenTaiko-website",
+    "no_scores": "Nog geen scores geregistreerd.",
+    "max_list_points": "Max. lijstpunten",
+    "col": {
+      "rank": "Positie",
+      "player": "Speler",
+      "score": "Score",
+      "grade": "Rang",
+      "good": "Goed",
+      "ok": "OK",
+      "bad": "Slecht",
+      "list_points": "Lijstptn",
+      "video": "Video",
+      "status": "Status"
+    },
+    "video_link": "Bekijken",
+    "close": "Sluiten",
+    "status": {
+      "perfect": "Perfect",
+      "full_combo": "Full Combo",
+      "clear": "Clear"
+    }
+  },
+  "version_chip": {
+    "incompatible": "Niet compatibel met de huidige OpenTaiko-versie",
+    "outdated": "Mogelijk verouderd, wees voorzichtig bij gebruik"
+  },
+  "player": {
+    "play": "afspelen",
+    "pause": "pauzeren"
+  },
+  "info": {
+    "tab": {
+      "changelog_game": "Changelogs (Spel)",
+      "changelog_hub": "Changelogs (Hub)",
+      "documentation": "Documentatie",
+      "troubleshooting": "Probleemoplossing",
+      "credits": "Credits"
+    },
+    "legend": {
+      "title": "Voor als je even de weg kwijt bent...",
+      "feat": "Staat voor \"Feature\". Wordt gebruikt voor nieuwe functies.",
+      "enhancement": "Update van een bestaande functie.",
+      "fix": "Spreekt voor zich.",
+      "fix_note": "(Let op: [Fix] en [BugFix] worden door elkaar gebruikt.)",
+      "chore": "Wijzigingen die geen bugfix of nieuwe functie zijn.",
+      "i18n": "Staat voor internationalisatie.",
+      "theme": "Voor toevoegingen en wijzigingen van OpenTaiko Hub-thema's."
+    },
+    "troubleshoot": {
+      "title": "Ondersteuning / Bugmelding",
+      "intro": "Als je een probleem tegenkomt of hulp zoekt bij OpenTaiko, raadpleeg dan de volgende links:",
+      "discord": "Het #support-kanaal van de OpenTaiko Discord",
+      "github": "GitHub issues-sectie",
+      "note": "Let op: doe eerst zelf onderzoek voordat je iets vraagt, want het probleem is misschien al eerder behandeld. Bekijk ook het #often_asked_question-kanaal op Discord."
+    },
+    "versioning": {
+      "title": "Versiebeheer van skins/assets",
+      "compat": "Alle getallen tot en met het minor-updatenummer (bijv. v[0.6.0].2) moeten tussen een skin en een gameversie overeenkomen om compatibel te zijn.",
+      "optional": "Dit is niet verplicht voor sommige asset-updates (personage/puchichara), omdat die niet per se de strikte versiepatronen van skins volgen.",
+      "revision": "Het revisienummer (bijv. v0.6.0.[2]) wordt verhoogd bij elke game-/skin-update zonder verplichte wijzigingen en hoeft niet overeen te komen.",
+      "example": "Voorbeeld: een skin met versienummer 0.6.1.3 werkt met elke OpenTaiko-versie vanaf 0.6.1.0 en is niet meer compatibel vanaf 0.6.2.0.",
+      "wip": "Deze sectie wordt in toekomstige OpenTaiko Hub-updates aangevuld op basis van gevonden problemen."
+    },
+    "error": {
+      "changelog": "Laden van de changelog mislukt.",
+      "credits": "Laden van de credits mislukt.",
+      "generic": "Fout: {error}"
+    }
+  },
+  "links": {
+    "section": {
+      "socials": "Socials/GitHub",
+      "websites": "Websites"
+    },
+    "discord_en": "Officiële Engelstalige Discord-server",
+    "discord_ja": "Officiële Japanse Discord-server",
+    "youtube": "Officieel YouTube-kanaal",
+    "bluesky": "Officieel Bluesky-account",
+    "twitter": "Officieel Twitter/X-account",
+    "source_main": "Hoofdbroncode van OpenTaiko",
+    "source_hub": "Broncode van de OpenTaiko Hub",
+    "github_org": "GitHub-organisatie",
+    "website": "Officiële OpenTaiko-website",
+    "blog": "Officiële OpenTaiko-blog",
+    "wiki": "Officiële OpenTaiko-wiki"
+  },
+  "tools": {
+    "tab": {
+      "charting": "Charting",
+      "lyrics": "Songteksten",
+      "submit": "Dien je content in!"
+    },
+    "charting": {
+      "primary": "Primaire bronnen:",
+      "tutorial": {
+        "title": "Taiko .TJA chart-tutorial",
+        "subtitle": "Chart-tutorial door ugyuu."
+      },
+      "peepo_dl": "Download PeepoDrumKit:",
+      "additional": "Extra bronnen:"
+    },
+    "lyrics": {
+      "dl": "Songtekst-editor"
+    },
+    "submit": {
+      "soundtrack": "OpenTaiko-soundtrack"
+    },
+    "card": {
+      "peepo_origin": {
+        "subtitle": "Nieuwste originele versie",
+        "text": "De originele versie door samyuu, voor gewone charts zonder de experimentele functies."
+      },
+      "peepo_optk": {
+        "subtitle": "Nieuwste versie van het OpenTaiko-team",
+        "text": "De versie voortgezet door Komi en leden van het OpenTaiko-team, met experimentele functies die door OpenTaiko worden ondersteund en verbeterde reguliere bewerking."
+      },
+      "peepo_preview": {
+        "subtitle": "Nieuwste versie van het OpenTaiko-team (preview)",
+        "text": "Preview van de volgende versie van het OpenTaiko-team door IID, met meer experimentele functies."
+      },
+      "peepo_sdl3": {
+        "subtitle": "Nieuwste versie van het OpenTaiko-team (SDL3-port)",
+        "text": "De cross-platform SDL3-port door Steve-xmh, met functies geselecteerd door IID voor volgende versies van het OpenTaiko-team."
+      },
+      "tja_tools": {
+        "title": "TJA Tools",
+        "subtitle": "Fork van WHMHammer",
+        "text": "Visualiseer je charts en bekijk in een handomdraai hun statistieken!"
+      },
+      "arrow_vortex": {
+        "title": "Arrow Vortex",
+        "subtitle": "Nieuwste officiële versie",
+        "text": "De aanbevolen tool om je charts probleemloos te syncen!"
+      },
+      "subtitle_edit": {
+        "title": "Subtitle Edit",
+        "subtitle": "Nieuwste officiële versie",
+        "text": "De aanbevolen tool om VTT-bestanden voor je charts te maken!"
+      },
+      "submission": {
+        "title": "Formulier voor het insturen van nummers",
+        "subtitle": "Voor je eigen nummers",
+        "text": "Hier kun je je nummers indienen voor de OpenTaiko-soundtrack! Als het nummer wordt geaccepteerd, wordt de chart meestal binnen 2 weken gemaakt."
+      },
+      "suggestion": {
+        "title": "Formulier voor liedsuggesties",
+        "subtitle": "Voor andere artiesten",
+        "text": "Hier kun je artiesten aanraden van wie je denkt dat hun nummers goed bij OpenTaiko passen!"
+      }
+    }
+  },
+  "themes": {
+    "title": "Kies een thema.",
+    "title_debug": "Kies een thema. (DEBUGMODUS AAN)",
+    "optgroup": {
+      "optk": "OpenTaiko Hub-thema's:",
+      "skeleton": "Skeleton-presetthema's:"
+    },
+    "preview": {
+      "title": "Welkom bij het tabblad OpenTaiko Hub-thema's!",
+      "color": "Kleurvoorbeeld",
+      "accents": "Thema-accenten:",
+      "accent_primary": "Primair accent",
+      "accent_secondary": "Secundair accent",
+      "accent_tertiary": "Tertiair accent",
+      "buttons": "Knopkleuren:",
+      "btn_action": "Actie",
+      "btn_download": "Downloaden",
+      "btn_repeat": "Herhalen",
+      "btn_error": "Destructief/Fout",
+      "notifs": "Meldingen:",
+      "notif_success": "Succes",
+      "notif_warning": "Waarschuwing",
+      "notif_error": "Fout"
+    },
+    "credits": {
+      "title": "Themacredits",
+      "text": "Alle themacredits vind je hier:"
+    },
+    "mode": {
+      "dark": "Donker",
+      "light": "Licht",
+      "current": "Huidige modus: {mode}"
+    },
+    "debug": {
+      "disable_btn": "Debugmodus uitschakelen"
+    },
+    "error": {
+      "theme_json": "Het bestand theme.json (of de instellingenmap) bestaat niet of is beschadigd!<br>Installeer de OpenTaiko Hub opnieuw om dit op te lossen.",
+      "thememode_json": "Het bestand thememode.json (of de instellingenmap) bestaat niet of is beschadigd!<br>Installeer de OpenTaiko Hub opnieuw om dit op te lossen."
+    },
+    "warn": {
+      "same_theme": "Het geselecteerde thema is hetzelfde als het huidige thema.",
+      "same_theme_debug": "DEBUG: Het geselecteerde thema is hetzelfde als het huidige thema."
+    },
+    "success": {
+      "debug_disabled": "<b>De debugmodus is uitgeschakeld.</b><br><p class=\"smalltext\">(Let op: je moet de waarde \"debugMode\" aanpassen om de debugmodus volledig uit te schakelen!)</p>"
+    }
+  },
+  "lang": {
+    "label": "Language",
+    "en": "English",
+    "ja": "日本語",
+    "zh_Hans": "中文 (简体)",
+    "zh_Hant": "中文 (繁體)",
+    "fr": "Français",
+    "es": "Español",
+    "de": "Deutsch",
+    "nl": "Nederlands",
+    "ko": "한국어",
+    "ru": "Русский"
+  }
+}

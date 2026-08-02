@@ -2,46 +2,69 @@
     // Dependencies
     import { onMount } from 'svelte';
     import { ProgressBar } from '@skeletonlabs/skeleton';
-    import { readFile, readTextFile, mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
+    import { mkdir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
+    import { openPath } from '@tauri-apps/plugin-opener';
     import { fetch } from "@tauri-apps/plugin-http";
     import { download } from "@tauri-apps/plugin-upload";
     import { path } from '@tauri-apps/api';
+    import { invoke, Channel } from '@tauri-apps/api/core';
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext('toast');
 
-    import { md5 } from 'js-md5';
-    import initSqlJs from 'sql.js';
-    import sqlWasmUrl from 'sql.js/dist/sql-wasm.wasm?url';
+    import { getSQL } from '$lib/utils/sqljs.js';
 
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
-    import { GetRootPath } from "$lib/utils/path.js";
+    import { GetGlobalSongsPath, GetTmpPath } from "../utils/path.js";
+    import { instances } from "../stores/instances.js";
 
     // Song management
     import AudioPlayer from '$lib/components/AudioPlayer.svelte';
     import SongDifficultyChip from '$lib/components/SongDifficultyChip.svelte';
+    import SongTree from '$lib/components/SongTree.svelte';
+    import SongMigrationModal from '$lib/components/SongMigrationModal.svelte';
 
     // Soundtrack
     const soundtrackInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/soundtrack_info.json';
     let soundtrackInfo = [];
-    let currentSongs = {};
+    let catalogFetchFailed = false;
+    let currentSongs = {};          // uniqueId → { chartMD5s: string[], chartRelativePath }
+    let allScannedSongs = [];       // every scanned song, catalog or custom
+    let scannedGenres = {};         // relPath → { title, boxDefSha1, preimageSha1 }
+    let scanStats = { dirs: 0, found: 0 };
     let scanning = false;
+    let viewMode = 'list';          // 'list' | 'tree'
     let searchSong = "";
     let searchGenre = "";
     let songPreviousSort = "none";
     let songDLProgress = {};
     let songCountProgress = 0;
     let songCountProgressBar = null;
+    let bulkBusy = false;          // a bulk download is running
+    let songBusy = false;          // any single-song download is running
+
+    // Git blob SHAs of the soundtrack repository (path → sha), fetched once per session
+    // and used to detect outdated box.def / default.png files
+    let remoteShaMap = null;
+
+    // Songs found inside attached instances that can be moved to the shared library
+    let migrationCandidates = [];
+    let migrationCandidate = null;   // the instance whose migration modal is open
+    let migrationGlobalPath = null;
+
+    // Chart-less folders in an instance that the shared library already provides: the
+    // game reads both paths, so each one shows up as a duplicate, empty box
+    let duplicateCandidates = [];
+    let duplicateBusy = false;
+
+    $: catalogById = new Map(Array.isArray(soundtrackInfo) ? soundtrackInfo.map((s) => [s.uniqueId, s]) : []);
 
     // Hall of Fame
     const hofDbUrl = 'https://opentaiko.github.io/hof.db3';
-    const hofDifficultyMap    = ["Easy", "Normal", "Hard", "Oni", "Edit"];
-    const hofDifficultyRevMap = Object.fromEntries(hofDifficultyMap.map((v, i) => [v, i]));
-    const diffShortMap        = ["ez", "nm", "hd", "ex", "exex"];
-    const diffShortRevMap     = Object.fromEntries(diffShortMap.map((v, i) => [v, i]));
-    const hofDiffShortMap     = (key) => diffShortMap[hofDifficultyRevMap[key]];
-    const hofDiffShortRevMap  = (key) => hofDifficultyMap[diffShortRevMap[key]];
+    const hofDifficultyMap    = { 0: "Easy", 1: "Normal", 2: "Hard", 3: "Oni", 4: "Edit" };
+    const hofDifficultyRevMap = { "Easy": 0, "Normal": 1, "Hard": 2, "Oni": 3, "Edit": 4 };
+    const hofDiffShortMap     = { "Easy": "EZ", "Normal": "NM", "Hard": "HD", "Oni": "EX", "Edit": "EXEX" };
     let hofDb = null;
     // uniqueId → { difficultyString → globalRank }
     let hofMap = {};
@@ -74,10 +97,11 @@
 
     const updateHoFInfo = async () => {
         try {
-            const SQL = await initSqlJs({ locateFile: () => sqlWasmUrl });
+            const SQL = await getSQL();
 
             const response = await fetch(hofDbUrl);
             const buffer = await response.arrayBuffer();
+            hofDb?.close();
             hofDb = new SQL.Database(new Uint8Array(buffer));
 
             // Global rank: all entries sorted by internalDifficultyIndex DESC regardless of difficulty
@@ -142,111 +166,204 @@
         hofModalOpen = true;
     };
 
-    const filters = {
-        undefined: (sInfo) => sInfo,
-        "zh-CN": (sInfo) => {
-            const uids = ["losTPEtAlSwANDERRBHLiXoUNdsetSUnaN"];
-            return sInfo.filter(obj => !uids.includes(obj.uniqueId));
-        }
-    };
+    const filter1 = (sInfo) => {
+        const uids = ["losTPEtAlSwANDERRBHLiXoUNdsetSUnaN"];
+        return sInfo.filter(obj => !uids.includes(obj.uniqueId));
+    }
+
+    const filter2 = (sInfo) => {
+        return sInfo;
+    }
 
     const updateSoundtrackInfo = async () => {
+        catalogFetchFailed = false;
         try {
             const response = await fetch(soundtrackInfoUrl);
         if (response.ok) {
             const text = await response.text();
             soundtrackInfo = JSON.parse(text);
-            soundtrackInfo = (filters[navigator.language] ?? filters[undefined])(soundtrackInfo);
+
+            if (navigator.language === "zh-CN") {
+                soundtrackInfo = filter1(soundtrackInfo);
+            }
+            else {
+                soundtrackInfo = filter2(soundtrackInfo);
+            }
         } else {
-            soundtrackInfo = {};
+            // Keep an ARRAY: template #each and .filter/.sort calls expect one
+            soundtrackInfo = [];
+            catalogFetchFailed = true;
         }
         } catch (error) {
-            soundtrackInfo = {};
+            soundtrackInfo = [];
+            catalogFetchFailed = true;
         }
     }
     
+    // Scans the shared Songs library natively (one IPC call, live progress batches)
     const crawlSongs = async () => {
-        const res = await GetRootPath();
-        const baseDir = './OpenTaiko/Songs';
         scanning = true;
-        const soundtrackIds = new Set(soundtrackInfo.map(s => s.uniqueId));
-        
-        async function folderExists(folderPath) {
-            try {
-                const fullPath = await path.join(res, folderPath);
-                const entries = await readDir(fullPath);
-                return true;
-            } catch (error) {
-                // Directory does not exist
-                console.log(error)
-                return false;
+        scanStats = { dirs: 0, found: 0 };
+        let liveSongs = {};
+        let liveAll = [];
+        currentSongs = {};
+        allScannedSongs = [];
+
+        const registerSong = (map, list, song) => {
+            list.push(song);
+            if (song.uniqueId) {
+                map[song.uniqueId] = {
+                    chartMD5s: song.tjaMd5s,
+                    chartRelativePath: song.relPath
+                };
             }
-        }
-
-        async function processFolder(folderPath) {
-            try {
-                const fullPath = await path.join(res, folderPath);
-                const entries = await readDir(fullPath, { recursive: true });
-
-                for (const entry of entries) {
-                    //console.log(entry)
-                    if (entry.isDirectory) {
-                        // If it's a folder, process it recursively
-                        await processFolder([folderPath, entry.name].join("/"));
-                    } else if (entry.name.endsWith('.tja')) {
-                        // If it's a .tja file, process it
-                        const tjaPath = [folderPath, entry.name].join("/");
-                        //const folderPath = tjaPath.substring(0, tjaPath.lastIndexOf('/'));
-                        const relativePath = folderPath.replace(`${baseDir}/`, '');
-
-                        // Read the uniqueID.json file in the same folder
-                        const uniqueIdFile = `${folderPath}/uniqueID.json`;
-                        try {
-                            let re = /[\0-\x1F\x7F-\x9F\xAD\u0378\u0379\u037F-\u0383\u038B\u038D\u03A2\u0528-\u0530\u0557\u0558\u0560\u0588\u058B-\u058E\u0590\u05C8-\u05CF\u05EB-\u05EF\u05F5-\u0605\u061C\u061D\u06DD\u070E\u070F\u074B\u074C\u07B2-\u07BF\u07FB-\u07FF\u082E\u082F\u083F\u085C\u085D\u085F-\u089F\u08A1\u08AD-\u08E3\u08FF\u0978\u0980\u0984\u098D\u098E\u0991\u0992\u09A9\u09B1\u09B3-\u09B5\u09BA\u09BB\u09C5\u09C6\u09C9\u09CA\u09CF-\u09D6\u09D8-\u09DB\u09DE\u09E4\u09E5\u09FC-\u0A00\u0A04\u0A0B-\u0A0E\u0A11\u0A12\u0A29\u0A31\u0A34\u0A37\u0A3A\u0A3B\u0A3D\u0A43-\u0A46\u0A49\u0A4A\u0A4E-\u0A50\u0A52-\u0A58\u0A5D\u0A5F-\u0A65\u0A76-\u0A80\u0A84\u0A8E\u0A92\u0AA9\u0AB1\u0AB4\u0ABA\u0ABB\u0AC6\u0ACA\u0ACE\u0ACF\u0AD1-\u0ADF\u0AE4\u0AE5\u0AF2-\u0B00\u0B04\u0B0D\u0B0E\u0B11\u0B12\u0B29\u0B31\u0B34\u0B3A\u0B3B\u0B45\u0B46\u0B49\u0B4A\u0B4E-\u0B55\u0B58-\u0B5B\u0B5E\u0B64\u0B65\u0B78-\u0B81\u0B84\u0B8B-\u0B8D\u0B91\u0B96-\u0B98\u0B9B\u0B9D\u0BA0-\u0BA2\u0BA5-\u0BA7\u0BAB-\u0BAD\u0BBA-\u0BBD\u0BC3-\u0BC5\u0BC9\u0BCE\u0BCF\u0BD1-\u0BD6\u0BD8-\u0BE5\u0BFB-\u0C00\u0C04\u0C0D\u0C11\u0C29\u0C34\u0C3A-\u0C3C\u0C45\u0C49\u0C4E-\u0C54\u0C57\u0C5A-\u0C5F\u0C64\u0C65\u0C70-\u0C77\u0C80\u0C81\u0C84\u0C8D\u0C91\u0CA9\u0CB4\u0CBA\u0CBB\u0CC5\u0CC9\u0CCE-\u0CD4\u0CD7-\u0CDD\u0CDF\u0CE4\u0CE5\u0CF0\u0CF3-\u0D01\u0D04\u0D0D\u0D11\u0D3B\u0D3C\u0D45\u0D49\u0D4F-\u0D56\u0D58-\u0D5F\u0D64\u0D65\u0D76-\u0D78\u0D80\u0D81\u0D84\u0D97-\u0D99\u0DB2\u0DBC\u0DBE\u0DBF\u0DC7-\u0DC9\u0DCB-\u0DCE\u0DD5\u0DD7\u0DE0-\u0DF1\u0DF5-\u0E00\u0E3B-\u0E3E\u0E5C-\u0E80\u0E83\u0E85\u0E86\u0E89\u0E8B\u0E8C\u0E8E-\u0E93\u0E98\u0EA0\u0EA4\u0EA6\u0EA8\u0EA9\u0EAC\u0EBA\u0EBE\u0EBF\u0EC5\u0EC7\u0ECE\u0ECF\u0EDA\u0EDB\u0EE0-\u0EFF\u0F48\u0F6D-\u0F70\u0F98\u0FBD\u0FCD\u0FDB-\u0FFF\u10C6\u10C8-\u10CC\u10CE\u10CF\u1249\u124E\u124F\u1257\u1259\u125E\u125F\u1289\u128E\u128F\u12B1\u12B6\u12B7\u12BF\u12C1\u12C6\u12C7\u12D7\u1311\u1316\u1317\u135B\u135C\u137D-\u137F\u139A-\u139F\u13F5-\u13FF\u169D-\u169F\u16F1-\u16FF\u170D\u1715-\u171F\u1737-\u173F\u1754-\u175F\u176D\u1771\u1774-\u177F\u17DE\u17DF\u17EA-\u17EF\u17FA-\u17FF\u180F\u181A-\u181F\u1878-\u187F\u18AB-\u18AF\u18F6-\u18FF\u191D-\u191F\u192C-\u192F\u193C-\u193F\u1941-\u1943\u196E\u196F\u1975-\u197F\u19AC-\u19AF\u19CA-\u19CF\u19DB-\u19DD\u1A1C\u1A1D\u1A5F\u1A7D\u1A7E\u1A8A-\u1A8F\u1A9A-\u1A9F\u1AAE-\u1AFF\u1B4C-\u1B4F\u1B7D-\u1B7F\u1BF4-\u1BFB\u1C38-\u1C3A\u1C4A-\u1C4C\u1C80-\u1CBF\u1CC8-\u1CCF\u1CF7-\u1CFF\u1DE7-\u1DFB\u1F16\u1F17\u1F1E\u1F1F\u1F46\u1F47\u1F4E\u1F4F\u1F58\u1F5A\u1F5C\u1F5E\u1F7E\u1F7F\u1FB5\u1FC5\u1FD4\u1FD5\u1FDC\u1FF0\u1FF1\u1FF5\u1FFF\u200B-\u200F\u202A-\u202E\u2060-\u206F\u2072\u2073\u208F\u209D-\u209F\u20BB-\u20CF\u20F1-\u20FF\u218A-\u218F\u23F4-\u23FF\u2427-\u243F\u244B-\u245F\u2700\u2B4D-\u2B4F\u2B5A-\u2BFF\u2C2F\u2C5F\u2CF4-\u2CF8\u2D26\u2D28-\u2D2C\u2D2E\u2D2F\u2D68-\u2D6E\u2D71-\u2D7E\u2D97-\u2D9F\u2DA7\u2DAF\u2DB7\u2DBF\u2DC7\u2DCF\u2DD7\u2DDF\u2E3C-\u2E7F\u2E9A\u2EF4-\u2EFF\u2FD6-\u2FEF\u2FFC-\u2FFF\u3040\u3097\u3098\u3100-\u3104\u312E-\u3130\u318F\u31BB-\u31BF\u31E4-\u31EF\u321F\u32FF\u4DB6-\u4DBF\u9FCD-\u9FFF\uA48D-\uA48F\uA4C7-\uA4CF\uA62C-\uA63F\uA698-\uA69E\uA6F8-\uA6FF\uA78F\uA794-\uA79F\uA7AB-\uA7F7\uA82C-\uA82F\uA83A-\uA83F\uA878-\uA87F\uA8C5-\uA8CD\uA8DA-\uA8DF\uA8FC-\uA8FF\uA954-\uA95E\uA97D-\uA97F\uA9CE\uA9DA-\uA9DD\uA9E0-\uA9FF\uAA37-\uAA3F\uAA4E\uAA4F\uAA5A\uAA5B\uAA7C-\uAA7F\uAAC3-\uAADA\uAAF7-\uAB00\uAB07\uAB08\uAB0F\uAB10\uAB17-\uAB1F\uAB27\uAB2F-\uABBF\uABEE\uABEF\uABFA-\uABFF\uD7A4-\uD7AF\uD7C7-\uD7CA\uD7FC-\uF8FF\uFA6E\uFA6F\uFADA-\uFAFF\uFB07-\uFB12\uFB18-\uFB1C\uFB37\uFB3D\uFB3F\uFB42\uFB45\uFBC2-\uFBD2\uFD40-\uFD4F\uFD90\uFD91\uFDC8-\uFDEF\uFDFE\uFDFF\uFE1A-\uFE1F\uFE27-\uFE2F\uFE53\uFE67\uFE6C-\uFE6F\uFE75\uFEFD-\uFF00\uFFBF-\uFFC1\uFFC8\uFFC9\uFFD0\uFFD1\uFFD8\uFFD9\uFFDD-\uFFDF\uFFE7\uFFEF-\uFFFB\uFFFE\uFFFF]/g;
-                            
-                            const uidFullPath = await path.join(res, uniqueIdFile);
-                            const uniqueIdData = (await readTextFile(uidFullPath)).replace(re, "");
-                            const uniqueId = (JSON.parse(uniqueIdData)).id;
-
-                            // Skip songs not tracked in soundtrackInfo
-                            if (!soundtrackIds.has(uniqueId)) continue;
-
-                            // Compute the MD5 hash of the .tja file
-                            const tjaFullPath = await path.join(res, tjaPath);
-                            const tjaContent = await readFile(tjaFullPath);
-                            const chartMD5 = md5(tjaContent);
-
-                            // Update the currentSongs object
-                            currentSongs[uniqueId] = {
-                                chartMD5,
-                                chartRelativePath: relativePath
-                            };
-                        } catch (error) {
-                            console.error(`Failed to read uniqueID.json in ${folderPath}:`, error);
-                            // Skip this folder if uniqueID.json is not found or there's an error reading it
-                        }
-                    }
-                }
-            } catch (error) {
-                console.error(`Error processing folder ${folderPath}:`, error);
-            }
-        }
+        };
 
         try {
-            // Check if base directory exists
-            if (await folderExists(baseDir)) {
-                // Start the process with the base directory
-                await processFolder(baseDir);
-            } else {
-                console.warn(`The directory "${baseDir}" does not exist.`);
-            }
+            const baseDirPath = await GetGlobalSongsPath();
 
-            scanning = false;
+            const channel = new Channel();
+            channel.onmessage = (message) => {
+                if (message.type !== 'progress') return;
+                scanStats = { dirs: message.scannedDirs, found: message.songsFound };
+                if (message.batch?.length) {
+                    for (const song of message.batch) registerSong(liveSongs, liveAll, song);
+                    currentSongs = liveSongs;
+                    allScannedSongs = liveAll;
+                }
+            };
+
+            const result = await invoke('scan_songs', { baseDir: baseDirPath, onEvent: channel });
+
+            // The command result is authoritative; events were only for live display
+            const finalSongs = {};
+            const finalAll = [];
+            for (const song of result.songs) registerSong(finalSongs, finalAll, song);
+            currentSongs = finalSongs;
+            allScannedSongs = finalAll;
+            scannedGenres = Object.fromEntries(result.genres.map((genre) => [genre.relPath, genre]));
+            scanStats = { dirs: scanStats.dirs, found: finalAll.length };
         } catch (error) {
-            console.error(`Error scanning songs:`, error);
-            scanning = false;
+            console.error('Song scan failed:', error);
+            TriggerError(get(_)('songs.error.scan_failed', { values: { error } }));
+        }
+        scanning = false;
+        CheckMigrations();
+    }
+
+    // Looks inside every attached (non-experimental) instance for songs that could be
+    // moved to the shared library
+    const CheckMigrations = async () => {
+        const candidates = [];
+        try {
+            const globalSongs = await GetGlobalSongsPath();
+            const norm = (p) => p.replace(/\//g, '\\').replace(/[\\]+$/, '').toLowerCase();
+            for (const inst of get(instances)) {
+                const instSongs = await path.join(inst.path, 'Songs');
+                if (norm(instSongs) === norm(globalSongs)) continue;
+                try {
+                    const probe = new Channel();
+                    const result = await invoke('scan_songs', { baseDir: instSongs, onEvent: probe });
+                    if (result.baseExists && result.songs.length > 0) {
+                        candidates.push({ instance: inst, count: result.songs.length, srcPath: instSongs });
+                    }
+                } catch (error) {
+                    console.error(`Migration check failed for ${inst.name}:`, error);
+                }
+            }
+        } catch (error) {
+            console.error('Migration check failed:', error);
+        }
+        migrationCandidates = candidates;
+        CheckDuplicates();
+    }
+
+    // Looks for chart-less folders an instance duplicates from the shared library
+    const CheckDuplicates = async () => {
+        const found = [];
+        try {
+            const globalSongs = await GetGlobalSongsPath();
+            for (const inst of get(instances)) {
+                const instSongs = await path.join(inst.path, 'Songs');
+                try {
+                    const folders = await invoke('find_duplicate_song_folders', {
+                        instanceSongs: instSongs,
+                        globalSongs
+                    });
+                    if (folders.length > 0) {
+                        found.push({ instance: inst, srcPath: instSongs, globalSongs, folders });
+                    }
+                } catch (error) {
+                    console.error(`Duplicate check failed for ${inst.name}:`, error);
+                }
+            }
+        } catch (error) {
+            console.error('Duplicate check failed:', error);
+        }
+        duplicateCandidates = found;
+    }
+
+    const CleanDuplicates = async (candidate) => {
+        if (duplicateBusy) return;
+        duplicateBusy = true;
+        try {
+            const removed = await invoke('remove_duplicate_song_folders', {
+                instanceSongs: candidate.srcPath,
+                globalSongs: candidate.globalSongs,
+                relPaths: candidate.folders.map((f) => f.relPath)
+            });
+            TriggerSuccess(get(_)('songs.duplicates.success', { values: { count: removed } }));
+            duplicateCandidates = duplicateCandidates.filter((c) => c !== candidate);
+        } catch (error) {
+            TriggerError(get(_)('songs.duplicates.error', { values: { error } }));
+        }
+        duplicateBusy = false;
+    }
+
+    // Opens the resolve/transfer modal for one instance (conflicts are decided there)
+    const OpenMigration = async (candidate) => {
+        migrationGlobalPath = await GetGlobalSongsPath();
+        migrationCandidate = candidate;
+    }
+
+    // Called by the modal after a plan was applied; the resolved instance is emptied,
+    // so it drops out of the candidate list and won't prompt again.
+    const OnMigrationApplied = (candidate) => {
+        migrationCandidates = migrationCandidates.filter((c) => c !== candidate);
+        migrationCandidate = null;
+        crawlSongs();
+    }
+
+    const OpenSongsFolder = async () => {
+        try {
+            const songsDir = await GetGlobalSongsPath();
+            await mkdir(songsDir, { recursive: true });
+            await openPath(songsDir);
+        } catch (error) {
+            TriggerError(get(_)('home.error.launch', { values: { error } }));
         }
     }
+
+    // Fetches the soundtrack repository's git tree once so local box.def / default.png
+    // files can be compared against their upstream version by git blob SHA
+    const EnsureRemoteShaMap = async () => {
+        if (remoteShaMap) return remoteShaMap;
+        try {
+            const response = await fetch('https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/main?recursive=1');
+            if (response.ok) {
+                const data = await response.json();
+                remoteShaMap = new Map(
+                    (data.tree ?? [])
+                        .filter((entry) => entry.type === 'blob')
+                        .map((entry) => [entry.path, entry.sha])
+                );
+            }
+        } catch (error) {
+            console.error('Failed to fetch the soundtrack repository tree:', error);
+        }
+        return remoteShaMap;
+    }
+
 
     $: GetFilteredSInfo = (SInfo) => {
         const bInNameFilter = SInfo.chartTitle.toLowerCase().includes(searchSong.toLowerCase()) || SInfo.chartSubtitle?.toLowerCase().includes(searchSong.toLowerCase());
@@ -255,10 +372,14 @@
         return bInGenreFilter && bInNameFilter;
     }
 
-    const GetFilteredAvailableSInfo = (SInfo) => {
-        const bNotUpToDate = !(Object.keys(currentSongs).includes(SInfo.uniqueId) && currentSongs[SInfo.uniqueId].chartMD5 === SInfo.tjaMD5);
+    // Reactive so status cells re-render as scan results stream in
+    $: IsSongUpToDate = (SInfo) => {
+        const localSong = currentSongs[SInfo.uniqueId];
+        return !!localSong && (localSong.chartMD5s ?? []).includes(SInfo.tjaMD5);
+    }
 
-        return bNotUpToDate && GetFilteredSInfo(SInfo);
+    const GetFilteredAvailableSInfo = (SInfo) => {
+        return !IsSongUpToDate(SInfo) && GetFilteredSInfo(SInfo);
     }
 
     const UndefinedToMinusOne = (val) => {
@@ -295,10 +416,29 @@
                 soundtrackInfo = soundtrackInfo.sort((a, b) => mult * (a.chartSize - b.chartSize));
                 break;
             }
-            case ("ez"): case ("nm"): case ("hd"): case ("ex"): case ("exex"):
+            case ("ez"):
             {
-                let diff = hofDiffShortRevMap(column);
-                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties[diff]) - UndefinedToMinusOne(b.chartDifficulties[diff]))));
+                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Easy) - UndefinedToMinusOne(b.chartDifficulties.Easy))));
+                break;
+            }
+            case ("nm"):
+            {
+                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Normal) - UndefinedToMinusOne(b.chartDifficulties.Normal))));
+                break;
+            }
+            case ("hd"):
+            {
+                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Hard) - UndefinedToMinusOne(b.chartDifficulties.Hard))));
+                break;
+            }
+            case ("ex"):
+            {
+                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Oni) - UndefinedToMinusOne(b.chartDifficulties.Oni))));
+                break;
+            }
+            case ("exex"):
+            {
+                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Edit) - UndefinedToMinusOne(b.chartDifficulties.Edit))));
                 break;
             }
         }
@@ -309,49 +449,145 @@
             TriggerError(get(_)('songs.error.scanning'));
             return ;
         }
+        // Guard the whole run, not just the progress-bar phase: the first steps are
+        // async, so without this a second click would start a parallel bulk download
+        if (bulkBusy) return;
+        bulkBusy = true;
 
-        const filteredSInfo = soundtrackInfo.filter((SInfo) => GetFilteredAvailableSInfo(SInfo));
+        try {
+            const filteredSInfo = soundtrackInfo.filter((SInfo) => GetFilteredAvailableSInfo(SInfo));
 
-        const songCount = filteredSInfo.length;
+            const songCount = filteredSInfo.length;
 
-        if (songCount === 0) {
-            TriggerSuccess(get(_)('songs.success.all_up_to_date'));
-            return ;
+            // Load the remote file index once so genre metadata can be checked for updates
+            await EnsureRemoteShaMap();
+
+            if (songCount === 0) {
+                const updated = await RefreshAllGenreMetadata();
+                if (updated > 0) {
+                    TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
+                } else {
+                    TriggerSuccess(get(_)('songs.success.all_up_to_date'));
+                }
+                return ;
+            }
+
+            songCountProgress = 0;
+            for (const SInfo of filteredSInfo) {
+                songCountProgressBar = 100 * (songCountProgress / songCount);
+
+                console.log(`Downloading song ${songCountProgress + 1} out of ${songCount}...`);
+                console.log(SInfo);
+
+                let curObj = null;
+                if (Object.keys(currentSongs).includes(SInfo.uniqueId)) curObj = currentSongs[SInfo.uniqueId];
+
+                await DownloadSong(SInfo, curObj, songCountProgress + 1, songCount);
+                songCountProgress++;
+            }
+
+            // Refresh outdated box.def / default.png files across the whole library
+            const updated = await RefreshAllGenreMetadata();
+            if (updated > 0) {
+                TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
+            }
+        } finally {
+            songCountProgressBar = null;
+            bulkBusy = false;
         }
+    }
 
-        songCountProgress = 0;
-        for (const SInfo of filteredSInfo) {
-            songCountProgressBar = 100 * (songCountProgress / songCount);
+    // Downloads box.def / default.png for a genre folder when it is missing or its git
+    // blob SHA differs from the soundtrack repository. Without the remote index the
+    // old behavior is kept (box.def always refreshed, preimage only when missing).
+    const EnsureGenreMetadata = async (genrePath, tmpFolder) => {
+        const baseDirPath = await GetGlobalSongsPath();
+        const genreFullPath = await path.join(baseDirPath, genrePath);
+        let changed = false;
 
-            console.log(`Downloading song ${songCountProgress + 1} out of ${songCount}...`);
-            console.log(SInfo);
+        for (const fileName of ['box.def', 'default.png']) {
+            const destPath = await path.join(genreFullPath, fileName);
+            const localGenre = scannedGenres[genrePath];
+            const localSha = fileName === 'box.def' ? localGenre?.boxDefSha1 : localGenre?.preimageSha1;
+            const remoteSha = remoteShaMap?.get(`${genrePath}/${fileName}`);
 
-            let curObj = null;
-            if (Object.keys(currentSongs).includes(SInfo.uniqueId)) curObj = currentSongs[SInfo.uniqueId];
+            let needsDownload;
+            if (remoteShaMap) {
+                needsDownload = !!remoteSha && localSha !== remoteSha;
+            } else {
+                needsDownload = fileName === 'box.def' ? true : !(await exists(destPath));
+            }
+            if (!needsDownload) continue;
 
-            await DownloadSong(SInfo, curObj, songCountProgress + 1, songCount);
-            songCountProgress++;
+            const _url = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${genrePath}/${fileName}`;
+            const dlPath = await path.join(tmpFolder, fileName);
+            const resourceExists = remoteShaMap ? true : await fetch(_url).then(res => res.ok).catch(() => false);
+            if (!resourceExists) continue;
+
+            try {
+                await download(_url, dlPath);
+                await copyFile(dlPath, destPath);
+                changed = true;
+                if (remoteSha) {
+                    scannedGenres[genrePath] = {
+                        ...(scannedGenres[genrePath] ?? { relPath: genrePath, title: null, boxDefSha1: null, preimageSha1: null }),
+                        [fileName === 'box.def' ? 'boxDefSha1' : 'preimageSha1']: remoteSha
+                    };
+                }
+            } catch (error) {
+                console.error(`Failed to update ${genrePath}/${fileName}:`, error);
+            }
         }
-        songCountProgressBar = null
+        return changed;
+    }
+
+    const RefreshAllGenreMetadata = async () => {
+        if (!remoteShaMap) return 0;
+        const tmpFolder = await GetTmpPath(crypto.randomUUID());
+        await mkdir(tmpFolder, { recursive: true });
+        let updated = 0;
+        for (const genrePath of Object.keys(scannedGenres)) {
+            if (await EnsureGenreMetadata(genrePath, tmpFolder)) updated++;
+        }
+        try { await remove(tmpFolder, { recursive: true }); } catch {}
+        return updated;
     }
 
     const DownloadSong = async (songObj, currentObj, songNb = undefined, songTotal = undefined) => {
+        // Never write into the library while it is still being scanned, the scan's
+        // final result would otherwise clobber this download's bookkeeping.
+        if (scanning) {
+            TriggerError(get(_)('songs.error.scanning'));
+            return;
+        }
+        // songNb is set when the bulk loop drives this, which owns the busy flag itself
+        const standalone = songNb === undefined;
+        if (standalone) {
+            if (songBusy || bulkBusy) return;
+            songBusy = true;
+        }
+        try {
+            await RunDownloadSong(songObj, currentObj, songNb, songTotal);
+        } finally {
+            if (standalone) songBusy = false;
+        }
+    }
+
+    const RunDownloadSong = async (songObj, currentObj, songNb, songTotal) => {
         songDLProgress[songObj.uniqueId] = 0;
         //console.log(songDLProgress);
 
-        const res = await GetRootPath();
-        const baseDir = './OpenTaiko/Songs';
-        const baseDirPath = await path.join(res, baseDir);
-        const localPath = `${baseDir}/${(currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath}`.replace(/\\/g, '/');
-        const tjaFullPath = await path.join(res, localPath);
+        await EnsureRemoteShaMap();
+
+        const baseDirPath = await GetGlobalSongsPath();
+        const localRelPath = ((currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath).replace(/\\/g, '/');
+        const tjaFullPath = await path.join(baseDirPath, localRelPath);
 
         let fold_exists = await exists(tjaFullPath);
         if (!fold_exists)
             await mkdir(tjaFullPath, {recursive: true});
 
-        const tmpFolder = await path.join(res, "./tmp");
-        const uuid = crypto.randomUUID();
-        const chartDownloadFolder = await path.join(tmpFolder, `${uuid}/`);
+        const chartDownloadFolder = await GetTmpPath(crypto.randomUUID());
 
         fold_exists = await exists(chartDownloadFolder);
         if (!fold_exists)
@@ -407,42 +643,14 @@
             //console.log(songDLProgress);
         }));
 
-        // Download box.def and default.png if missing
+        // Download / refresh box.def and default.png of every ancestor genre folder
         const genrePaths = songObj.tjaFolderPath.split('\\').slice(0, -1).map((_, i, arr) => arr.slice(0, i + 1).join('/'));
 
         for (const genrePath of genrePaths) {
             const genreFullPath = await path.join(baseDirPath, genrePath);
-            const boxdefPath = await path.join(genreFullPath, "./box.def");
-            const preimgPath = await path.join(genreFullPath, "./default.png");
-
-            // Always download the box.def file to be sure it remains up-to-date, not a good implementation but would get the job done for now
-            const deffile_exists = false; // await exists(boxdefPath);
-            if (!deffile_exists) {
-                const localFileName = 'box.def';
-                const _url = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${genrePath}/box.def`;
-                const dlPath = await path.join(chartDownloadFolder, localFileName);
-
-                const resourceExists = await fetch(_url).then(res => res.ok).catch(() => false);
-
-                if (resourceExists) {
-                    await download(_url, dlPath);
-                    await copyFile(dlPath, boxdefPath);
-                }
-            }
-
-            const preimage_exists = await exists(preimgPath);
-            if (!preimage_exists) {
-                const localFileName = 'default.png';
-                const _url = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${genrePath}/default.png`;
-                const dlPath = await path.join(chartDownloadFolder, localFileName);
-
-                const resourceExists = await fetch(_url).then(res => res.ok).catch(() => false);
-
-                if (resourceExists) {
-                    await download(_url, dlPath);
-                    await copyFile(dlPath, preimgPath);
-                }
-            }
+            if (!await exists(genreFullPath))
+                await mkdir(genreFullPath, {recursive: true});
+            await EnsureGenreMetadata(genrePath, chartDownloadFolder);
         }
 
         // Clean after pooping
@@ -455,8 +663,9 @@
 
         //crawlSongs();
         currentSongs[songObj.uniqueId] = {
-            chartMD5: songObj.tjaMD5,
-            chartRelativePath: songObj.tjaFolderPath
+            chartMD5s: [songObj.tjaMD5],
+            // Keep the actual install location when the song was relocated by the user
+            chartRelativePath: (currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath
         };
 
         delete songDLProgress[songObj.uniqueId];
@@ -469,11 +678,12 @@
     let expandedSongUid = null;
 
     const updateArtistInfo = async () => {
+        let db = null;
         try {
-            const SQL = await initSqlJs({ locateFile: () => sqlWasmUrl });
+            const SQL = await getSQL();
             const response = await fetch(artistsDbUrl);
             const buffer = await response.arrayBuffer();
-            const db = new SQL.Database(new Uint8Array(buffer));
+            db = new SQL.Database(new Uint8Array(buffer));
 
             const artistsResult = db.exec('SELECT entryId, artist, youtube, soundcloud, spotify, bandcamp, bilibili, other FROM artists');
             const artistsById = {};
@@ -494,6 +704,8 @@
             songArtistsMap = songArtistsMap;
         } catch (e) {
             console.error('Failed to load artist info:', e);
+        } finally {
+            db?.close();
         }
     };
 
@@ -502,14 +714,77 @@
     };
 
     onMount(async () => {
+        crawlSongs();         // native scan: no longer depends on the catalog fetch
         await updateSoundtrackInfo();
         updateHoFInfo();      // fire-and-forget: patches soundtrackInfo when DB is ready
         updateArtistInfo();   // fire-and-forget
-        crawlSongs();
     });
 
 </script>
 
+{#if catalogFetchFailed}
+<aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
+	<i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+	<span class="flex-1"><b>{$_('common.fetch_error')}</b></span>
+	<button type="button" class="button-red button-main" on:click={updateSoundtrackInfo}>
+		<i class="fa-solid fa-rotate"></i> {$_('common.retry')}
+	</button>
+</aside>
+{/if}
+
+{#each duplicateCandidates as candidate (candidate.instance.id)}
+<aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
+	<i class="fa-solid fa-clone text-yellow-500"></i>
+	<span class="flex-1">
+		{$_('songs.duplicates.banner', { values: { count: candidate.folders.length, instance: candidate.instance.name } })}
+		<br />
+		<span class="text-sm opacity-70">{candidate.folders.map((f) => f.relPath).join(', ')}</span>
+	</span>
+	<button type="button" class="button-green button-main" disabled={duplicateBusy} on:click={() => CleanDuplicates(candidate)}>
+		<i class="fa-solid fa-broom"></i> {$_('songs.duplicates.button')}
+	</button>
+	<button type="button" class="button-gray button-main" on:click={() => duplicateCandidates = duplicateCandidates.filter((c) => c !== candidate)}>
+		{$_('songs.migrate.later')}
+	</button>
+</aside>
+{/each}
+
+{#each migrationCandidates as candidate (candidate.instance.id)}
+<aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
+	<i class="fa-solid fa-boxes-packing"></i>
+	<span class="flex-1">{$_('songs.migrate.banner', { values: { count: candidate.count, instance: candidate.instance.name } })}</span>
+	<button type="button" class="button-green button-main" disabled={scanning || bulkBusy || songBusy || migrationCandidate !== null} on:click={() => OpenMigration(candidate)}>
+		<i class="fa-solid fa-right-left"></i> {$_('songs.migrate.button')}
+	</button>
+	<button type="button" class="button-gray button-main" on:click={() => migrationCandidates = migrationCandidates.filter((c) => c !== candidate)}>
+		{$_('songs.migrate.later')}
+	</button>
+</aside>
+{/each}
+
+<div class="card bg-surface-100-800-token p-3 mb-2 flex items-center gap-3 flex-wrap">
+	{#if scanning}
+		<div class="flex-1 flex items-center gap-3 min-w-[16rem]">
+			<ProgressBar />
+			<span class="whitespace-nowrap text-sm">{$_('songs.scan.progress', { values: { count: scanStats.found } })}</span>
+		</div>
+	{:else}
+		<span class="text-sm">{$_('songs.scan.done', { values: { count: allScannedSongs.length } })}</span>
+		<button type="button" class="button-blue button-main" on:click={crawlSongs}><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
+		<button type="button" class="button-blue button-main" on:click={OpenSongsFolder}><i class="fa-solid fa-folder-open"></i> {$_('songs.button.open_folder')}</button>
+		<span class="flex-1"></span>
+	{/if}
+	<button type="button" class="button-{viewMode === 'list' ? 'gray' : 'blue'} button-main" on:click={() => viewMode = 'list'}>
+		<i class="fa-solid fa-list"></i> {$_('songs.view.list')}
+	</button>
+	<button type="button" class="button-{viewMode === 'tree' ? 'gray' : 'blue'} button-main" on:click={() => viewMode = 'tree'}>
+		<i class="fa-solid fa-folder-tree"></i> {$_('songs.view.tree')}
+	</button>
+</div>
+
+{#if viewMode === 'tree'}
+<SongTree Songs={allScannedSongs} Genres={scannedGenres} CatalogById={catalogById} />
+{:else}
 <div class="table-container text-token">
 	<table class="table table-hover">
 		<thead>
@@ -523,15 +798,17 @@
 			<tr>
 				<th><input class="w-full rounded-md px-3 py-2 text-blue-950" placeholder={$_('songs.filter.song')} bind:value={searchSong}></th>
 				<th><input class="w-full rounded-md px-3 py-2 text-blue-950" placeholder={$_('songs.filter.folder')} bind:value={searchGenre}></th>
-				{#each diffShortMap as diff}
-					<th><button on:click={() => SortSongsByColumn(diff)}> {diff.toUpperCase()} </button></th>
-				{/each}
+				<th><button on:click={() => SortSongsByColumn("ez")}>EZ</button></th>
+				<th><button on:click={() => SortSongsByColumn("nm")}>NM</button></th>
+				<th><button on:click={() => SortSongsByColumn("hd")}>HD</button></th>
+				<th><button on:click={() => SortSongsByColumn("ex")}>EX</button></th>
+				<th><button on:click={() => SortSongsByColumn("exex")}>EXEX</button></th>
 				<th></th>
 				<th>
 					{#if songCountProgressBar !== null}
 					<ProgressBar bind:value={songCountProgressBar} max={100} />
 					{:else}
-					<button type="button" on:click={DownloadDisplayedSongs} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.bulk_download')}</button>
+					<button type="button" disabled={bulkBusy || songBusy} on:click={DownloadDisplayedSongs} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.bulk_download')}</button>
 					{/if}
 				</th>
 			</tr>
@@ -558,15 +835,25 @@
 					<SongDifficultyChip SongInfo={songInfo} Difficulty="Tower"/>
 				</td>
 				{:else}
-					{#each hofDifficultyMap as diff}
-						<td>
-							<SongDifficultyChip SongInfo={songInfo} Difficulty={diff} OnCrownClick={openHoFModal}/>
-						</td>
-					{/each}
+				<td>
+					<SongDifficultyChip SongInfo={songInfo} Difficulty="Easy" OnCrownClick={openHoFModal}/>
+				</td>
+				<td>
+					<SongDifficultyChip SongInfo={songInfo} Difficulty="Normal" OnCrownClick={openHoFModal}/>
+				</td>
+				<td>
+					<SongDifficultyChip SongInfo={songInfo} Difficulty="Hard" OnCrownClick={openHoFModal}/>
+				</td>
+				<td>
+					<SongDifficultyChip SongInfo={songInfo} Difficulty="Oni" OnCrownClick={openHoFModal}/>
+				</td>
+				<td>
+					<SongDifficultyChip SongInfo={songInfo} Difficulty="Edit" OnCrownClick={openHoFModal}/>
+				</td>
 				{/if}
 				<td>{songInfo.chartSize}Mb</td>
 				<!-- songDLProgress[songObj.uniqueId] -->
-				{#if scanning === true}
+				{#if scanning === true && !Object.keys(currentSongs).includes(songInfo.uniqueId)}
 				<td>
 					<p>{$_('songs.status.scanning')}</p>
 				</td>
@@ -575,17 +862,17 @@
 					<p>{$_('songs.status.not_downloaded')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
+					<button type="button" disabled={bulkBusy || songBusy} on:click={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
 				</td>
-				{:else if currentSongs[songInfo.uniqueId].chartMD5 === songInfo.tjaMD5}
+				{:else if IsSongUpToDate(songInfo)}
 				<td>
 					<p>{$_('songs.status.up_to_date')}</p>
                     <br />
                     {#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
+					<button type="button" disabled={bulkBusy || songBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -595,7 +882,7 @@
 					<p>{$_('songs.status.outdated')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
+					<button type="button" disabled={bulkBusy || songBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -650,6 +937,7 @@
 		</tbody>
 	</table>
 </div>
+{/if}
 
 {#if hofModalOpen && hofModalSongInfo}
 <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
@@ -657,7 +945,7 @@
     <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
     <div class="card p-6 space-y-4 modal-card" on:click|stopPropagation>
         <div class="flex justify-between items-center">
-            <h2 class="h3">Hall of Fame — {hofModalSongInfo.chartTitle} ({hofDiffShortMap(hofModalDifficulty).toUpperCase()} #{hofMap[hofModalSongInfo.uniqueId]?.[hofModalDifficulty]})</h2>
+            <h2 class="h3">Hall of Fame — {hofModalSongInfo.chartTitle} ({hofDiffShortMap[hofModalDifficulty]} #{hofMap[hofModalSongInfo.uniqueId]?.[hofModalDifficulty]})</h2>
             <button class="btn-icon btn-icon-sm variant-filled" on:click={() => hofModalOpen = false} aria-label={$_('hof.close')}>✕</button>
         </div>
         <div class="flex flex-col gap-1">
@@ -681,7 +969,7 @@
                         <th>{$_('hof.col.good')}</th>
                         <th>{$_('hof.col.ok')}</th>
                         <th>{$_('hof.col.bad')}</th>
-                        <th>{$_('hof.col.list_points')}</th>
+                        <th>LP</th>
                         <th>{$_('hof.col.video')}</th>
                     </tr>
                 </thead>
@@ -712,6 +1000,16 @@
         {/if}
     </div>
 </div>
+{/if}
+
+{#if migrationCandidate}
+<SongMigrationModal
+	Candidate={migrationCandidate}
+	GlobalPath={migrationGlobalPath}
+	CatalogById={catalogById}
+	OnClose={() => migrationCandidate = null}
+	OnApplied={() => OnMigrationApplied(migrationCandidate)}
+/>
 {/if}
 
 <style>
