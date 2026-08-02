@@ -41,6 +41,8 @@
     let songDLProgress = {};
     let songCountProgress = 0;
     let songCountProgressBar = null;
+    let bulkBusy = false;          // a bulk download is running
+    let songBusy = false;          // any single-song download is running
 
     // Git blob SHAs of the soundtrack repository (path → sha), fetched once per session
     // and used to detect outdated box.def / default.png files
@@ -447,43 +449,51 @@
             TriggerError(get(_)('songs.error.scanning'));
             return ;
         }
+        // Guard the whole run, not just the progress-bar phase: the first steps are
+        // async, so without this a second click would start a parallel bulk download
+        if (bulkBusy) return;
+        bulkBusy = true;
 
-        const filteredSInfo = soundtrackInfo.filter((SInfo) => GetFilteredAvailableSInfo(SInfo));
+        try {
+            const filteredSInfo = soundtrackInfo.filter((SInfo) => GetFilteredAvailableSInfo(SInfo));
 
-        const songCount = filteredSInfo.length;
+            const songCount = filteredSInfo.length;
 
-        // Load the remote file index once so genre metadata can be checked for updates
-        await EnsureRemoteShaMap();
+            // Load the remote file index once so genre metadata can be checked for updates
+            await EnsureRemoteShaMap();
 
-        if (songCount === 0) {
+            if (songCount === 0) {
+                const updated = await RefreshAllGenreMetadata();
+                if (updated > 0) {
+                    TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
+                } else {
+                    TriggerSuccess(get(_)('songs.success.all_up_to_date'));
+                }
+                return ;
+            }
+
+            songCountProgress = 0;
+            for (const SInfo of filteredSInfo) {
+                songCountProgressBar = 100 * (songCountProgress / songCount);
+
+                console.log(`Downloading song ${songCountProgress + 1} out of ${songCount}...`);
+                console.log(SInfo);
+
+                let curObj = null;
+                if (Object.keys(currentSongs).includes(SInfo.uniqueId)) curObj = currentSongs[SInfo.uniqueId];
+
+                await DownloadSong(SInfo, curObj, songCountProgress + 1, songCount);
+                songCountProgress++;
+            }
+
+            // Refresh outdated box.def / default.png files across the whole library
             const updated = await RefreshAllGenreMetadata();
             if (updated > 0) {
                 TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
-            } else {
-                TriggerSuccess(get(_)('songs.success.all_up_to_date'));
             }
-            return ;
-        }
-
-        songCountProgress = 0;
-        for (const SInfo of filteredSInfo) {
-            songCountProgressBar = 100 * (songCountProgress / songCount);
-
-            console.log(`Downloading song ${songCountProgress + 1} out of ${songCount}...`);
-            console.log(SInfo);
-
-            let curObj = null;
-            if (Object.keys(currentSongs).includes(SInfo.uniqueId)) curObj = currentSongs[SInfo.uniqueId];
-
-            await DownloadSong(SInfo, curObj, songCountProgress + 1, songCount);
-            songCountProgress++;
-        }
-        songCountProgressBar = null
-
-        // Refresh outdated box.def / default.png files across the whole library
-        const updated = await RefreshAllGenreMetadata();
-        if (updated > 0) {
-            TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
+        } finally {
+            songCountProgressBar = null;
+            bulkBusy = false;
         }
     }
 
@@ -544,12 +554,26 @@
     }
 
     const DownloadSong = async (songObj, currentObj, songNb = undefined, songTotal = undefined) => {
-        // Never write into the library while it is still being scanned — the scan's
+        // Never write into the library while it is still being scanned, the scan's
         // final result would otherwise clobber this download's bookkeeping.
         if (scanning) {
             TriggerError(get(_)('songs.error.scanning'));
             return;
         }
+        // songNb is set when the bulk loop drives this, which owns the busy flag itself
+        const standalone = songNb === undefined;
+        if (standalone) {
+            if (songBusy || bulkBusy) return;
+            songBusy = true;
+        }
+        try {
+            await RunDownloadSong(songObj, currentObj, songNb, songTotal);
+        } finally {
+            if (standalone) songBusy = false;
+        }
+    }
+
+    const RunDownloadSong = async (songObj, currentObj, songNb, songTotal) => {
         songDLProgress[songObj.uniqueId] = 0;
         //console.log(songDLProgress);
 
@@ -729,7 +753,7 @@
 <aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
 	<i class="fa-solid fa-boxes-packing"></i>
 	<span class="flex-1">{$_('songs.migrate.banner', { values: { count: candidate.count, instance: candidate.instance.name } })}</span>
-	<button type="button" class="button-green button-main" disabled={scanning} on:click={() => OpenMigration(candidate)}>
+	<button type="button" class="button-green button-main" disabled={scanning || bulkBusy || songBusy || migrationCandidate !== null} on:click={() => OpenMigration(candidate)}>
 		<i class="fa-solid fa-right-left"></i> {$_('songs.migrate.button')}
 	</button>
 	<button type="button" class="button-gray button-main" on:click={() => migrationCandidates = migrationCandidates.filter((c) => c !== candidate)}>
@@ -784,7 +808,7 @@
 					{#if songCountProgressBar !== null}
 					<ProgressBar bind:value={songCountProgressBar} max={100} />
 					{:else}
-					<button type="button" on:click={DownloadDisplayedSongs} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.bulk_download')}</button>
+					<button type="button" disabled={bulkBusy || songBusy} on:click={DownloadDisplayedSongs} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.bulk_download')}</button>
 					{/if}
 				</th>
 			</tr>
@@ -838,7 +862,7 @@
 					<p>{$_('songs.status.not_downloaded')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
+					<button type="button" disabled={bulkBusy || songBusy} on:click={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -848,7 +872,7 @@
 					<p>{$_('songs.status.up_to_date')}</p>
                     <br />
                     {#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
+					<button type="button" disabled={bulkBusy || songBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -858,7 +882,7 @@
 					<p>{$_('songs.status.outdated')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
+					<button type="button" disabled={bulkBusy || songBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}

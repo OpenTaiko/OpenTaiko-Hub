@@ -169,12 +169,12 @@
       "no_db": "このインスタンスにはまだセーブデータベースがありません。",
       "load": "セーブデータベースを読み込めませんでした。",
       "invalid_file": "有効な OpenTaiko セーブファイルではありません。",
-      "older": "このセーブ（{imported}）はデータベース（{current}）より古いため、読み込みを中止しました。",
       "export": "セーブの書き出しに失敗しました：{error}",
       "import": "セーブの読み込みに失敗しました：{error}",
       "rebind": "セーブスロットの変更に失敗しました：{error}",
       "create": "セーブの作成に失敗しました：{error}",
-      "delete": "セーブの削除に失敗しました：{error}"
+      "delete": "セーブの削除に失敗しました：{error}",
+      "newer": "このセーブ（{imported}）はデータベース（{current}）より新しいため、先にゲームを更新してください。"
     },
     "rebind_hint": "スロットを変更（使用中なら入れ替え）。",
     "confirm_title": "セーブの読み込み",
@@ -183,7 +183,8 @@
     "new_name": "新しいプレイヤー",
     "delete": "セーブを削除",
     "confirm_delete_title": "セーブの削除",
-    "confirm_delete": "セーブ「{name}」を削除しますか？元に戻せません。"
+    "confirm_delete": "セーブ「{name}」を削除しますか？元に戻せません。",
+    "drag_hint": "他のスロットにドラッグして入れ替え。"
   },
   "hub": {
     "status": {
@@ -249,11 +250,11 @@
       "button": "曲を移動",
       "later": "あとで",
       "modal_title": "「{instance}」から曲を移動",
-      "summary_new": "{count} 個の新しい譜面が共有ライブラリに追加されます。",
-      "summary_identical": "{count} 個の同一の譜面がこのインスタンスから削除されます。",
+      "summary_new": "{count} 個の新しい曲フォルダが共有ライブラリに追加されます。",
+      "summary_identical": "{count} 個の同一の曲フォルダがこのインスタンスから削除されます。",
       "nothing": "このインスタンスに移動できる譜面はありません。",
       "conflicts_title": "競合 ({count})",
-      "conflicts_hint": "これらの譜面は内容の異なるものが共有ライブラリに既に存在します。どちらの版を残すか選択してください。",
+      "conflicts_hint": "これらの曲は内容の異なるものが共有ライブラリに既に存在します。どちらの版を残すか選択してください。",
       "col_global": "共有ライブラリ",
       "col_instance": "このインスタンス",
       "bulk_keep_global": "すべて共有を維持",

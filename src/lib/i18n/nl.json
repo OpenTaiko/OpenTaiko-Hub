@@ -169,12 +169,12 @@
       "no_db": "Deze instantie heeft nog geen save-database.",
       "load": "Kon de save-database niet lezen.",
       "invalid_file": "Geen geldig OpenTaiko-savebestand.",
-      "older": "Deze save ({imported}) is ouder dan de database ({current}). Import geannuleerd.",
       "export": "Kon de save niet exporteren: {error}",
       "import": "Kon de save niet importeren: {error}",
       "rebind": "Kon het save-slot niet wijzigen: {error}",
       "create": "Kon de save niet aanmaken: {error}",
-      "delete": "Kon de save niet verwijderen: {error}"
+      "delete": "Kon de save niet verwijderen: {error}",
+      "newer": "Deze save ({imported}) is nieuwer dan de database ({current}). Werk eerst het spel bij."
     },
     "rebind_hint": "Slot wijzigen (wisselt met de bezetter).",
     "confirm_title": "Save importeren",
@@ -183,7 +183,8 @@
     "new_name": "Nieuwe speler",
     "delete": "Verwijderen",
     "confirm_delete_title": "Save verwijderen",
-    "confirm_delete": "De save \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt."
+    "confirm_delete": "De save \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt.",
+    "drag_hint": "Sleep naar een ander slot om te wisselen."
   },
   "hub": {
     "status": {
@@ -249,11 +250,11 @@
       "button": "Nummers overzetten",
       "later": "Later",
       "modal_title": "Nummers overzetten uit \"{instance}\"",
-      "summary_new": "{count} nieuwe chart(s) worden toegevoegd aan de gedeelde bibliotheek.",
-      "summary_identical": "{count} identieke chart(s) worden uit deze instantie verwijderd.",
+      "summary_new": "{count} nieuwe muziekmap(pen) worden toegevoegd aan de gedeelde bibliotheek.",
+      "summary_identical": "{count} identieke muziekmap(pen) worden uit deze instantie verwijderd.",
       "nothing": "Deze instantie heeft geen charts om over te zetten.",
       "conflicts_title": "Conflicten ({count})",
-      "conflicts_hint": "Deze charts bestaan al in de gedeelde bibliotheek met andere inhoud. Kies welke versie je wilt behouden.",
+      "conflicts_hint": "Deze nummers bestaan al in de gedeelde bibliotheek met andere inhoud. Kies welke versie je wilt behouden.",
       "col_global": "Gedeelde bibliotheek",
       "col_instance": "Deze instantie",
       "bulk_keep_global": "Overal gedeelde houden",

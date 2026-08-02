@@ -169,12 +169,12 @@
       "no_db": "Cette instance n'a pas encore de base de sauvegarde.",
       "load": "Impossible de lire la base de sauvegarde.",
       "invalid_file": "Fichier de sauvegarde OpenTaiko invalide.",
-      "older": "Cette sauvegarde ({imported}) est plus ancienne que la base ({current}). Import annulé.",
       "export": "Échec de l'export de la sauvegarde : {error}",
       "import": "Échec de l'import de la sauvegarde : {error}",
       "rebind": "Échec du changement d'emplacement : {error}",
       "create": "Échec de la création : {error}",
-      "delete": "Échec de la suppression : {error}"
+      "delete": "Échec de la suppression : {error}",
+      "newer": "Cette sauvegarde ({imported}) est plus récente que la base ({current}). Mettez le jeu à jour."
     },
     "rebind_hint": "Changer d'emplacement (échange avec l'occupant).",
     "confirm_title": "Importer une sauvegarde",
@@ -183,7 +183,8 @@
     "new_name": "Nouveau joueur",
     "delete": "Supprimer",
     "confirm_delete_title": "Supprimer la sauvegarde",
-    "confirm_delete": "Supprimer la sauvegarde « {name} » ? Action irréversible."
+    "confirm_delete": "Supprimer la sauvegarde « {name} » ? Action irréversible.",
+    "drag_hint": "Glissez sur un autre emplacement pour échanger."
   },
   "hub": {
     "status": {
@@ -249,11 +250,11 @@
       "button": "Transférer les chansons",
       "later": "Plus tard",
       "modal_title": "Transférer les chansons de « {instance} »",
-      "summary_new": "{count} nouveau(x) chart(s) seront ajoutés à la bibliothèque partagée.",
-      "summary_identical": "{count} chart(s) identique(s) seront retirés de cette instance.",
+      "summary_new": "{count} nouveau(x) dossier(s) de chanson seront ajoutés à la bibliothèque partagée.",
+      "summary_identical": "{count} dossier(s) de chanson identiques seront retirés de cette instance.",
       "nothing": "Cette instance n'a aucun chart à transférer.",
       "conflicts_title": "Conflits ({count})",
-      "conflicts_hint": "Ces charts existent déjà dans la bibliothèque partagée avec un contenu différent. Choisissez la version à conserver.",
+      "conflicts_hint": "Ces chansons existent déjà dans la bibliothèque partagée avec un contenu différent. Choisissez la version à conserver.",
       "col_global": "Bibliothèque partagée",
       "col_instance": "Cette instance",
       "bulk_keep_global": "Tout garder du partagé",

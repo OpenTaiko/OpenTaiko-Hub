@@ -169,12 +169,12 @@
       "no_db": "此实例尚无存档数据库。",
       "load": "无法读取存档数据库。",
       "invalid_file": "不是有效的 OpenTaiko 存档文件。",
-      "older": "此存档（{imported}）比数据库（{current}）旧，已取消导入。",
       "export": "导出存档失败：{error}",
       "import": "导入存档失败：{error}",
       "rebind": "更改存档槽位失败：{error}",
       "create": "创建存档失败：{error}",
-      "delete": "删除存档失败：{error}"
+      "delete": "删除存档失败：{error}",
+      "newer": "此存档（{imported}）比数据库（{current}）新，请先更新游戏。"
     },
     "rebind_hint": "更改槽位（占用时会交换）。",
     "confirm_title": "导入存档",
@@ -183,7 +183,8 @@
     "new_name": "新玩家",
     "delete": "删除存档",
     "confirm_delete_title": "删除存档",
-    "confirm_delete": "要删除存档“{name}”吗？此操作无法撤销。"
+    "confirm_delete": "要删除存档“{name}”吗？此操作无法撤销。",
+    "drag_hint": "拖到其他槽位可交换。"
   },
   "hub": {
     "status": {
@@ -249,11 +250,11 @@
       "button": "移动歌曲",
       "later": "稍后",
       "modal_title": "从“{instance}”移动歌曲",
-      "summary_new": "{count} 个新谱面将被添加到共享曲库。",
-      "summary_identical": "{count} 个完全相同的谱面将从此实例中移除。",
+      "summary_new": "将有 {count} 个新的歌曲文件夹被添加到共享曲库。",
+      "summary_identical": "将从此实例中移除 {count} 个完全相同的歌曲文件夹。",
       "nothing": "此实例没有可移动的谱面。",
       "conflicts_title": "冲突（{count}）",
-      "conflicts_hint": "这些谱面在共享曲库中已存在但内容不同。请选择要保留的版本。",
+      "conflicts_hint": "这些歌曲在共享曲库中已存在但内容不同。请选择要保留的版本。",
       "col_global": "共享曲库",
       "col_instance": "此实例",
       "bulk_keep_global": "全部保留共享",

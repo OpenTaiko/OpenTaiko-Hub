@@ -169,12 +169,12 @@
       "no_db": "Diese Instanz hat noch keine Spielstand-Datenbank.",
       "load": "Die Spielstand-Datenbank konnte nicht gelesen werden.",
       "invalid_file": "Keine gültige OpenTaiko-Spielstanddatei.",
-      "older": "Dieser Spielstand ({imported}) ist älter als die Datenbank ({current}). Import abgebrochen.",
       "export": "Spielstand konnte nicht exportiert werden: {error}",
       "import": "Spielstand konnte nicht importiert werden: {error}",
       "rebind": "Slot-Wechsel fehlgeschlagen: {error}",
       "create": "Spielstand konnte nicht erstellt werden: {error}",
-      "delete": "Spielstand konnte nicht gelöscht werden: {error}"
+      "delete": "Spielstand konnte nicht gelöscht werden: {error}",
+      "newer": "Dieser Spielstand ({imported}) ist neuer als die Datenbank ({current}). Aktualisiere zuerst das Spiel."
     },
     "rebind_hint": "Slot wechseln (tauscht mit dem Belegten).",
     "confirm_title": "Spielstand importieren",
@@ -183,7 +183,8 @@
     "new_name": "Neuer Spieler",
     "delete": "Löschen",
     "confirm_delete_title": "Spielstand löschen",
-    "confirm_delete": "Den Spielstand „{name}“ löschen? Das lässt sich nicht rückgängig machen."
+    "confirm_delete": "Den Spielstand „{name}“ löschen? Das lässt sich nicht rückgängig machen.",
+    "drag_hint": "Auf einen anderen Slot ziehen zum Tauschen."
   },
   "hub": {
     "status": {
@@ -249,11 +250,11 @@
       "button": "Songs übertragen",
       "later": "Später",
       "modal_title": "Songs aus „{instance}“ übertragen",
-      "summary_new": "{count} neue(s) Chart(s) werden zur geteilten Bibliothek hinzugefügt.",
-      "summary_identical": "{count} identische(s) Chart(s) werden aus dieser Instanz entfernt.",
+      "summary_new": "{count} neue Song-Ordner werden zur geteilten Bibliothek hinzugefügt.",
+      "summary_identical": "{count} identische Song-Ordner werden aus dieser Instanz entfernt.",
       "nothing": "Diese Instanz hat keine Charts zum Übertragen.",
       "conflicts_title": "Konflikte ({count})",
-      "conflicts_hint": "Diese Charts sind bereits mit anderem Inhalt in der geteilten Bibliothek vorhanden. Wähle die zu behaltende Version.",
+      "conflicts_hint": "Diese Songs sind bereits mit anderem Inhalt in der geteilten Bibliothek vorhanden. Wähle die zu behaltende Version.",
       "col_global": "Geteilte Bibliothek",
       "col_instance": "Diese Instanz",
       "bulk_keep_global": "Überall geteilte behalten",

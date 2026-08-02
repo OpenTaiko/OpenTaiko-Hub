@@ -169,12 +169,12 @@
       "no_db": "Esta instancia aún no tiene base de datos de partidas.",
       "load": "No se pudo leer la base de datos de partidas.",
       "invalid_file": "Archivo de partida de OpenTaiko no válido.",
-      "older": "Esta partida ({imported}) es más antigua que la base de datos ({current}). Import cancelado.",
       "export": "No se pudo exportar la partida: {error}",
       "import": "No se pudo importar la partida: {error}",
       "rebind": "No se pudo cambiar la ranura: {error}",
       "create": "No se pudo crear la partida: {error}",
-      "delete": "No se pudo eliminar la partida: {error}"
+      "delete": "No se pudo eliminar la partida: {error}",
+      "newer": "Esta partida ({imported}) es más reciente que la base de datos ({current}). Actualiza el juego primero."
     },
     "rebind_hint": "Cambiar de ranura (intercambia con el ocupante).",
     "confirm_title": "Importar partida",
@@ -183,7 +183,8 @@
     "new_name": "Nuevo jugador",
     "delete": "Eliminar",
     "confirm_delete_title": "Eliminar partida",
-    "confirm_delete": "¿Eliminar la partida «{name}»? No se puede deshacer."
+    "confirm_delete": "¿Eliminar la partida «{name}»? No se puede deshacer.",
+    "drag_hint": "Arrastra a otra ranura para intercambiar."
   },
   "hub": {
     "status": {
@@ -249,11 +250,11 @@
       "button": "Transferir canciones",
       "later": "Más tarde",
       "modal_title": "Transferir canciones de «{instance}»",
-      "summary_new": "Se añadirán {count} chart(s) nuevo(s) a la biblioteca compartida.",
-      "summary_identical": "Se eliminarán {count} chart(s) idéntico(s) de esta instancia.",
+      "summary_new": "Se añadirán {count} carpeta(s) de canción nuevas a la biblioteca compartida.",
+      "summary_identical": "Se eliminarán {count} carpeta(s) de canción idénticas de esta instancia.",
       "nothing": "Esta instancia no tiene charts para transferir.",
       "conflicts_title": "Conflictos ({count})",
-      "conflicts_hint": "Estos charts ya existen en la biblioteca compartida con contenido diferente. Elige qué versión conservar.",
+      "conflicts_hint": "Estas canciones ya existen en la biblioteca compartida con contenido diferente. Elige qué versión conservar.",
       "col_global": "Biblioteca compartida",
       "col_instance": "Esta instancia",
       "bulk_keep_global": "Conservar compartida en todo",

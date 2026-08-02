@@ -169,12 +169,12 @@
       "no_db": "This instance has no save database yet.",
       "load": "Could not read the save database.",
       "invalid_file": "Not a valid OpenTaiko save file.",
-      "older": "This save ({imported}) is older than the database ({current}). Import cancelled.",
       "export": "Failed to export the save: {error}",
       "import": "Failed to import the save: {error}",
       "rebind": "Failed to change the save slot: {error}",
       "create": "Failed to create the save: {error}",
-      "delete": "Failed to delete the save: {error}"
+      "delete": "Failed to delete the save: {error}",
+      "newer": "This save ({imported}) is newer than the database ({current}). Update the game first."
     },
     "rebind_hint": "Change slot (swaps with the occupant).",
     "confirm_title": "Import save",
@@ -183,7 +183,8 @@
     "new_name": "New player",
     "delete": "Delete save",
     "confirm_delete_title": "Delete save",
-    "confirm_delete": "Delete the save \"{name}\"? This cannot be undone."
+    "confirm_delete": "Delete the save \"{name}\"? This cannot be undone.",
+    "drag_hint": "Drag onto another slot to swap."
   },
   "hub": {
     "status": {
@@ -249,11 +250,11 @@
       "button": "Transfer songs",
       "later": "Later",
       "modal_title": "Transfer songs from \"{instance}\"",
-      "summary_new": "{count} new chart(s) will be added to the shared library.",
-      "summary_identical": "{count} identical chart(s) will be removed from this instance.",
+      "summary_new": "{count} new song folder(s) will be added to the shared library.",
+      "summary_identical": "{count} identical song folder(s) will be removed from this instance.",
       "nothing": "This instance has no charts to transfer.",
       "conflicts_title": "Conflicts ({count})",
-      "conflicts_hint": "These charts already exist in the shared library with different content. Choose which version to keep.",
+      "conflicts_hint": "These songs already exist in the shared library with different content. Choose which version to keep.",
       "col_global": "Shared library",
       "col_instance": "This instance",
       "bulk_keep_global": "Keep shared for all",
