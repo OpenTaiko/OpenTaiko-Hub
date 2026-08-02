@@ -183,8 +183,7 @@
     "new_name": "新玩家",
     "delete": "删除存档",
     "confirm_delete_title": "删除存档",
-    "confirm_delete": "要删除存档“{name}”吗？此操作无法撤销。",
-    "drag_hint": "拖到其他槽位可交换。"
+    "confirm_delete": "要删除存档“{name}”吗？此操作无法撤销。"
   },
   "hub": {
     "status": {

@@ -183,8 +183,7 @@
     "new_name": "新しいプレイヤー",
     "delete": "セーブを削除",
     "confirm_delete_title": "セーブの削除",
-    "confirm_delete": "セーブ「{name}」を削除しますか？元に戻せません。",
-    "drag_hint": "他のスロットにドラッグして入れ替え。"
+    "confirm_delete": "セーブ「{name}」を削除しますか？元に戻せません。"
   },
   "hub": {
     "status": {

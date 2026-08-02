@@ -183,8 +183,7 @@
     "new_name": "Nuevo jugador",
     "delete": "Eliminar",
     "confirm_delete_title": "Eliminar partida",
-    "confirm_delete": "¿Eliminar la partida «{name}»? No se puede deshacer.",
-    "drag_hint": "Arrastra a otra ranura para intercambiar."
+    "confirm_delete": "¿Eliminar la partida «{name}»? No se puede deshacer."
   },
   "hub": {
     "status": {

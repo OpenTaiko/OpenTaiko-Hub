@@ -143,44 +143,6 @@
         }
     };
 
-    // Drag a row onto another to swap their slots, the same operation the slot
-    // selector performs. Dropping onto a reserve save is refused, since that would
-    // empty a playable slot.
-    let dragSaveId = null;
-    let dragOverId = null;
-
-    const DragStart = (event, entry) => {
-        if (busy) return;
-        dragSaveId = entry.saveId;
-        event.dataTransfer.effectAllowed = 'move';
-        // Firefox only starts a drag when data is set
-        event.dataTransfer.setData('text/plain', String(entry.saveId));
-    };
-
-    const DragOver = (event, entry) => {
-        if (dragSaveId === null || dragSaveId === entry.saveId || entry.slot === null) return;
-        event.preventDefault();
-        event.dataTransfer.dropEffect = 'move';
-        dragOverId = entry.saveId;
-    };
-
-    const DragEnd = () => {
-        dragSaveId = null;
-        dragOverId = null;
-    };
-
-    const Drop = async (event, entry) => {
-        event.preventDefault();
-        const sourceId = dragSaveId;
-        DragEnd();
-        // A slot is always the destination: dropping onto a reserve save would leave
-        // one of the five playable slots empty
-        if (sourceId === null || sourceId === entry.saveId || entry.slot === null) return;
-        const source = saves.find((s) => s.saveId === sourceId);
-        if (!source) return;
-        await ApplyRebind(source, entry.slot);
-    };
-
     const CreateSave = async () => {
         try {
             const result = await WithDb((db) => createSave(db, get(_)('saves.new_name'), crypto.randomUUID()));
@@ -281,16 +243,12 @@
         }
     };
 
-    const Rebind = async (entry, event) => {
-        await ApplyRebind(entry, Number(event.target.value));
-    };
-
     // Rebinds a save to another slot; an occupied target slot swaps the two saves
     // (e.g. moving P5 to Slot 1 puts the previous Slot 1 save into P5's old place).
-    // Shared by the slot selector and by dragging one row onto another.
     // The rows are updated in place (no reload) so the layout never shifts.
-    const ApplyRebind = async (entry, targetSlot) => {
+    const Rebind = async (entry, event) => {
         if (busy) return;
+        const targetSlot = Number(event.target.value);
         const fromSlot = entry.slot;
         let db = null;
         busy = true;
@@ -374,37 +332,24 @@
                 </thead>
                 <tbody>
                     {#each saves as entry (entry.saveId)}
-                    <!-- Rows can be dragged onto each other to swap their slots -->
-                    <tr
-                        class:drop-target={dragOverId === entry.saveId && dragSaveId !== entry.saveId}
-                        class:dragging={dragSaveId === entry.saveId}
-                        draggable={!busy}
-                        on:dragstart={(e) => DragStart(e, entry)}
-                        on:dragover={(e) => DragOver(e, entry)}
-                        on:dragleave={() => { if (dragOverId === entry.saveId) dragOverId = null; }}
-                        on:drop={(e) => Drop(e, entry)}
-                        on:dragend={DragEnd}
-                    >
+                    <tr>
                         <td>
-                            <div class="flex items-center gap-2">
-                                <i class="fa-solid fa-grip-vertical drag-handle" title={$_('saves.drag_hint')}></i>
-                                <select
-                                    class="select slot-select"
-                                    value={entry.slot === null ? 'reserve' : String(entry.slot)}
-                                    disabled={busy}
-                                    title={$_('saves.rebind_hint')}
-                                    on:change={(e) => Rebind(entry, e)}
-                                >
-                                    <!-- Reserve is only a display state for reserve saves, never a
-                                         target: the game needs all 5 slots to exist and stay unique -->
-                                    {#if entry.slot === null}
-                                        <option value="reserve" disabled>{$_('saves.slot_reserve')}</option>
-                                    {/if}
-                                    {#each [0, 1, 2, 3, 4] as s}
-                                        <option value={String(s)}>{$_('saves.slot_n', { values: { n: s + 1 } })}</option>
-                                    {/each}
-                                </select>
-                            </div>
+                            <select
+                                class="select slot-select"
+                                value={entry.slot === null ? 'reserve' : String(entry.slot)}
+                                disabled={busy}
+                                title={$_('saves.rebind_hint')}
+                                on:change={(e) => Rebind(entry, e)}
+                            >
+                                <!-- Reserve is only a display state for reserve saves, never a
+                                     target: the game needs all 5 slots to exist and stay unique -->
+                                {#if entry.slot === null}
+                                    <option value="reserve" disabled>{$_('saves.slot_reserve')}</option>
+                                {/if}
+                                {#each [0, 1, 2, 3, 4] as s}
+                                    <option value={String(s)}>{$_('saves.slot_n', { values: { n: s + 1 } })}</option>
+                                {/each}
+                            </select>
                         </td>
                         <td>{entry.name}</td>
                         <td class="uid-cell" title={entry.saveUid}>{entry.saveUid ? entry.saveUid.slice(0, 8) : '-'}</td>
@@ -444,20 +389,5 @@
         width: auto;
         min-width: 7rem;
         padding: 0.25rem 0.5rem;
-    }
-    .drag-handle {
-        cursor: grab;
-        opacity: 0.45;
-        font-size: 0.85rem;
-    }
-    .drag-handle:hover {
-        opacity: 0.9;
-    }
-    tr.dragging {
-        opacity: 0.5;
-    }
-    tr.drop-target {
-        outline: 2px dashed rgba(var(--color-primary-500) / 0.9);
-        outline-offset: -2px;
     }
 </style>

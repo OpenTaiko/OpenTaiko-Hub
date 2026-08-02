@@ -183,8 +183,7 @@
     "new_name": "New player",
     "delete": "Delete save",
     "confirm_delete_title": "Delete save",
-    "confirm_delete": "Delete the save \"{name}\"? This cannot be undone.",
-    "drag_hint": "Drag onto another slot to swap."
+    "confirm_delete": "Delete the save \"{name}\"? This cannot be undone."
   },
   "hub": {
     "status": {

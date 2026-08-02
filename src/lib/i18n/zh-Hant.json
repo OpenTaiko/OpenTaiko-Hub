@@ -183,8 +183,7 @@
     "new_name": "新玩家",
     "delete": "刪除存檔",
     "confirm_delete_title": "刪除存檔",
-    "confirm_delete": "要刪除存檔「{name}」嗎？此操作無法復原。",
-    "drag_hint": "拖到其他槽位可交換。"
+    "confirm_delete": "要刪除存檔「{name}」嗎？此操作無法復原。"
   },
   "hub": {
     "status": {

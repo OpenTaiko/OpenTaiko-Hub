@@ -183,8 +183,7 @@
     "new_name": "Neuer Spieler",
     "delete": "Löschen",
     "confirm_delete_title": "Spielstand löschen",
-    "confirm_delete": "Den Spielstand „{name}“ löschen? Das lässt sich nicht rückgängig machen.",
-    "drag_hint": "Auf einen anderen Slot ziehen zum Tauschen."
+    "confirm_delete": "Den Spielstand „{name}“ löschen? Das lässt sich nicht rückgängig machen."
   },
   "hub": {
     "status": {

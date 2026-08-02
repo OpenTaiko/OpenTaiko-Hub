@@ -183,8 +183,7 @@
     "new_name": "Nieuwe speler",
     "delete": "Verwijderen",
     "confirm_delete_title": "Save verwijderen",
-    "confirm_delete": "De save \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt.",
-    "drag_hint": "Sleep naar een ander slot om te wisselen."
+    "confirm_delete": "De save \"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt."
   },
   "hub": {
     "status": {

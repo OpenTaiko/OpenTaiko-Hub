@@ -183,8 +183,7 @@
     "new_name": "Nouveau joueur",
     "delete": "Supprimer",
     "confirm_delete_title": "Supprimer la sauvegarde",
-    "confirm_delete": "Supprimer la sauvegarde « {name} » ? Action irréversible.",
-    "drag_hint": "Glissez sur un autre emplacement pour échanger."
+    "confirm_delete": "Supprimer la sauvegarde « {name} » ? Action irréversible."
   },
   "hub": {
     "status": {

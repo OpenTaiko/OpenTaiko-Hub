@@ -183,8 +183,7 @@
     "new_name": "새 플레이어",
     "delete": "삭제",
     "confirm_delete_title": "세이브 삭제",
-    "confirm_delete": "세이브 \"{name}\"을(를) 삭제할까요? 되돌릴 수 없습니다.",
-    "drag_hint": "다른 슬롯으로 끌어 교체."
+    "confirm_delete": "세이브 \"{name}\"을(를) 삭제할까요? 되돌릴 수 없습니다."
   },
   "hub": {
     "status": {
