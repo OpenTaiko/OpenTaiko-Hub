@@ -40,7 +40,7 @@
     "label": "Instance",
     "manage": "Gérer",
     "title": "Instances OpenTaiko",
-    "none": "Aucune instance OpenTaiko pour le moment. Utilisez \"Gérer\" pour en créer une nouvelle ou attacher un dossier existant.",
+    "none": "Aucune instance OpenTaiko pour le moment. Utilisez « Gérer » pour en créer une nouvelle ou attacher un dossier existant.",
     "active": "Active",
     "set_active": "Sélectionner",
     "attach": "Attacher un dossier existant",
@@ -66,9 +66,9 @@
       "create_failed": "Échec de la création de l'instance : {error}"
     },
     "success": {
-      "attached": "\"{name}\" attachée",
-      "created": "\"{name}\" créée",
-      "detached": "\"{name}\" détachée"
+      "attached": "« {name} »  attachée",
+      "created": "« {name} »  créée",
+      "detached": "« {name} »  détachée"
     },
     "picker": {
       "title": "Choisir un build à installer",
@@ -103,7 +103,7 @@
       "skin_update": "(La mise à jour nécessitera une mise à jour du skin)"
     },
     "hint": {
-      "first_start": "Pensez à télécharger un skin (onglet \"Skins\") et des chansons (onglet \"Chansons\") avant de lancer le jeu pour la première fois !",
+      "first_start": "Pensez à télécharger un skin (onglet « Skins » ) et des chansons (onglet « Chansons » ) avant de lancer le jeu pour la première fois !",
       "experimental": "Les builds expérimentaux incluent déjà les skins et les personnages, vous pouvez jouer immédiatement !"
     },
     "experimental": {
@@ -196,7 +196,7 @@
       "update": "Mettre à jour l'OpenTaiko Hub vers {version}"
     },
     "warn": {
-      "outdated_toast": "Votre installation de l'OpenTaiko Hub n'est pas à jour.<br>Veuillez cliquer sur le bouton \"Mettre à jour l'OpenTaiko Hub\"."
+      "outdated_toast": "Votre installation de l'OpenTaiko Hub n'est pas à jour.<br>Veuillez cliquer sur le bouton « Mettre à jour l'OpenTaiko Hub »."
     },
     "error": {
       "fetch": "Échec de la récupération de la dernière version de l'OpenTaiko Hub : {error}"
@@ -207,7 +207,7 @@
       "name": "Nom de la chanson",
       "folder": "Dossier",
       "difficulties": "Difficultés",
-      "charter": "Charteur : ",
+      "charter": "Auteur de la partition : ",
       "size": "Taille",
       "status": "Statut"
     },
@@ -217,7 +217,7 @@
     },
     "status": {
       "scanning": "Analyse...",
-      "not_downloaded": "Non téléchargée",
+      "not_downloaded": "Pas téléchargée",
       "up_to_date": "À jour",
       "outdated": "Obsolète"
     },
@@ -249,9 +249,9 @@
       "button": "Transférer les chansons",
       "later": "Plus tard",
       "modal_title": "Transférer les chansons de « {instance} »",
-      "summary_new": "{count} nouveau(x) dossier(s) de chanson seront ajoutés à la bibliothèque partagée.",
+      "summary_new": "{count} nouvelle(s) dossier(s) de chanson seront ajoutés à la bibliothèque partagée.",
       "summary_identical": "{count} dossier(s) de chanson identiques seront retirés de cette instance.",
-      "nothing": "Cette instance n'a aucun chart à transférer.",
+      "nothing": "Cette instance n'a aucune partition à transférer.",
       "conflicts_title": "Conflits ({count})",
       "conflicts_hint": "Ces chansons existent déjà dans la bibliothèque partagée avec un contenu différent. Choisissez la version à conserver.",
       "col_global": "Bibliothèque partagée",
@@ -312,7 +312,7 @@
     },
     "error": {
       "scanning": "Impossible de télécharger des {type} pendant l'analyse des dossiers locaux",
-      "zip_not_found": "Le paquet du skin est introuvable sur le serveur. Veuillez réessayer dans 5 minutes. Si le problème persiste, veuillez contacter l'équipe OpenTaiko."
+      "zip_not_found": "Le paquet du skin est introuvable sur le serveur. Veuillez réessayer dans 5 minutes. Si le problème persiste, veuillez contacter la Team OpenTaiko."
     },
     "success": {
       "all_up_to_date": "Tous les {type} sont déjà à jour",
@@ -338,9 +338,9 @@
       "player": "Joueur",
       "score": "Score",
       "grade": "Grade",
-      "good": "Good",
+      "good": "Bon",
       "ok": "OK",
-      "bad": "Bad",
+      "bad": "Mauvais",
       "list_points": "Pts liste",
       "video": "Vidéo",
       "status": "Statut"
@@ -348,9 +348,9 @@
     "video_link": "Regarder",
     "close": "Fermer",
     "status": {
-      "perfect": "Perfect",
-      "full_combo": "Full Combo",
-      "clear": "Clear"
+      "perfect": "Parfait",
+      "full_combo": "Plein Combo",
+      "clear": "Terminé"
     }
   },
   "version_chip": {
@@ -371,7 +371,7 @@
     },
     "legend": {
       "title": "Au cas où vous seriez un peu perdu...",
-      "feat": "Signifie \"Feature\" (fonctionnalité). Utilisé pour les ajouts de fonctionnalités.",
+      "feat": "Signifie « Feature »  (fonctionnalité). Utilisé pour les ajouts de fonctionnalités.",
       "enhancement": "Mise à jour d'une fonctionnalité existante.",
       "fix": "Devrait se passer d'explication.",
       "fix_note": "(Note : [Fix] et [BugFix] sont utilisés de manière interchangeable.)",
@@ -383,7 +383,7 @@
       "title": "Support / Rapport de bug",
       "intro": "Si vous rencontrez un problème ou cherchez de l'aide à propos d'OpenTaiko, veuillez consulter les liens suivants :",
       "discord": "Le canal #support du Discord d'OpenTaiko",
-      "github": "La section issues de GitHub",
+      "github": "La section Tickets (Issues) de GitHub",
       "note": "Note : Pensez à faire vos propres recherches avant de demander, le problème a peut-être déjà été traité ; pensez aussi à consulter le canal #often_asked_question du Discord."
     },
     "versioning": {
@@ -419,15 +419,15 @@
   },
   "tools": {
     "tab": {
-      "charting": "Charting",
+      "charting": "Partition",
       "lyrics": "Paroles",
       "submit": "Soumettez votre contenu !"
     },
     "charting": {
       "primary": "Ressources principales :",
       "tutorial": {
-        "title": "Tutoriel de création de charts .TJA",
-        "subtitle": "Tutoriel de charting par ugyuu."
+        "title": "Tutoriel de création de partitions .TJA",
+        "subtitle": "Tutoriel de partition par ugyuu."
       },
       "peepo_dl": "Télécharger PeepoDrumKit :",
       "additional": "Ressources supplémentaires :"
@@ -441,39 +441,39 @@
     "card": {
       "peepo_origin": {
         "subtitle": "Dernière version originale",
-        "text": "La version originale de samyuu, pour des charts classiques sans les fonctionnalités expérimentales."
+        "text": "La version originale de samyuu, pour des partitions classiques sans les fonctionnalités expérimentales."
       },
       "peepo_optk": {
-        "subtitle": "Dernière version de l'équipe OpenTaiko",
-        "text": "La version poursuivie par Komi et les membres de l'équipe OpenTaiko, ajoutant les fonctionnalités expérimentales prises en charge par OpenTaiko et améliorant l'édition classique."
+        "subtitle": "Dernière version de la Team OpenTaiko",
+        "text": "La version poursuivie par Komi et les membres de la Team OpenTaiko, ajoutant les fonctionnalités expérimentales prises en charge par OpenTaiko et améliorant l'édition classique."
       },
       "peepo_preview": {
-        "subtitle": "Dernière version de l'équipe OpenTaiko (aperçu)",
-        "text": "Aperçu de la prochaine version de l'équipe OpenTaiko par IID, ajoutant davantage de fonctionnalités expérimentales."
+        "subtitle": "Dernière version de la Team OpenTaiko (aperçu)",
+        "text": "Aperçu de la prochaine version de la Team OpenTaiko par IID, ajoutant davantage de fonctionnalités expérimentales."
       },
       "peepo_sdl3": {
-        "subtitle": "Dernière version de l'équipe OpenTaiko (port SDL3)",
-        "text": "Le port SDL3 multiplateforme de Steve-xmh, avec des fonctionnalités sélectionnées par IID pour les prochaines versions de l'équipe OpenTaiko."
+        "subtitle": "Dernière version de la Team OpenTaiko (port SDL3)",
+        "text": "Le port SDL3 multiplateforme de Steve-xmh, avec des fonctionnalités sélectionnées par IID pour les prochaines versions de la Team OpenTaiko."
       },
       "tja_tools": {
         "title": "TJA Tools",
-        "subtitle": "Fork de WHMHammer",
-        "text": "Visualisez vos charts et consultez leurs statistiques en un clin d'œil !"
+        "subtitle": "Bifurcation de WHMHammer",
+        "text": "Visualisez vos partitions et consultez leurs statistiques en un clin d'œil !"
       },
       "arrow_vortex": {
         "title": "Arrow Vortex",
         "subtitle": "Dernière version officielle",
-        "text": "L'outil recommandé pour synchroniser vos charts sans souci !"
+        "text": "L'outil recommandé pour synchroniser vos partitions sans souci !"
       },
       "subtitle_edit": {
         "title": "Subtitle Edit",
         "subtitle": "Dernière version officielle",
-        "text": "L'outil recommandé pour créer des fichiers VTT pour vos charts !"
+        "text": "L'outil recommandé pour créer des fichiers VTT pour vos partitions !"
       },
       "submission": {
         "title": "Formulaire de soumission de chansons",
         "subtitle": "Pour vos chansons",
-        "text": "Vous pouvez soumettre vos chansons ici pour la bande-son d'OpenTaiko ! Les charts sont généralement créés sous 2 semaines si la chanson est acceptée."
+        "text": "Vous pouvez soumettre vos chansons ici pour la bande-son d'OpenTaiko ! Les partitions sont généralement créées sous 2 semaines si la chanson est acceptée."
       },
       "suggestion": {
         "title": "Formulaire de suggestion de chansons",
@@ -527,11 +527,11 @@
       "same_theme_debug": "DEBUG : Le thème sélectionné est identique au thème actuel."
     },
     "success": {
-      "debug_disabled": "<b>Le mode debug a été désactivé.</b><br><p class=\"smalltext\">(Note : Vous devez changer la valeur \"debugMode\" pour désactiver complètement le mode debug !)</p>"
+      "debug_disabled": "<b>Le mode debug a été désactivé.</b><br><p class=\"smalltext\">(Note : Vous devez changer la valeur « debugMode »  pour désactiver complètement le mode debug !)</p>"
     }
   },
   "lang": {
-    "label": "Language",
+    "label": "Langue",
     "en": "English",
     "ja": "日本語",
     "zh_Hans": "中文 (简体)",

@@ -7,10 +7,10 @@
   },
   "dl": {
     "error": {
-      "failed_abort": "La descarga falló, cancelando"
+      "failed_abort": "Descarga falló, cancelando"
     },
     "warn": {
-      "failed_retry": "La descarga falló, reintentando... ({attempt}/{max})"
+      "failed_retry": "Descarga falló, reintentando... ({attempt}/{max})"
     }
   },
   "nav": {
@@ -26,7 +26,7 @@
     "tooltip": {
       "home": "Gestiona OpenTaiko y el OpenTaiko Hub.",
       "songlist": "Actualiza tus canciones de OpenTaiko y descarga las más recientes.",
-      "skins": "Obtén los skins de OpenTaiko más recientes y recursos relacionados.",
+      "skins": "Obtén las skins de OpenTaiko más recientes y recursos relacionados.",
       "docs": "Consulta la documentación incluida en la build de OpenTaiko seleccionada.",
       "tools": "Herramientas que pueden mejorar tu experiencia con OpenTaiko.",
       "secrets": "???",
@@ -100,10 +100,10 @@
       "install": "Instalar una versión..."
     },
     "warn": {
-      "skin_update": "(Actualizar requerirá una actualización del skin)"
+      "skin_update": "(Actualizar requerirá una actualización de la skin)"
     },
     "hint": {
-      "first_start": "¡Asegúrate de descargar un skin (pestaña \"Skins\") y canciones (pestaña \"Canciones\") antes de iniciar el juego por primera vez!",
+      "first_start": "¡Asegúrate de descargar una skin (pestaña \"Skins\") y canciones (pestaña \"Canciones\") antes de iniciar el juego por primera vez!",
       "experimental": "Las versiones experimentales ya incluyen skins y personajes, ¡puedes jugar de inmediato!"
     },
     "experimental": {
@@ -158,12 +158,12 @@
     "slot_reserve": "Reserva",
     "slot_n": "Ranura {n}",
     "success": {
-      "export": "Partida «{name}» exportada.",
-      "rebind": "Partida «{name}» movida.",
-      "rebind_swap": "Partidas «{a}» y «{b}» intercambiadas.",
-      "imported_into": "«{name}» importada en {slot}.",
-      "created": "Partida «{name}» creada.",
-      "deleted": "Partida «{name}» eliminada."
+      "export": "Partida \"{name}\" exportada.",
+      "rebind": "Partida \"{name}\" movida.",
+      "rebind_swap": "Partidas \"{a}\" y \"{b}\" intercambiadas.",
+      "imported_into": "\"{name}\" importada en {slot}.",
+      "created": "Partida \"{name}\" creada.",
+      "deleted": "Partida \"{name}\" eliminada."
     },
     "error": {
       "no_db": "Esta instancia aún no tiene base de datos de partidas.",
@@ -178,12 +178,12 @@
     },
     "rebind_hint": "Cambiar de ranura (intercambia con el ocupante).",
     "confirm_title": "Importar partida",
-    "confirm_import": "¿Fusionar «{imported}» en {slot} («{current}»)?",
+    "confirm_import": "¿Fusionar \"{imported}\" en {slot} (\"{current}\")?",
     "create": "Nueva partida",
     "new_name": "Nuevo jugador",
-    "delete": "Eliminar",
+    "delete": "Eliminar partida",
     "confirm_delete_title": "Eliminar partida",
-    "confirm_delete": "¿Eliminar la partida «{name}»? No se puede deshacer."
+    "confirm_delete": "¿Eliminar la partida \"{name}\"? No se puede deshacer."
   },
   "hub": {
     "status": {
@@ -207,7 +207,7 @@
       "name": "Nombre de la canción",
       "folder": "Carpeta",
       "difficulties": "Dificultades",
-      "charter": "Autor del chart: ",
+      "charter": "Autor de la partitura: ",
       "size": "Tamaño",
       "status": "Estado"
     },
@@ -245,13 +245,13 @@
       "sweet": "Dulce"
     },
     "migrate": {
-      "banner": "Se encontraron {count} carpeta(s) de canciones en «{instance}». ¿Transferirlas a la biblioteca de canciones compartida?",
+      "banner": "Se encontraron {count} carpeta(s) de canciones en \"{instance}\". ¿Transferirlas a la biblioteca de canciones compartida?",
       "button": "Transferir canciones",
       "later": "Más tarde",
-      "modal_title": "Transferir canciones de «{instance}»",
+      "modal_title": "Transferir canciones de \"{instance}\"",
       "summary_new": "Se añadirán {count} carpeta(s) de canción nuevas a la biblioteca compartida.",
       "summary_identical": "Se eliminarán {count} carpeta(s) de canción idénticas de esta instancia.",
-      "nothing": "Esta instancia no tiene charts para transferir.",
+      "nothing": "Esta instancia no tiene partituras para transferir.",
       "conflicts_title": "Conflictos ({count})",
       "conflicts_hint": "Estas canciones ya existen en la biblioteca compartida con contenido diferente. Elige qué versión conservar.",
       "col_global": "Biblioteca compartida",
@@ -278,7 +278,7 @@
       "download_nb": "Canción descargada: {nb} de {total}"
     },
     "duplicates": {
-      "banner": "{count} carpeta(s) vacías duplicadas en «{instance}». ¿Eliminarlas?",
+      "banner": "{count} carpeta(s) vacías duplicadas en \"{instance}\". ¿Eliminarlas?",
       "button": "Limpiar",
       "success": "Se eliminaron {count} carpeta(s) duplicada(s).",
       "error": "No se pudieron eliminar las carpetas duplicadas: {error}"
@@ -308,11 +308,11 @@
     },
     "experimental": {
       "blocked_title": "No disponible para builds experimentales",
-      "blocked_text": "Las builds experimentales ya incluyen sus propios skins, personajes y puchicharas."
+      "blocked_text": "Las builds experimentales ya incluyen sus propias skins, personajes y puchicharas."
     },
     "error": {
       "scanning": "No se pueden descargar {type} mientras se escanean las carpetas locales",
-      "zip_not_found": "No se pudo encontrar el paquete del skin en el servidor. Inténtalo de nuevo en 5 minutos. Si el problema persiste, contacta con el equipo de OpenTaiko."
+      "zip_not_found": "No se pudo encontrar el paquete de la skin en el servidor. Inténtalo de nuevo en 5 minutos. Si el problema persiste, contacta con el OpenTaiko Team."
     },
     "success": {
       "all_up_to_date": "Todos los {type} ya están actualizados",
@@ -338,9 +338,9 @@
       "player": "Jugador",
       "score": "Puntuación",
       "grade": "Rango",
-      "good": "Good",
-      "ok": "OK",
-      "bad": "Bad",
+      "good": "Bien",
+      "ok": "Vale",
+      "bad": "Mal",
       "list_points": "Pts de lista",
       "video": "Video",
       "status": "Estado"
@@ -349,8 +349,8 @@
     "close": "Cerrar",
     "status": {
       "perfect": "Perfecto",
-      "full_combo": "Full Combo",
-      "clear": "Superado"
+      "full_combo": "Combo Completo",
+      "clear": "Completado"
     }
   },
   "version_chip": {
@@ -371,7 +371,7 @@
     },
     "legend": {
       "title": "Por si estás un poco perdido...",
-      "feat": "Significa \"Feature\" (función). Se usa para la adición de nuevas funciones.",
+      "feat": "Significa \"Feature\" (Función). Se usa para la adición de nuevas funciones.",
       "enhancement": "Actualización de una función existente.",
       "fix": "Debería explicarse por sí solo.",
       "fix_note": "(Nota: [Fix] y [BugFix] se usan indistintamente.)",
@@ -383,15 +383,15 @@
       "title": "Soporte / Reporte de errores",
       "intro": "Si encuentras un problema o buscas ayuda con OpenTaiko, consulta los siguientes enlaces:",
       "discord": "Canal #support del Discord de OpenTaiko",
-      "github": "Sección de issues de GitHub",
+      "github": "Sección de Incidencias (Issues) de GitHub",
       "note": "Nota: Asegúrate de investigar por tu cuenta antes de preguntar, ya que el problema podría haberse tratado antes; revisa también el canal #often_asked_question de Discord."
     },
     "versioning": {
       "title": "Versionado de skins / recursos",
-      "compat": "Todos los números hasta el número de actualización menor (p. ej. v[0.6.0].2) deben coincidir entre un skin y una versión del juego para que sean compatibles.",
-      "optional": "No es obligatorio para algunas actualizaciones de recursos (personajes/puchicharas), ya que no siguen necesariamente los patrones de versionado estrictos de los skins.",
-      "revision": "El número de revisión (p. ej. v0.6.0.[2]) se incrementa en cada actualización del juego/skin que no implica cambios obligatorios y no necesita coincidir.",
-      "example": "Ejemplo: un skin con el número de versión 0.6.1.3 funcionará con cualquier versión de OpenTaiko desde la 0.6.1.0 y dejará de ser compatible a partir de la 0.6.2.0.",
+      "compat": "Todos los números hasta el número de actualización menor (p. ej. v[0.6.0].2) deben coincidir entre una skin y una versión del juego para que sean compatibles.",
+      "optional": "No es obligatorio para algunas actualizaciones de recursos (personajes/puchicharas), ya que no siguen necesariamente los patrones de versionado estrictos de las skins.",
+      "revision": "El número de revisión (p. ej. v0.6.0.[2]) se incrementa en cada actualización del juego/de la skin que no implica cambios obligatorios y no necesita coincidir.",
+      "example": "Ejemplo: una skin con el número de versión 0.6.1.3 funcionará con cualquier versión de OpenTaiko desde la 0.6.1.0 y dejará de ser compatible a partir de la 0.6.2.0.",
       "wip": "Esta sección se completará en futuras actualizaciones del OpenTaiko Hub según los problemas encontrados."
     },
     "error": {
@@ -405,29 +405,29 @@
       "socials": "Redes sociales/GitHub",
       "websites": "Sitios web"
     },
-    "discord_en": "Servidor de Discord oficial en inglés",
-    "discord_ja": "Servidor de Discord oficial en japonés",
-    "youtube": "Canal oficial de YouTube",
-    "bluesky": "Cuenta oficial de Bluesky",
-    "twitter": "Cuenta oficial de Twitter/X",
-    "source_main": "Código fuente principal de OpenTaiko",
-    "source_hub": "Código fuente del OpenTaiko Hub",
+    "discord_en": "Servidor de Discord Oficial en inglés",
+    "discord_ja": "Servidor de Discord Oficial en japonés",
+    "youtube": "Canal Oficial de YouTube",
+    "bluesky": "Cuenta Oficial de Bluesky",
+    "twitter": "Cuenta Oficial de Twitter/X",
+    "source_main": "Código Fuente Principal de OpenTaiko",
+    "source_hub": "Código Fuente del OpenTaiko Hub",
     "github_org": "Organización de GitHub",
-    "website": "Sitio web oficial de OpenTaiko",
-    "blog": "Blog oficial de OpenTaiko",
-    "wiki": "Wiki oficial de OpenTaiko"
+    "website": "Sitio Web Oficial de OpenTaiko",
+    "blog": "Blog Oficial de OpenTaiko",
+    "wiki": "Wiki Oficial de OpenTaiko"
   },
   "tools": {
     "tab": {
-      "charting": "Creación de charts",
+      "charting": "Creación de Paritutras",
       "lyrics": "Letras",
       "submit": "¡Envía tu contenido!"
     },
     "charting": {
       "primary": "Recursos principales:",
       "tutorial": {
-        "title": "Tutorial de creación de charts .TJA",
-        "subtitle": "Tutorial de charting por ugyuu."
+        "title": "Tutorial de Creación de Partituras .TJA",
+        "subtitle": "Tutorial de partituras por ugyuu."
       },
       "peepo_dl": "Descargar PeepoDrumKit:",
       "additional": "Recursos adicionales:"
@@ -436,47 +436,47 @@
       "dl": "Editor de letras"
     },
     "submit": {
-      "soundtrack": "Banda sonora de OpenTaiko"
+      "soundtrack": "Banda Sonora de OpenTaiko"
     },
     "card": {
       "peepo_origin": {
-        "subtitle": "Última versión original",
-        "text": "La versión original de samyuu, para charts normales sin las funciones experimentales."
+        "subtitle": "Última Versión Original",
+        "text": "La versión original de samyuu, para partituras normales sin las funciones experimentales."
       },
       "peepo_optk": {
-        "subtitle": "Última versión del equipo de OpenTaiko",
-        "text": "La versión continuada por Komi y los miembros del equipo de OpenTaiko, que añade funciones experimentales compatibles con OpenTaiko y mejora la edición normal."
+        "subtitle": "Última Versión del OpenTaiko Team",
+        "text": "La versión continuada por Komi y los miembros del OpenTaiko Team, que añade funciones experimentales compatibles con OpenTaiko y mejora la edición normal."
       },
       "peepo_preview": {
-        "subtitle": "Última versión del equipo de OpenTaiko (vista previa)",
-        "text": "Vista previa de la próxima versión del equipo de OpenTaiko por IID, que añade más funciones experimentales."
+        "subtitle": "Última Versión del OpenTaiko Team (Vista Previa)",
+        "text": "Vista previa de la próxima versión del OpenTaiko Team por IID, que añade más funciones experimentales."
       },
       "peepo_sdl3": {
-        "subtitle": "Última versión del equipo de OpenTaiko (port SDL3)",
-        "text": "El port SDL3 multiplataforma de Steve-xmh, con funciones seleccionadas por IID para las próximas versiones del equipo de OpenTaiko."
+        "subtitle": "Última versión del OpenTaiko Team (Port SDL3)",
+        "text": "El port SDL3 multiplataforma de Steve-xmh, con funciones seleccionadas por IID para las próximas versiones del OpenTaiko Team."
       },
       "tja_tools": {
         "title": "TJA Tools",
         "subtitle": "Fork de WHMHammer",
-        "text": "¡Visualiza tus charts y consulta sus estadísticas al instante!"
+        "text": "¡Visualiza tus partituras y consulta sus estadísticas al instante!"
       },
       "arrow_vortex": {
         "title": "Arrow Vortex",
-        "subtitle": "Última versión oficial",
+        "subtitle": "Última Versión Oficial",
         "text": "¡La herramienta recomendada para sincronizar tus charts sin problemas!"
       },
       "subtitle_edit": {
         "title": "Subtitle Edit",
-        "subtitle": "Última versión oficial",
-        "text": "¡La herramienta recomendada para crear archivos VTT para tus charts!"
+        "subtitle": "Última Versión Oficial",
+        "text": "¡La herramienta recomendada para crear archivos VTT para tus partiutras!"
       },
       "submission": {
-        "title": "Formulario de envío de canciones",
+        "title": "Formulario de Envío de Canciones",
         "subtitle": "Para tus canciones",
-        "text": "¡Puedes enviar tus canciones aquí para la banda sonora de OpenTaiko! Los charts suelen crearse en un plazo de 2 semanas si la canción es aceptada."
+        "text": "¡Puedes enviar tus canciones aquí para la banda sonora de OpenTaiko! Las partituras suelen crearse en un plazo de 2 semanas si la canción es aceptada."
       },
       "suggestion": {
-        "title": "Formulario de sugerencia de canciones",
+        "title": "Formulario de Sugerencia de Canciones",
         "subtitle": "Para otros artistas",
         "text": "¡Puedes recomendar aquí artistas cuyas canciones creas que encajarían en OpenTaiko!"
       }
@@ -490,7 +490,7 @@
       "skeleton": "Temas predefinidos de Skeleton:"
     },
     "preview": {
-      "title": "¡Bienvenido a la pestaña de temas del OpenTaiko Hub!",
+      "title": "¡Bienvenido/a a la pestaña de temas del OpenTaiko Hub!",
       "color": "Vista previa de colores",
       "accents": "Acentos del tema:",
       "accent_primary": "Acento primario",
@@ -531,7 +531,7 @@
     }
   },
   "lang": {
-    "label": "Language",
+    "label": "Idioma",
     "en": "English",
     "ja": "日本語",
     "zh_Hans": "中文 (简体)",
