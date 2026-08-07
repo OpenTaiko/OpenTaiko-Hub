@@ -245,12 +245,12 @@
       "sweet": "Doux"
     },
     "migrate": {
-      "banner": "{count} dossier(s) de chansons trouvé(s) dans « {instance} ». Les transférer vers la bibliothèque de chansons partagée ?",
+      "banner": "{count} dossier(s) de chansons trouvé(s) dans « {instance} ». Le(s) transférer vers la bibliothèque de chansons partagée ?",
       "button": "Transférer les chansons",
       "later": "Plus tard",
       "modal_title": "Transférer les chansons de « {instance} »",
-      "summary_new": "{count} nouvelle(s) dossier(s) de chanson seront ajoutés à la bibliothèque partagée.",
-      "summary_identical": "{count} dossier(s) de chanson identiques seront retirés de cette instance.",
+      "summary_new": "{count} nouveau(x) dossier(s) de chanson sera/ont ajouté(s) à la bibliothèque partagée.",
+      "summary_identical": "{count} dossier(s) de chanson identique(s) sera/ont retiré(s) de cette instance.",
       "nothing": "Cette instance n'a aucune partition à transférer.",
       "conflicts_title": "Conflits ({count})",
       "conflicts_hint": "Ces chansons existent déjà dans la bibliothèque partagée avec un contenu différent. Choisissez la version à conserver.",
@@ -278,7 +278,7 @@
       "download_nb": "Chanson {nb} sur {total} téléchargée"
     },
     "duplicates": {
-      "banner": "{count} dossier(s) vides en double dans « {instance} ». Les supprimer ?",
+      "banner": "{count} dossier(s) vide(s) en double dans « {instance} ». Le(s) supprimer ?",
       "button": "Nettoyer",
       "success": "{count} dossier(s) en double supprimé(s).",
       "error": "Échec de la suppression des dossiers en double : {error}"
