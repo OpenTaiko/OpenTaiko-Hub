@@ -3,6 +3,12 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.2.2] - 2026-08-07 (Alpha)
+
+- [Chore] Max list points now decay by 0.95 up to rank 20, 0.96 from rank 21 to 50 and 0.98 from rank 51, so later ranks lose less points (matches the website)
+- [Fix] The "Update OpenTaiko Hub" button did nothing when clicked
+- [Fix] Songs were not recognized when a .tja file was placed directly inside the Songs folder
+
 ## [0.2.1] - 2026-08-03 (Alpha)
 
 - [Fix] Fix local instance missing in the instances list when updating the Hub to 0.2 (can still be added with Attach Existing Instance but it is not an intuitive method)

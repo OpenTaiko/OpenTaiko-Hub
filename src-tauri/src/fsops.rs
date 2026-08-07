@@ -65,7 +65,14 @@ pub async fn merge_move_dir(src: String, dest: String) -> Result<(), String> {
 
 /// A song folder is a directory that directly contains at least one .tja file.
 /// Song folders are moved as a whole, so nested content stays intact.
-pub(crate) fn collect_song_dirs(dir: &Path, out: &mut Vec<PathBuf>) {
+///
+/// The starting folder itself is never reported as a song: a loose .tja dropped into a
+/// Songs folder would otherwise make the whole library look like a single song.
+pub(crate) fn collect_song_dirs(base: &Path, out: &mut Vec<PathBuf>) {
+    collect_song_dirs_from(base, base, out);
+}
+
+fn collect_song_dirs_from(dir: &Path, base: &Path, out: &mut Vec<PathBuf>) {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(_) => return,
@@ -85,12 +92,12 @@ pub(crate) fn collect_song_dirs(dir: &Path, out: &mut Vec<PathBuf>) {
             has_tja = true;
         }
     }
-    if has_tja {
+    if has_tja && dir != base {
         out.push(dir.to_path_buf());
         return;
     }
     for sub in subdirs {
-        collect_song_dirs(&sub, out);
+        collect_song_dirs_from(&sub, base, out);
     }
 }
 

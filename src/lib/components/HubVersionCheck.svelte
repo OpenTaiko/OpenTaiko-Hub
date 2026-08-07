@@ -2,6 +2,7 @@
     import { onMount } from 'svelte';
     import { getVersion } from '@tauri-apps/api/app';
     import { fetch } from "@tauri-apps/plugin-http";
+    import { openUrl } from '@tauri-apps/plugin-opener';
 
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning } = getContext('toast');
@@ -48,7 +49,15 @@
         }
     }
 
-    const UpdateHub = async () => {window.open("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest");}
+    // window.open is a no-op inside the webview, the opener plugin has to be used to
+    // hand the URL to the system browser
+    const UpdateHub = async () => {
+        try {
+            await openUrl("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest");
+        } catch (err) {
+            TriggerError(get(_)('hub.error.fetch', { values: { error: err } }));
+        }
+    }
 
     onMount(async () => {
         getHubVersion()

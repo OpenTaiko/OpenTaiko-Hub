@@ -76,8 +76,15 @@
     let hofModalScores = [];
     let hofModalMaxListPoints = 0;
 
+    // Max list points decay per rank, matching the website: 0.95 up to rank 20, then
+    // 0.96 up to rank 50, then 0.98, so the drop flattens out for later ranks. The
+    // tiers chain from one another (no reset), which keeps the curve continuous.
     const ComputeMaxListPoints = (rank) => {
-        return parseInt(1000 * Math.pow(0.95, rank - 1));
+        const r = Math.max(1, rank);
+        const steps95 = Math.min(r, 20) - 1;
+        const steps96 = Math.min(Math.max(r - 20, 0), 30);
+        const steps98 = Math.max(r - 50, 0);
+        return parseInt(1000 * Math.pow(0.95, steps95) * Math.pow(0.96, steps96) * Math.pow(0.98, steps98));
     };
 
     const ScoreToListPointsRatio = (score) => {

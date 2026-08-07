@@ -12,6 +12,14 @@
           }
         ]
       },
+      {
+        "identifier": "opener:allow-open-url",
+        "allow": [
+          {
+            "url": "https://*"
+          }
+        ]
+      },
       "shell:allow-open",
       "shell:default"
     ]

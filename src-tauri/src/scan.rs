@@ -242,10 +242,13 @@ fn walk_dir(dir: &Path, ctx: &mut WalkCtx) {
         .map(|r| r.to_string_lossy().replace('\\', "/"))
         .unwrap_or_default();
 
-    if !tja_files.is_empty() {
+    // The library root is never a song, whatever it holds: a loose .tja dropped
+    // directly into Songs/ would otherwise end the walk immediately and hide every
+    // song below it.
+    if !tja_files.is_empty() && !rel_path.is_empty() {
         // A folder holding a .tja is one song. Its subfolders (replay data, extra
         // assets like "Adulation"'s folder) belong to the song, so treat it as a leaf
-        // and do NOT descend into them — otherwise they surface as phantom genres.
+        // and do NOT descend into them, otherwise they surface as phantom genres.
         tja_files.sort();
         let mut tja_md5s = Vec::with_capacity(tja_files.len());
         let mut title = None;
@@ -390,6 +393,28 @@ mod tests {
         assert_eq!(parse_side(b"SIDE:2\n").as_deref(), Some("Ex"));
         assert_eq!(parse_side(b"SIDE:1\n").as_deref(), Some("Normal"));
         assert_eq!(parse_side(b"TITLE:no side\n"), None);
+    }
+
+    #[test]
+    fn a_loose_tja_at_the_library_root_does_not_hide_the_songs() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path();
+
+        // A chart dropped straight into Songs/ used to end the walk right there
+        write(&base.join("Stray.tja"), "TITLE:Stray\n");
+        write(&base.join("01 Pop/box.def"), "#TITLE:Pop");
+        write(&base.join("01 Pop/Song A/song.tja"), "TITLE:A\n");
+        write(&base.join("02 Anime/Song B/song.tja"), "TITLE:B\n");
+
+        let (songs, genres) = collect_tree(base, &mut |_| {});
+
+        let mut paths: Vec<&str> = songs.iter().map(|s| s.rel_path.as_str()).collect();
+        paths.sort();
+        assert_eq!(paths, vec!["01 Pop/Song A", "02 Anime/Song B"], "songs below the root must still be found");
+        // The root itself is never a song, so it never appears as one
+        assert!(!songs.iter().any(|s| s.rel_path.is_empty()));
+        let genre_paths: Vec<&str> = genres.iter().map(|g| g.rel_path.as_str()).collect();
+        assert!(genre_paths.contains(&"01 Pop"));
     }
 
     #[test]

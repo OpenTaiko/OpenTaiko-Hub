@@ -655,6 +655,32 @@ mod tests {
     }
 
     #[test]
+    fn a_loose_tja_at_the_root_does_not_swallow_the_whole_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("inst/Songs");
+        let dest = tmp.path().join("global/Songs");
+
+        // A chart sitting directly in Songs/ next to real song folders
+        write(&src.join("Stray.tja"), "TITLE:Stray\n");
+        write(&src.join("01 Pop/Song A/song.tja"), "TITLE:A\n");
+
+        let plan = build_plan(&src, &dest);
+        let paths: Vec<&str> = plan.items.iter().map(|i| i.src.rel_path.as_str()).collect();
+        assert_eq!(paths, vec!["01 Pop/Song A"], "the root must not be planned as one song");
+
+        // Migrating moves the song, never the whole Songs folder
+        let decisions = vec![MigrationDecision {
+            src_rel_path: "01 Pop/Song A".into(),
+            action: "move".into(),
+            dest_rel_path: None,
+        }];
+        apply_plan(&src, &dest, &decisions).unwrap();
+        assert!(src.join("Stray.tja").is_file(), "the loose chart stays where it was");
+        assert!(src.is_dir(), "the Songs folder itself is never moved away");
+        assert!(dest.join("01 Pop/Song A/song.tja").is_file());
+    }
+
+    #[test]
     fn strip_is_a_noop_without_a_songs_folder() {
         let tmp = tempfile::tempdir().unwrap();
         let missing = tmp.path().join("publish/Songs");
