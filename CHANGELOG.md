@@ -3,6 +3,11 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.2.3] - 2026-09-06 (Alpha)
+
+- [Fix] Songs can be downloaded concurrently again: since 0.2.0 every Download / Update button was locked while any single song was downloading
+- [Fix] A song download that fails or throws now releases its row (the button no longer stays stuck as a progress bar) and cleans up its temporary folder
+
 ## [0.2.2] - 2026-08-07 (Alpha)
 
 - [Chore] Max list points now decay by 0.95 up to rank 20, 0.96 from rank 21 to 50 and 0.98 from rank 51, so later ranks lose less points (matches the website)

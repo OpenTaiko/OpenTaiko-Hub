@@ -42,11 +42,13 @@
     let songCountProgress = 0;
     let songCountProgressBar = null;
     let bulkBusy = false;          // a bulk download is running
-    let songBusy = false;          // any single-song download is running
+    let activeSingleDownloads = 0;  // single-song downloads currently in flight (they run concurrently)
+    $: songBusy = activeSingleDownloads > 0;
 
     // Git blob SHAs of the soundtrack repository (path → sha), fetched once per session
     // and used to detect outdated box.def / default.png files
     let remoteShaMap = null;
+    let remoteShaMapFetch = null;   // in-flight fetch, shared by downloads that start together
 
     // Songs found inside attached instances that can be moved to the shared library
     let migrationCandidates = [];
@@ -355,20 +357,29 @@
     // files can be compared against their upstream version by git blob SHA
     const EnsureRemoteShaMap = async () => {
         if (remoteShaMap) return remoteShaMap;
-        try {
-            const response = await fetch('https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/main?recursive=1');
-            if (response.ok) {
-                const data = await response.json();
-                remoteShaMap = new Map(
-                    (data.tree ?? [])
-                        .filter((entry) => entry.type === 'blob')
-                        .map((entry) => [entry.path, entry.sha])
-                );
-            }
-        } catch (error) {
-            console.error('Failed to fetch the soundtrack repository tree:', error);
+        // Downloads started back to back share one request instead of each hitting the
+        // GitHub API (rate limited) for the same tree
+        if (!remoteShaMapFetch) {
+            remoteShaMapFetch = (async () => {
+                try {
+                    const response = await fetch('https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/main?recursive=1');
+                    if (response.ok) {
+                        const data = await response.json();
+                        remoteShaMap = new Map(
+                            (data.tree ?? [])
+                                .filter((entry) => entry.type === 'blob')
+                                .map((entry) => [entry.path, entry.sha])
+                        );
+                    }
+                } catch (error) {
+                    console.error('Failed to fetch the soundtrack repository tree:', error);
+                } finally {
+                    remoteShaMapFetch = null;
+                }
+                return remoteShaMap;
+            })();
         }
-        return remoteShaMap;
+        return remoteShaMapFetch;
     }
 
 
@@ -457,8 +468,10 @@
             return ;
         }
         // Guard the whole run, not just the progress-bar phase: the first steps are
-        // async, so without this a second click would start a parallel bulk download
-        if (bulkBusy) return;
+        // async, so without this a second click would start a parallel bulk download.
+        // Single downloads must have drained too, the loop would otherwise pick up a
+        // song that is still being written.
+        if (bulkBusy || songBusy) return;
         bulkBusy = true;
 
         try {
@@ -507,7 +520,18 @@
     // Downloads box.def / default.png for a genre folder when it is missing or its git
     // blob SHA differs from the soundtrack repository. Without the remote index the
     // old behavior is kept (box.def always refreshed, preimage only when missing).
-    const EnsureGenreMetadata = async (genrePath, tmpFolder) => {
+    //
+    // Calls are serialized: songs download concurrently, and two songs of the same
+    // genre would otherwise copy the same box.def on top of each other. Once the first
+    // one has written it, the next sees the updated local SHA and skips the file.
+    let genreMetadataLock = Promise.resolve();
+    const EnsureGenreMetadata = (genrePath, tmpFolder) => {
+        const run = genreMetadataLock.then(() => EnsureGenreMetadataUnlocked(genrePath, tmpFolder));
+        genreMetadataLock = run.catch(() => {});
+        return run;
+    }
+
+    const EnsureGenreMetadataUnlocked = async (genrePath, tmpFolder) => {
         const baseDirPath = await GetGlobalSongsPath();
         const genreFullPath = await path.join(baseDirPath, genrePath);
         let changed = false;
@@ -570,20 +594,26 @@
         // songNb is set when the bulk loop drives this, which owns the busy flag itself
         const standalone = songNb === undefined;
         if (standalone) {
-            if (songBusy || bulkBusy) return;
-            songBusy = true;
+            // Single songs run in parallel. Only refuse while a bulk run owns every
+            // displayed row, or when this exact song is already in flight (it would
+            // write into the same folder twice).
+            if (bulkBusy || songDLProgress[songObj.uniqueId] !== undefined) return;
+            activeSingleDownloads++;
         }
+        // Claim the row right away (nothing awaited above) so a second click on the
+        // same song cannot slip through before the download shows its progress bar
+        songDLProgress[songObj.uniqueId] = 0;
         try {
             await RunDownloadSong(songObj, currentObj, songNb, songTotal);
         } finally {
-            if (standalone) songBusy = false;
+            // Also releases the row when the download throws, otherwise the button
+            // would stay replaced by a stuck progress bar
+            delete songDLProgress[songObj.uniqueId];
+            if (standalone) activeSingleDownloads--;
         }
     }
 
     const RunDownloadSong = async (songObj, currentObj, songNb, songTotal) => {
-        songDLProgress[songObj.uniqueId] = 0;
-        //console.log(songDLProgress);
-
         await EnsureRemoteShaMap();
 
         const baseDirPath = await GetGlobalSongsPath();
@@ -600,68 +630,68 @@
         if (!fold_exists)
             await mkdir(chartDownloadFolder, {recursive: true});
 
-        let fileNames = [];
+        try {
+            let fileNames = [];
 
-        let totbyts = 0;
-        for (const filePath of songObj.tjaFilesPath) {
-            // forbid non-children paths
-            let localFilePath = (filePath.startsWith(songObj.tjaFolderPath + '\\') || filePath.startsWith(songObj.tjaFolderPath + '/')) ?
-                filePath.slice(songObj.tjaFolderPath.length + 1)
-                : filePath.split("\\").pop();
+            let totbyts = 0;
+            for (const filePath of songObj.tjaFilesPath) {
+                // forbid non-children paths
+                let localFilePath = (filePath.startsWith(songObj.tjaFolderPath + '\\') || filePath.startsWith(songObj.tjaFolderPath + '/')) ?
+                    filePath.slice(songObj.tjaFolderPath.length + 1)
+                    : filePath.split("\\").pop();
 
-            const tjaFileUrl = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${filePath}`;
-            const dlPath = await path.join(chartDownloadFolder, localFilePath.replace(/\\/g, '/'));
+                const tjaFileUrl = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${filePath}`;
+                const dlPath = await path.join(chartDownloadFolder, localFilePath.replace(/\\/g, '/'));
 
-            // ensure subdirectory exists
-            const dlPathFold = await path.dirname(dlPath);
-            if (!await exists(dlPathFold))
-                await mkdir(dlPathFold, {recursive: true});
+                // ensure subdirectory exists
+                const dlPathFold = await path.dirname(dlPath);
+                if (!await exists(dlPathFold))
+                    await mkdir(dlPathFold, {recursive: true});
 
-            const success = await backoffDownload(
-                tjaFileUrl,
-                dlPath,
-                (pr) => {
-                    totbyts += pr.progress;
-                    songDLProgress[songObj.uniqueId] = 100 * (totbyts / (songObj.chartSize * 1024 * 1024));
-                    //console.log(songDLProgress);
-                }
-            );
+                const success = await backoffDownload(
+                    tjaFileUrl,
+                    dlPath,
+                    (pr) => {
+                        totbyts += pr.progress;
+                        songDLProgress[songObj.uniqueId] = 100 * (totbyts / (songObj.chartSize * 1024 * 1024));
+                        //console.log(songDLProgress);
+                    }
+                );
 
-            if (!success) {
-                delete songDLProgress[songObj.uniqueId];
-                return ;
+                // The caller's finally releases the row
+                if (!success) return ;
+
+                fileNames.push(localFilePath);
+            };
+
+            songDLProgress[songObj.uniqueId] = 0;
+            await Promise.all(fileNames.map(async (fn, idx) => {
+                const strPath = await path.join(chartDownloadFolder, fn.replace(/\\/g, '/'));
+                const destPath = await path.join(tjaFullPath, fn.replace(/\\/g, '/'));
+
+                // ensure subdirectory exists
+                const destPathDir = await path.dirname(destPath);
+                if (!await exists(destPathDir))
+                    await mkdir(destPathDir, {recursive: true});
+
+                await copyFile(strPath, destPath);
+                songDLProgress[songObj.uniqueId] = (idx + 1) * (100 / fileNames.length);
+                //console.log(songDLProgress);
+            }));
+
+            // Download / refresh box.def and default.png of every ancestor genre folder
+            const genrePaths = songObj.tjaFolderPath.split('\\').slice(0, -1).map((_, i, arr) => arr.slice(0, i + 1).join('/'));
+
+            for (const genrePath of genrePaths) {
+                const genreFullPath = await path.join(baseDirPath, genrePath);
+                if (!await exists(genreFullPath))
+                    await mkdir(genreFullPath, {recursive: true});
+                await EnsureGenreMetadata(genrePath, chartDownloadFolder);
             }
-
-            fileNames.push(localFilePath);
-        };
-
-        songDLProgress[songObj.uniqueId] = 0;
-        await Promise.all(fileNames.map(async (fn, idx) => {
-            const strPath = await path.join(chartDownloadFolder, fn.replace(/\\/g, '/'));
-            const destPath = await path.join(tjaFullPath, fn.replace(/\\/g, '/'));
-
-            // ensure subdirectory exists
-            const destPathDir = await path.dirname(destPath);
-            if (!await exists(destPathDir))
-                await mkdir(destPathDir, {recursive: true});
-
-            await copyFile(strPath, destPath);
-            songDLProgress[songObj.uniqueId] = (idx + 1) * (100 / fileNames.length);
-            //console.log(songDLProgress);
-        }));
-
-        // Download / refresh box.def and default.png of every ancestor genre folder
-        const genrePaths = songObj.tjaFolderPath.split('\\').slice(0, -1).map((_, i, arr) => arr.slice(0, i + 1).join('/'));
-
-        for (const genrePath of genrePaths) {
-            const genreFullPath = await path.join(baseDirPath, genrePath);
-            if (!await exists(genreFullPath))
-                await mkdir(genreFullPath, {recursive: true});
-            await EnsureGenreMetadata(genrePath, chartDownloadFolder);
+        } finally {
+            // Clean after pooping, including when the download gave up halfway
+            try { await remove(chartDownloadFolder, { recursive: true }); } catch {}
         }
-
-        // Clean after pooping
-        await remove(chartDownloadFolder, { recursive: true });
 
         if (songNb === undefined)
             TriggerSuccess(get(_)('songs.success.download_complete'));
@@ -674,9 +704,6 @@
             // Keep the actual install location when the song was relocated by the user
             chartRelativePath: (currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath
         };
-
-        delete songDLProgress[songObj.uniqueId];
-        //console.log(songDLProgress);
     }
 
     // Artists info
@@ -869,7 +896,7 @@
 					<p>{$_('songs.status.not_downloaded')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy || songBusy} on:click={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
+					<button type="button" disabled={bulkBusy} on:click={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -879,7 +906,7 @@
 					<p>{$_('songs.status.up_to_date')}</p>
                     <br />
                     {#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy || songBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
+					<button type="button" disabled={bulkBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
@@ -889,7 +916,7 @@
 					<p>{$_('songs.status.outdated')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy || songBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
+					<button type="button" disabled={bulkBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
 					{:else}
 					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}

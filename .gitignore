@@ -132,3 +132,7 @@ dist
 
 .svelte-kit
 build
+
+# Vite bundles vite.config.js into a temporary file and normally deletes it; it is
+# left behind when the process is killed before cleanup
+vite.config.*.timestamp-*
