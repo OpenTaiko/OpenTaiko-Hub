@@ -3,7 +3,7 @@
     import { openPath } from '@tauri-apps/plugin-opener';
     import { instances, activeInstanceId, activeInstance, setActiveInstance, instanceVersions } from '$lib/stores/instances.js';
 
-    export let OnManage = () => {};
+    let { OnManage = () => {} } = $props();
 
     const OpenActiveFolder = async () => {
         const inst = $activeInstance;
@@ -29,7 +29,7 @@
         <select
             class="select flex-1 max-w-md"
             value={$activeInstanceId}
-            on:change={(e) => setActiveInstance(e.target.value)}
+            onchange={(e) => setActiveInstance(e.target.value)}
         >
             {#each $instances as inst (inst.id)}
                 <option value={inst.id}>{inst.name}</option>
@@ -39,9 +39,9 @@
             {@const key = channelKey($activeInstance)}
             <span
                 class="badge whitespace-nowrap"
-                class:variant-filled-primary={key === 'stable'}
-                class:variant-filled-warning={key === 'experimental'}
-                class:variant-soft={key === 'empty'}
+                class:preset-filled-primary-500={key === 'stable'}
+                class:preset-filled-warning-500={key === 'experimental'}
+                class:preset-tonal={key === 'empty'}
             >
                 {#if key === 'experimental' && $activeInstance.experimental?.label}
                     {$activeInstance.experimental.label}
@@ -52,12 +52,12 @@
             {#if $instanceVersions[$activeInstance.id]}
                 <span class="opacity-70 text-sm whitespace-nowrap">{$instanceVersions[$activeInstance.id]}</span>
             {/if}
-            <button type="button" class="button-blue button-main" title={$_('instances.open_folder')} on:click={OpenActiveFolder}>
+            <button type="button" class="button-blue button-main" title={$_('instances.open_folder')} onclick={OpenActiveFolder}>
                 <i class="fa-solid fa-folder-open"></i>
             </button>
         {/if}
     {/if}
-    <button type="button" class="button-blue button-main whitespace-nowrap" on:click={OnManage}>
+    <button type="button" class="button-blue button-main whitespace-nowrap" onclick={OnManage}>
         <i class="fa-solid fa-gear"></i> {$_('instances.manage')}
     </button>
 </div>

@@ -5,21 +5,22 @@
     import { _ } from 'svelte-i18n';
     import { fetchLatestRelease, fetchExperimentalOptions } from '$lib/utils/builds.js';
 
-    export let Show = false;
-    export let OnClose = () => {};
-    export let OnPick = (_build) => {};
+    /**
+     * @typedef {Object} Props
+     * @property {boolean} [Show]
+     * @property {any} [OnClose]
+     * @property {any} [OnPick]
+     */
 
-    let loading = false;
-    let latestTag = null;
-    let experimentalOptions = [];
-    let selected = 'stable';   // 'stable' | index into experimentalOptions
-    let loadedFor = false;
+    /** @type {Props} */
+    let { Show = false, OnClose = () => {}, OnPick = (_build) => {} } = $props();
 
-    $: if (Show && !loadedFor) {
-        loadedFor = true;
-        LoadOptions();
-    }
-    $: if (!Show) loadedFor = false;
+    let loading = $state(false);
+    let latestTag = $state(null);
+    let experimentalOptions = $state([]);
+    let selected = $state('stable');   // 'stable' | index into experimentalOptions
+    let loadedFor = false;             // bookkeeping only, never rendered
+
 
     const LoadOptions = async () => {
         loading = true;
@@ -44,23 +45,34 @@
         }
         OnClose();
     };
+    // Fetch the options each time the dialog opens
+    $effect(() => {
+        if (Show) {
+            if (!loadedFor) {
+                loadedFor = true;
+                LoadOptions();
+            }
+        } else {
+            loadedFor = false;
+        }
+    });
 </script>
 
 {#if Show}
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-<div class="modal-backdrop" on:click={OnClose}>
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="card p-6 space-y-4 modal-card" on:click|stopPropagation>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div class="modal-backdrop" onclick={OnClose}>
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
         <h2 class="h3">{$_('instances.picker.title')}</h2>
 
         {#if loading}
-            <div class="placeholder animate-pulse w-full h-16" />
+            <div class="placeholder animate-pulse w-full h-16"></div>
         {:else}
             <label class="option-row" class:selected={selected === 'stable'}>
                 <input type="radio" name="build" value="stable" bind:group={selected} />
                 <div class="option-body">
                     <div class="option-head">
-                        <span class="badge variant-filled-primary">{$_('instances.channel.stable')}</span>
+                        <span class="badge preset-filled-primary-500">{$_('instances.channel.stable')}</span>
                         <span>{latestTag ?? '—'}</span>
                     </div>
                     <p class="option-desc">{$_('instances.picker.stable_desc')}</p>
@@ -73,7 +85,7 @@
                         <input type="radio" name="build" value={index} bind:group={selected} />
                         <div class="option-body">
                             <div class="option-head">
-                                <span class="badge variant-filled-warning">{$_('instances.channel.experimental')}</span>
+                                <span class="badge preset-filled-warning-500">{$_('instances.channel.experimental')}</span>
                                 <span>{option.label}</span>
                             </div>
                             <p class="option-desc">
@@ -85,15 +97,15 @@
             {:else}
                 <div class="option-row opacity-50 cursor-not-allowed">
                     <input type="radio" disabled />
-                    <span class="badge variant-soft">{$_('instances.channel.experimental')}</span>
+                    <span class="badge preset-tonal">{$_('instances.channel.experimental')}</span>
                     <span class="flex-1">{$_('home.experimental.unavailable')}</span>
                 </div>
             {/if}
         {/if}
 
         <div class="flex gap-3 justify-end">
-            <button type="button" class="button-gray button-main" on:click={OnClose}>{$_('common.cancel')}</button>
-            <button type="button" class="button-green button-main" disabled={loading} on:click={Confirm}>
+            <button type="button" class="button-gray button-main" onclick={OnClose}>{$_('common.cancel')}</button>
+            <button type="button" class="button-green button-main" disabled={loading} onclick={Confirm}>
                 <i class="fa-solid fa-download"></i> {$_('instances.picker.install')}
             </button>
         </div>
@@ -125,8 +137,8 @@
         cursor: pointer;
     }
     .option-row.selected {
-        border-color: rgba(var(--color-primary-500) / 1);
-        background: rgba(var(--color-primary-500) / 0.1);
+        border-color: var(--color-primary-500);
+        background: color-mix(in oklab, var(--color-primary-500) 10%, transparent);
     }
     .option-body {
         display: flex;

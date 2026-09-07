@@ -4,8 +4,7 @@
     import "../lite-yt-embed.js";
 
     import { onMount, setContext } from 'svelte';
-    import { autoModeWatcher, getToastStore } from '@skeletonlabs/skeleton';
-    import { initializeStores, Toast } from '@skeletonlabs/skeleton';
+    import { Toast } from '@skeletonlabs/skeleton-svelte';
     import { download } from "@tauri-apps/plugin-upload";
     import { readTextFile } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
@@ -15,41 +14,30 @@
     import { get } from 'svelte/store';
 
     import { GetPreferencesPath } from '$lib/utils/path.js';
+    import { toaster } from '$lib/utils/toaster.js';
+    /**
+     * @typedef {Object} Props
+     * @property {import('svelte').Snippet} [children]
+     */
+
+    /** @type {Props} */
+    let { children } = $props();
 
     setupI18n();
 
-    initializeStores();
-
-    const toastStore = getToastStore();
-
     const TriggerError = (msg) => {
         console.error(msg);
-        const t = {
-            message: msg,
-            timeout: 4000,
-            background: 'variant-filled-error',
-        };
-        toastStore.trigger(t);
+        toaster.error({ description: msg, duration: 4000 });
     };
 
     const TriggerWarning = (msg) => {
         console.warn(msg);
-        const t = {
-            message: msg,
-            timeout: 4000,
-            background: 'variant-filled-warning',
-        };
-        toastStore.trigger(t);
+        toaster.warning({ description: msg, duration: 4000 });
     };
 
     const TriggerSuccess = (msg) => {
         console.log(msg);
-        const t = {
-            message: msg,
-            timeout: 4000,
-            background: 'variant-filled-success',
-        };
-        toastStore.trigger(t);
+        toaster.success({ description: msg, duration: 4000 });
     };
 
     const wait = (ms) => {
@@ -77,8 +65,6 @@
     setContext('toast', { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, wait });
 
     onMount(async () => {
-        autoModeWatcher();
-
         // Restore persisted locale
         try {
             const prefsDir = await GetPreferencesPath();
@@ -92,7 +78,19 @@
     })
 </script>
 
-<Toast />
+<Toast.Group {toaster}>
+    {#snippet children(toast)}
+        <Toast {toast}>
+            <Toast.Message>
+                {#if toast.title}<Toast.Title>{toast.title}</Toast.Title>{/if}
+                <!-- Messages are app translations that carry markup (<br>, <b>), which the
+                     Skeleton v2 toast used to render as HTML -->
+                <Toast.Description>{@html toast.description}</Toast.Description>
+            </Toast.Message>
+            <Toast.CloseTrigger />
+        </Toast>
+    {/snippet}
+</Toast.Group>
 {#if !$isLoading}
-<slot></slot>
+{@render children?.()}
 {/if}

@@ -1,15 +1,27 @@
 <script>
-    export let color1 = "rgb(255, 133, 62)";
-    export let color2 = "rgb(255, 102, 42)";
-    export let OnClick = () => {};
-    export let text = "";
-    export let textColor = "";
+    /**
+     * @typedef {Object} Props
+     * @property {string} [color1]
+     * @property {string} [color2]
+     * @property {any} [OnClick]
+     * @property {string} [text]
+     * @property {string} [textColor]
+     */
+
+    /** @type {Props} */
+    let {
+        color1 = "rgb(255, 133, 62)",
+        color2 = "rgb(255, 102, 42)",
+        OnClick = () => {},
+        text = "",
+        textColor = ""
+    } = $props();
 </script>
 
 
 <button type="button"
     class="button"
-    on:click={OnClick}
+    onclick={OnClick}
     style="--color1: {color1}; --color2: {color2}; --textColor: {textColor}"
 >
     {text}

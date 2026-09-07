@@ -23,20 +23,14 @@
 
     const DB_NAME = 'Saves.db3';
 
-    let saves = [];
-    let currentVersion = null;
-    let loading = false;
-    let loadError = null;
-    let busy = false;
-    let loadedFor = null;
+    let saves = $state([]);
+    let currentVersion = $state(null);
+    let loading = $state(false);
+    let loadError = $state(null);
+    let busy = $state(false);
+    let loadedFor = null;   // bookkeeping only, never rendered
     let loadToken = 0; // guards against out-of-order reloads when switching instances
 
-    $: instance = $activeInstance;
-    // Reload the save DB whenever the active instance changes (refresh on the spot).
-    $: if (instance && loadedFor !== instance.id) {
-        loadedFor = instance.id;
-        Load(instance);
-    }
 
     const dbPath = (inst) => path.join(inst.path, DB_NAME);
 
@@ -285,6 +279,14 @@
             busy = false;
         }
     };
+    let instance = $derived($activeInstance);
+    // Reload the save DB whenever the active instance changes (refresh on the spot).
+    $effect(() => {
+        if (instance && loadedFor !== instance.id) {
+            loadedFor = instance.id;
+            Load(instance);
+        }
+    });
 </script>
 
 <section class="card w-full">
@@ -297,20 +299,20 @@
         <div class="flex gap-3 items-center flex-wrap">
             <span class="whitespace-nowrap"><b>{$_('saves.current_version')}</b></span>
             {#if loading}
-                <div class="placeholder animate-pulse flex-1 max-w-xs" />
+                <div class="placeholder animate-pulse flex-1 max-w-xs"></div>
             {:else if loadError}
                 <span class="text-red-500">{$_('saves.error.load')}</span>
             {:else if currentVersion}
-                <span class="badge variant-filled-primary">{currentVersion}</span>
+                <span class="badge preset-filled-primary-500">{currentVersion}</span>
             {:else}
                 <span class="opacity-70">{$_('saves.no_saves')}</span>
             {/if}
             <span class="flex-1"></span>
             <!-- Never disabled by `loading`: the tab must always be recoverable -->
-            <button type="button" class="button-blue button-main" disabled={busy} on:click={() => Load(instance)}>
+            <button type="button" class="button-blue button-main" disabled={busy} onclick={() => Load(instance)}>
                 <i class="fa-solid fa-rotate"></i> {$_('common.reload')}
             </button>
-            <button type="button" class="button-green button-main" disabled={busy} on:click={CreateSave}>
+            <button type="button" class="button-green button-main" disabled={busy} onclick={CreateSave}>
                 <i class="fa-solid fa-plus"></i> {$_('saves.create')}
             </button>
         </div>
@@ -320,7 +322,7 @@
         {/if}
 
         {#if !loading && saves.length > 0}
-        <div class="table-container">
+        <div class="table-wrap">
             <table class="table table-hover">
                 <thead>
                     <tr>
@@ -339,7 +341,7 @@
                                 value={entry.slot === null ? 'reserve' : String(entry.slot)}
                                 disabled={busy}
                                 title={$_('saves.rebind_hint')}
-                                on:change={(e) => Rebind(entry, e)}
+                                onchange={(e) => Rebind(entry, e)}
                             >
                                 <!-- Reserve is only a display state for reserve saves, never a
                                      target: the game needs all 5 slots to exist and stay unique -->
@@ -354,16 +356,16 @@
                         <td>{entry.name}</td>
                         <td class="uid-cell" title={entry.saveUid}>{entry.saveUid ? entry.saveUid.slice(0, 8) : '-'}</td>
                         <td class="text-right whitespace-nowrap">
-                            <button type="button" class="button-green button-main" disabled={busy} on:click={() => Export(entry)}>
+                            <button type="button" class="button-green button-main" disabled={busy} onclick={() => Export(entry)}>
                                 <i class="fa-solid fa-file-export"></i> {$_('saves.export')}
                             </button>
-                            <button type="button" class="button-blue button-main" disabled={busy} on:click={() => Import(entry)}>
+                            <button type="button" class="button-blue button-main" disabled={busy} onclick={() => Import(entry)}>
                                 <i class="fa-solid fa-file-import"></i> {$_('saves.import')}
                             </button>
                             <!-- Deleting is offered for reserve saves only: the game
                                  needs its 5 playable slots to stay filled -->
                             {#if entry.slot === null}
-                                <button type="button" class="button-red button-main" disabled={busy} title={$_('saves.delete')} aria-label={$_('saves.delete')} on:click={() => DeleteSave(entry)}>
+                                <button type="button" class="button-red button-main" disabled={busy} title={$_('saves.delete')} aria-label={$_('saves.delete')} onclick={() => DeleteSave(entry)}>
                                     <i class="fa-solid fa-xmark"></i>
                                 </button>
                             {/if}

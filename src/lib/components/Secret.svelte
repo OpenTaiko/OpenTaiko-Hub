@@ -1,4 +1,5 @@
 <script>
+    import { onMount } from 'svelte';
     import SecretButton from '$lib/components/SecretButton.svelte';
 
     const setColor = () => {
@@ -38,12 +39,27 @@
             downloadurl.click();
         }
     }
+
+    const onSubmit = (event) => {
+        event.preventDefault();
+        fetchSecret();
+    }
+
+    onMount(() => {
+        const images = document.getElementsByTagName("img");
+        for (let i = 0; i < images.length; i++) {
+            images[i].classList.add('no-drag');
+            images[i].setAttribute('no-drag', 'on');
+            images[i].setAttribute('draggable', 'false');
+            images[i].addEventListener('dragstart', (event) => event.preventDefault(), false);
+        }
+    });
 </script>
 
 <div class="content">
     <div class="collection">
-        <form onsubmit="event.preventDefault(); fetchSecret();">
-            <input type="text" id="secret" name="secret">
+        <form onsubmit={onSubmit}>
+            <input type="text" id="secret" name="secret" class="bg-white text-black">
         </form>
     <div style="width:fit-content;margin:auto;">
             <SecretButton
@@ -55,21 +71,6 @@
             />
         </div>
     </div>
-
-    <script>
-    function disableImgDragging() {
-        var images = document.getElementsByTagName("img");
-        for(var i = 0 ; i < images.length ; i++) {
-            images[i].classList.add('no-drag');
-            images[i].setAttribute('no-drag', 'on');
-            images[i].setAttribute('draggable', 'false');
-            images[i].addEventListener('dragstart', function( event ) {
-                event.preventDefault();
-            }, false);	
-        }
-    }
-    disableImgDragging();
-    </script>
 </div>
 
 <style>

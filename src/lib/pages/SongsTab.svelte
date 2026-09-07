@@ -1,7 +1,7 @@
 <script>
     // Dependencies
     import { onMount } from 'svelte';
-    import { ProgressBar } from '@skeletonlabs/skeleton';
+    import ProgressBar from '$lib/components/ProgressBar.svelte';
     import { mkdir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
     import { openPath } from '@tauri-apps/plugin-opener';
     import { fetch } from "@tauri-apps/plugin-http";
@@ -27,23 +27,23 @@
 
     // Soundtrack
     const soundtrackInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/soundtrack_info.json';
-    let soundtrackInfo = [];
-    let catalogFetchFailed = false;
-    let currentSongs = {};          // uniqueId → { chartMD5s: string[], chartRelativePath }
-    let allScannedSongs = [];       // every scanned song, catalog or custom
-    let scannedGenres = {};         // relPath → { title, boxDefSha1, preimageSha1 }
-    let scanStats = { dirs: 0, found: 0 };
-    let scanning = false;
-    let viewMode = 'list';          // 'list' | 'tree'
-    let searchSong = "";
-    let searchGenre = "";
+    let soundtrackInfo = $state([]);
+    let catalogFetchFailed = $state(false);
+    let currentSongs = $state({});          // uniqueId → { chartMD5s: string[], chartRelativePath }
+    let allScannedSongs = $state([]);       // every scanned song, catalog or custom
+    let scannedGenres = $state({});         // relPath → { title, boxDefSha1, preimageSha1 }
+    let scanStats = $state({ dirs: 0, found: 0 });
+    let scanning = $state(false);
+    let viewMode = $state('list');          // 'list' | 'tree'
+    let searchSong = $state("");
+    let searchGenre = $state("");
     let songPreviousSort = "none";
-    let songDLProgress = {};
+    let songDLProgress = $state({});
     let songCountProgress = 0;
-    let songCountProgressBar = null;
-    let bulkBusy = false;          // a bulk download is running
-    let activeSingleDownloads = 0;  // single-song downloads currently in flight (they run concurrently)
-    $: songBusy = activeSingleDownloads > 0;
+    let songCountProgressBar = $state(null);
+    let bulkBusy = $state(false);          // a bulk download is running
+    let activeSingleDownloads = $state(0);  // single-song downloads currently in flight (they run concurrently)
+    let songBusy = $derived(activeSingleDownloads > 0);
 
     // Git blob SHAs of the soundtrack repository (path → sha), fetched once per session
     // and used to detect outdated box.def / default.png files
@@ -51,16 +51,16 @@
     let remoteShaMapFetch = null;   // in-flight fetch, shared by downloads that start together
 
     // Songs found inside attached instances that can be moved to the shared library
-    let migrationCandidates = [];
-    let migrationCandidate = null;   // the instance whose migration modal is open
-    let migrationGlobalPath = null;
+    let migrationCandidates = $state([]);
+    let migrationCandidate = $state(null);   // the instance whose migration modal is open
+    let migrationGlobalPath = $state(null);
 
     // Chart-less folders in an instance that the shared library already provides: the
     // game reads both paths, so each one shows up as a duplicate, empty box
-    let duplicateCandidates = [];
-    let duplicateBusy = false;
+    let duplicateCandidates = $state([]);
+    let duplicateBusy = $state(false);
 
-    $: catalogById = new Map(Array.isArray(soundtrackInfo) ? soundtrackInfo.map((s) => [s.uniqueId, s]) : []);
+    let catalogById = $derived(new Map(Array.isArray(soundtrackInfo) ? soundtrackInfo.map((s) => [s.uniqueId, s]) : []));
 
     // Hall of Fame
     const hofDbUrl = 'https://opentaiko.github.io/hof.db3';
@@ -69,14 +69,14 @@
     const hofDiffShortMap     = { "Easy": "EZ", "Normal": "NM", "Hard": "HD", "Oni": "EX", "Edit": "EXEX" };
     let hofDb = null;
     // uniqueId → { difficultyString → globalRank }
-    let hofMap = {};
+    let hofMap = $state({});
 
     // Modal state
-    let hofModalOpen = false;
-    let hofModalSongInfo = null;
-    let hofModalDifficulty = null;
-    let hofModalScores = [];
-    let hofModalMaxListPoints = 0;
+    let hofModalOpen = $state(false);
+    let hofModalSongInfo = $state(null);
+    let hofModalDifficulty = $state(null);
+    let hofModalScores = $state([]);
+    let hofModalMaxListPoints = $state(0);
 
     // Max list points decay per rank, matching the website: 0.95 up to rank 20, then
     // 0.96 up to rank 50, then 0.98, so the drop flattens out for later ranks. The
@@ -383,18 +383,18 @@
     }
 
 
-    $: GetFilteredSInfo = (SInfo) => {
+    let GetFilteredSInfo = $derived((SInfo) => {
         const bInNameFilter = SInfo.chartTitle.toLowerCase().includes(searchSong.toLowerCase()) || SInfo.chartSubtitle?.toLowerCase().includes(searchSong.toLowerCase());
         const bInGenreFilter = SInfo.tjaGenreFolder.toLowerCase().includes(searchGenre.toLowerCase());
 
         return bInGenreFilter && bInNameFilter;
-    }
+    })
 
     // Reactive so status cells re-render as scan results stream in
-    $: IsSongUpToDate = (SInfo) => {
+    let IsSongUpToDate = $derived((SInfo) => {
         const localSong = currentSongs[SInfo.uniqueId];
         return !!localSong && (localSong.chartMD5s ?? []).includes(SInfo.tjaMD5);
-    }
+    })
 
     const GetFilteredAvailableSInfo = (SInfo) => {
         return !IsSongUpToDate(SInfo) && GetFilteredSInfo(SInfo);
@@ -708,8 +708,8 @@
 
     // Artists info
     const artistsDbUrl = 'https://opentaiko.github.io/artists_info.db3';
-    let songArtistsMap = {}; // songUid → { artists: ArtistObj[], link }
-    let expandedSongUid = null;
+    let songArtistsMap = $state({}); // songUid → { artists: ArtistObj[], link }
+    let expandedSongUid = $state(null);
 
     const updateArtistInfo = async () => {
         let db = null;
@@ -760,7 +760,7 @@
 <aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
 	<i class="fa-solid fa-triangle-exclamation text-red-500"></i>
 	<span class="flex-1"><b>{$_('common.fetch_error')}</b></span>
-	<button type="button" class="button-red button-main" on:click={updateSoundtrackInfo}>
+	<button type="button" class="button-red button-main" onclick={updateSoundtrackInfo}>
 		<i class="fa-solid fa-rotate"></i> {$_('common.retry')}
 	</button>
 </aside>
@@ -774,10 +774,10 @@
 		<br />
 		<span class="text-sm opacity-70">{candidate.folders.map((f) => f.relPath).join(', ')}</span>
 	</span>
-	<button type="button" class="button-green button-main" disabled={duplicateBusy} on:click={() => CleanDuplicates(candidate)}>
+	<button type="button" class="button-green button-main" disabled={duplicateBusy} onclick={() => CleanDuplicates(candidate)}>
 		<i class="fa-solid fa-broom"></i> {$_('songs.duplicates.button')}
 	</button>
-	<button type="button" class="button-gray button-main" on:click={() => duplicateCandidates = duplicateCandidates.filter((c) => c !== candidate)}>
+	<button type="button" class="button-gray button-main" onclick={() => duplicateCandidates = duplicateCandidates.filter((c) => c !== candidate)}>
 		{$_('songs.migrate.later')}
 	</button>
 </aside>
@@ -787,16 +787,16 @@
 <aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
 	<i class="fa-solid fa-boxes-packing"></i>
 	<span class="flex-1">{$_('songs.migrate.banner', { values: { count: candidate.count, instance: candidate.instance.name } })}</span>
-	<button type="button" class="button-green button-main" disabled={scanning || bulkBusy || songBusy || migrationCandidate !== null} on:click={() => OpenMigration(candidate)}>
+	<button type="button" class="button-green button-main" disabled={scanning || bulkBusy || songBusy || migrationCandidate !== null} onclick={() => OpenMigration(candidate)}>
 		<i class="fa-solid fa-right-left"></i> {$_('songs.migrate.button')}
 	</button>
-	<button type="button" class="button-gray button-main" on:click={() => migrationCandidates = migrationCandidates.filter((c) => c !== candidate)}>
+	<button type="button" class="button-gray button-main" onclick={() => migrationCandidates = migrationCandidates.filter((c) => c !== candidate)}>
 		{$_('songs.migrate.later')}
 	</button>
 </aside>
 {/each}
 
-<div class="card bg-surface-100-800-token p-3 mb-2 flex items-center gap-3 flex-wrap">
+<div class="card bg-surface-100-800 p-3 mb-2 flex items-center gap-3 flex-wrap">
 	{#if scanning}
 		<div class="flex-1 flex items-center gap-3 min-w-[16rem]">
 			<ProgressBar />
@@ -804,14 +804,14 @@
 		</div>
 	{:else}
 		<span class="text-sm">{$_('songs.scan.done', { values: { count: allScannedSongs.length } })}</span>
-		<button type="button" class="button-blue button-main" on:click={crawlSongs}><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
-		<button type="button" class="button-blue button-main" on:click={OpenSongsFolder}><i class="fa-solid fa-folder-open"></i> {$_('songs.button.open_folder')}</button>
+		<button type="button" class="button-blue button-main" onclick={crawlSongs}><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
+		<button type="button" class="button-blue button-main" onclick={OpenSongsFolder}><i class="fa-solid fa-folder-open"></i> {$_('songs.button.open_folder')}</button>
 		<span class="flex-1"></span>
 	{/if}
-	<button type="button" class="button-{viewMode === 'list' ? 'gray' : 'blue'} button-main" on:click={() => viewMode = 'list'}>
+	<button type="button" class="button-{viewMode === 'list' ? 'gray' : 'blue'} button-main" onclick={() => viewMode = 'list'}>
 		<i class="fa-solid fa-list"></i> {$_('songs.view.list')}
 	</button>
-	<button type="button" class="button-{viewMode === 'tree' ? 'gray' : 'blue'} button-main" on:click={() => viewMode = 'tree'}>
+	<button type="button" class="button-{viewMode === 'tree' ? 'gray' : 'blue'} button-main" onclick={() => viewMode = 'tree'}>
 		<i class="fa-solid fa-folder-tree"></i> {$_('songs.view.tree')}
 	</button>
 </div>
@@ -819,30 +819,30 @@
 {#if viewMode === 'tree'}
 <SongTree Songs={allScannedSongs} Genres={scannedGenres} CatalogById={catalogById} />
 {:else}
-<div class="table-container text-token">
+<div class="table-wrap">
 	<table class="table table-hover">
 		<thead>
 			<tr>
-				<th><button on:click={() => SortSongsByColumn("name")}>{$_('songs.col.name')}</button></th>
-				<th><button on:click={() => SortSongsByColumn("genre")}>{$_('songs.col.folder')}</button></th>
+				<th><button onclick={() => SortSongsByColumn("name")}>{$_('songs.col.name')}</button></th>
+				<th><button onclick={() => SortSongsByColumn("genre")}>{$_('songs.col.folder')}</button></th>
 				<th colspan="5" class="w-1/5">{$_('songs.col.difficulties')}</th>
-				<th><button on:click={() => SortSongsByColumn("size")}>{$_('songs.col.size')}</button></th>
+				<th><button onclick={() => SortSongsByColumn("size")}>{$_('songs.col.size')}</button></th>
 				<th class="w-1/6">{$_('songs.col.status')}</th>
 			</tr>
 			<tr>
-				<th><input class="w-full rounded-md px-3 py-2 text-blue-950" placeholder={$_('songs.filter.song')} bind:value={searchSong}></th>
-				<th><input class="w-full rounded-md px-3 py-2 text-blue-950" placeholder={$_('songs.filter.folder')} bind:value={searchGenre}></th>
-				<th><button on:click={() => SortSongsByColumn("ez")}>EZ</button></th>
-				<th><button on:click={() => SortSongsByColumn("nm")}>NM</button></th>
-				<th><button on:click={() => SortSongsByColumn("hd")}>HD</button></th>
-				<th><button on:click={() => SortSongsByColumn("ex")}>EX</button></th>
-				<th><button on:click={() => SortSongsByColumn("exex")}>EXEX</button></th>
+				<th><input class="w-full rounded-md px-3 py-2 bg-white text-blue-950" placeholder={$_('songs.filter.song')} bind:value={searchSong}></th>
+				<th><input class="w-full rounded-md px-3 py-2 bg-white text-blue-950" placeholder={$_('songs.filter.folder')} bind:value={searchGenre}></th>
+				<th><button onclick={() => SortSongsByColumn("ez")}>EZ</button></th>
+				<th><button onclick={() => SortSongsByColumn("nm")}>NM</button></th>
+				<th><button onclick={() => SortSongsByColumn("hd")}>HD</button></th>
+				<th><button onclick={() => SortSongsByColumn("ex")}>EX</button></th>
+				<th><button onclick={() => SortSongsByColumn("exex")}>EXEX</button></th>
 				<th></th>
 				<th>
 					{#if songCountProgressBar !== null}
-					<ProgressBar bind:value={songCountProgressBar} max={100} />
+					<ProgressBar value={songCountProgressBar} max={100} />
 					{:else}
-					<button type="button" disabled={bulkBusy || songBusy} on:click={DownloadDisplayedSongs} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.bulk_download')}</button>
+					<button type="button" disabled={bulkBusy || songBusy} onclick={DownloadDisplayedSongs} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.bulk_download')}</button>
 					{/if}
 				</th>
 			</tr>
@@ -853,7 +853,7 @@
 			<tr class:row-expanded={expandedSongUid === songInfo.uniqueId}>
 				<td>
 					<div class="flex items-center gap-2">
-						<button class="expand-btn" on:click={() => toggleExpand(songInfo.uniqueId)} aria-label="expand">
+						<button class="expand-btn" onclick={() => toggleExpand(songInfo.uniqueId)} aria-label="expand">
 							<i class="fa-solid fa-chevron-{expandedSongUid === songInfo.uniqueId ? 'down' : 'right'}"></i>
 						</button>
 						<div class="flex-1"><AudioPlayer {songInfo} /></div>
@@ -896,9 +896,9 @@
 					<p>{$_('songs.status.not_downloaded')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy} on:click={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
+					<button type="button" disabled={bulkBusy} onclick={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
 					{:else}
-					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
+					<ProgressBar value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
 				</td>
 				{:else if IsSongUpToDate(songInfo)}
@@ -906,9 +906,9 @@
 					<p>{$_('songs.status.up_to_date')}</p>
                     <br />
                     {#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
+					<button type="button" disabled={bulkBusy} onclick={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
 					{:else}
-					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
+					<ProgressBar value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
 				</td>
 				{:else}
@@ -916,9 +916,9 @@
 					<p>{$_('songs.status.outdated')}</p>
 					<br />
 					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy} on:click={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
+					<button type="button" disabled={bulkBusy} onclick={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
 					{:else}
-					<ProgressBar bind:value={songDLProgress[songInfo.uniqueId]} max={100} />
+					<ProgressBar value={songDLProgress[songInfo.uniqueId]} max={100} />
 					{/if}
 				</td>
 				{/if}
@@ -974,13 +974,13 @@
 {/if}
 
 {#if hofModalOpen && hofModalSongInfo}
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-<div class="modal-backdrop" on:click={() => hofModalOpen = false}>
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="card p-6 space-y-4 modal-card" on:click|stopPropagation>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div class="modal-backdrop" onclick={() => hofModalOpen = false}>
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
         <div class="flex justify-between items-center">
             <h2 class="h3">Hall of Fame — {hofModalSongInfo.chartTitle} ({hofDiffShortMap[hofModalDifficulty]} #{hofMap[hofModalSongInfo.uniqueId]?.[hofModalDifficulty]})</h2>
-            <button class="btn-icon btn-icon-sm variant-filled" on:click={() => hofModalOpen = false} aria-label={$_('hof.close')}>✕</button>
+            <button class="btn-icon btn-icon-sm preset-filled" onclick={() => hofModalOpen = false} aria-label={$_('hof.close')}>✕</button>
         </div>
         <div class="flex flex-col gap-1">
             <a href="https://opentaiko.github.io/songinfo/{hofModalSongInfo.uniqueId}?d={hofDifficultyRevMap[hofModalDifficulty]}" target="_blank" class="text-blue-600 underline">
@@ -991,7 +991,7 @@
         {#if hofModalScores.length === 0}
             <p>{$_('hof.no_scores')}</p>
         {:else}
-        <div class="table-container">
+        <div class="table-wrap">
             <table class="table table-hover">
                 <thead>
                     <tr>

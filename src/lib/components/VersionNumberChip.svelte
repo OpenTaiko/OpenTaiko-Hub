@@ -1,9 +1,15 @@
 <script>
     import { _ } from 'svelte-i18n';
 
-    export let LatestVersion = "Unknown";
-    export let CurrentVersion = "Unknown";
-    export let Strictness = "Error";
+    /**
+     * @typedef {Object} Props
+     * @property {string} [LatestVersion]
+     * @property {string} [CurrentVersion]
+     * @property {string} [Strictness]
+     */
+
+    /** @type {Props} */
+    let { LatestVersion = "Unknown", CurrentVersion = "Unknown", Strictness = "Error" } = $props();
 
     const checkSkinCompatibility = (version1, version2) => {
         const regex = /^\d+\.\d+\.\d+\.\d+$/; // Match versions in the form <main>.<major>.<minor>.<patch>

@@ -1,11 +1,9 @@
 import adapter from '@sveltejs/adapter-static' // change l' adaptateur depuis adapter-auto
-import preprocess from 'svelte-preprocess'
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
-  // Consulter https://github.com/sveltejs/svelte-preprocess
-  // pour plus d'informations sur le préprocesseur
-  preprocess: preprocess(),
+  preprocess: vitePreprocess(),
 
   kit: {
     adapter: adapter(),

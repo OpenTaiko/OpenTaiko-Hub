@@ -1,14 +1,22 @@
 <script>
+    // A component may import itself for recursion (replaces <svelte:self>)
+    import SongTreeNode from './SongTreeNode.svelte';
     import { _ } from 'svelte-i18n';
 
-    export let Node;
-    export let CatalogById = new Map();
-    export let Depth = 0;
+    /**
+     * @typedef {Object} Props
+     * @property {any} Node
+     * @property {any} [CatalogById]
+     * @property {number} [Depth]
+     */
 
-    let open = Depth < 1;
+    /** @type {Props} */
+    let { Node, CatalogById = new Map(), Depth = 0 } = $props();
 
-    $: folders = [...Node.children.values()].sort((a, b) => a.name.localeCompare(b.name));
-    $: songs = [...Node.songs].sort((a, b) => SongLabel(a).localeCompare(SongLabel(b)));
+    // Depth only seeds the initial state: folders start expanded at the top level
+    // svelte-ignore state_referenced_locally
+    let open = $state(Depth < 1);
+
 
     const DIFF_ORDER = ['Easy', 'Normal', 'Hard', 'Oni', 'Edit', 'Tower', 'Dan'];
     const DIFF_ABBR = { Easy: 'EZ', Normal: 'NM', Hard: 'HD', Oni: 'EX', Edit: 'EXEX', Tower: 'Tower', Dan: 'Dan' };
@@ -42,22 +50,24 @@
         if (level >= 10 && level - base >= 0.5) return `${base}+`;
         return `${base}`;
     };
+    let folders = $derived([...Node.children.values()].sort((a, b) => a.name.localeCompare(b.name)));
+    let songs = $derived([...Node.songs].sort((a, b) => SongLabel(a).localeCompare(SongLabel(b))));
 </script>
 
 <div class="tree-node">
-    <button type="button" class="tree-row tree-folder" on:click={() => open = !open}>
+    <button type="button" class="tree-row tree-folder" onclick={() => open = !open}>
         <i class="fa-solid fa-chevron-right chevron" class:open></i>
         <i class="fa-solid {open ? 'fa-folder-open' : 'fa-folder'} folder-icon"></i>
         <span class="folder-name">{Node.title ?? Node.name}</span>
         {#if Node.title && Node.title !== Node.name}
             <span class="folder-alt">({Node.name})</span>
         {/if}
-        <span class="badge variant-soft song-count">{$_('songs.tree.songs_count', { values: { count: Node.count } })}</span>
+        <span class="badge preset-tonal song-count">{$_('songs.tree.songs_count', { values: { count: Node.count } })}</span>
     </button>
     {#if open}
         <div class="tree-children">
             {#each folders as child (child.name)}
-                <svelte:self Node={child} {CatalogById} Depth={Depth + 1} />
+                <SongTreeNode Node={child} {CatalogById} Depth={Depth + 1} />
             {/each}
             {#each songs as song (song.relPath)}
                 {@const status = SongStatus(song)}
@@ -65,14 +75,14 @@
                     <i class="fa-solid fa-music song-icon"></i>
                     <span class="song-title">{SongLabel(song)}</span>
                     {#if IsCatalog(song)}
-                        <span class="badge variant-soft-primary source-chip">{$_('songs.tree.soundtrack')}</span>
+                        <span class="badge preset-tonal-primary source-chip">{$_('songs.tree.soundtrack')}</span>
                         {#if status === 'up_to_date'}
-                            <span class="badge variant-soft-success">{$_('songs.status.up_to_date')}</span>
+                            <span class="badge preset-tonal-success">{$_('songs.status.up_to_date')}</span>
                         {:else}
-                            <span class="badge variant-soft-warning">{$_('songs.status.outdated')}</span>
+                            <span class="badge preset-tonal-warning">{$_('songs.status.outdated')}</span>
                         {/if}
                     {:else}
-                        <span class="badge variant-soft-secondary source-chip">{$_('songs.tree.custom')}</span>
+                        <span class="badge preset-tonal-secondary source-chip">{$_('songs.tree.custom')}</span>
                     {/if}
                     <span class="diffs">
                         {#each DiffList(song) as diff (diff.course)}
@@ -148,7 +158,7 @@
         background: rgba(128, 128, 128, 0.35);
     }
     /* No connector tick for top-level rows (they have no rail to attach to) */
-    :global(.tree-root > .tree-node) > .tree-row::before {
+    :global(.tree-root) > .tree-node > .tree-row::before {
         display: none;
     }
     .tree-song {

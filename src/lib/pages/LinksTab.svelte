@@ -29,8 +29,11 @@
 </div>
 
 <style>
+    /* Tailwind 4 compiles component styles in isolation: pull in the app theme for @apply */
+    @reference "../../app.css";
+
     ul {list-style-type: circle;}
-    .content {@apply card w-full bg-surface-100-800-token p-4;}
+    .content {@apply card w-full bg-surface-100-800 p-4;}
     .container {
         display: flex;
         align-items:center;

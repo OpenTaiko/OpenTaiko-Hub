@@ -1,6 +1,7 @@
 <script>
-    import { afterUpdate, getContext } from 'svelte';
-    import { ProgressBar, TabGroup, Tab } from '@skeletonlabs/skeleton';
+    import { getContext } from 'svelte';
+    import { Tabs } from '@skeletonlabs/skeleton-svelte';
+    import ProgressBar from '$lib/components/ProgressBar.svelte';
     import { writeTextFile, mkdir, exists, remove } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
     import { invoke, Channel } from '@tauri-apps/api/core';
@@ -39,58 +40,66 @@
     // Images
     import optkLogoUrl from '$lib/optk.png';
 
-    let optk_OS = 'Win';
+    let optk_OS = $state('Win');
     GetOS().then((os) => optk_OS = os);
 
     // Sub-tabs: 0 Overview, 1 Skins, 2 Characters, 3 Puchicharas, 4 Docs
-    let homeSubTab = 0;
+    let homeSubTab = $state(0);
 
     // Latest stable release
-    let latestVersion = null;
+    let latestVersion = $state(null);
     let latestRelease = null;
-    let latestLoading = true;
-    let latestVersionErrorFound = false;
+    let latestLoading = $state(true);
+    let latestVersionErrorFound = $state(false);
 
     // Active instance state
-    let versionLoading = false;
-    let versionLoadedFor = null;
-    let indevLatestSha = null;
+    let versionLoading = $state(false);
+    let versionLoadedFor = null;       // bookkeeping only, never rendered
+    let indevLatestSha = $state(null);
 
     // Download / build state
-    let downloadBusy = false;
-    let progress = 0;
-    let buildStage = null;
-    let buildLog = [];
-    let buildLogElement = null;
+    let downloadBusy = $state(false);
+    let progress = $state(0);
+    let buildStage = $state(null);
+    let buildLog = $state([]);
+    let buildLogElement = $state(null);
 
     // Build picker
-    let showBuildPicker = false;
+    let showBuildPicker = $state(false);
 
-    $: current = $activeInstance;
-    $: currentVersion = current ? ($instanceVersions[current.id] ?? null) : null;
-    $: isIndev = current?.channel === 'experimental' && current?.experimental?.kind === 'indev';
-    $: isPrerelease = current?.channel === 'experimental' && current?.experimental?.kind === 'prerelease';
-    $: indevUpdateAvailable = isIndev && indevLatestSha !== null && indevLatestSha !== current?.experimental?.sha;
+    let current = $derived($activeInstance);
+    let currentVersion = $derived(current ? ($instanceVersions[current.id] ?? null) : null);
+    let isIndev = $derived(current?.channel === 'experimental' && current?.experimental?.kind === 'indev');
+    let isPrerelease = $derived(current?.channel === 'experimental' && current?.experimental?.kind === 'prerelease');
+    let indevUpdateAvailable = $derived(isIndev && indevLatestSha !== null && indevLatestSha !== current?.experimental?.sha);
 
     // Sub-tab availability
-    $: assetsAvailable = current !== null && current.channel !== 'experimental' && currentVersion !== null;
-    $: docsAvailable = current !== null && isVersionAtLeast(currentVersion, '0.6.1');
-    $: savesAvailable = current !== null && currentVersion !== null; // any installed build has saves
-    $: if ((homeSubTab >= 1 && homeSubTab <= 3 && !assetsAvailable) || (homeSubTab === 4 && !docsAvailable) || (homeSubTab === 5 && !savesAvailable)) homeSubTab = 0;
+    let assetsAvailable = $derived(current !== null && current.channel !== 'experimental' && currentVersion !== null);
+    let docsAvailable = $derived(current !== null && isVersionAtLeast(currentVersion, '0.6.1'));
+    let savesAvailable = $derived(current !== null && currentVersion !== null); // any installed build has saves
+    $effect(() => {
+        if ((homeSubTab >= 1 && homeSubTab <= 3 && !assetsAvailable) || (homeSubTab === 4 && !docsAvailable) || (homeSubTab === 5 && !savesAvailable)) homeSubTab = 0;
+    });
 
-    $: if (current && versionLoadedFor !== current.id) {
-        versionLoadedFor = current.id;
-        LoadInstanceState();
-    }
+    $effect(() => {
+        if (current && versionLoadedFor !== current.id) {
+            versionLoadedFor = current.id;
+            LoadInstanceState();
+        }
+    });
 
     // An instance created through the build picker carries its chosen build; start it
-    let pendingStartedFor = null;
-    $: if (current?.pendingInstall && !downloadBusy && pendingStartedFor !== current.id) {
-        pendingStartedFor = current.id;
-        StartPendingInstall(current);
-    }
+    let pendingStartedFor = null;      // bookkeeping only, never rendered
+    $effect(() => {
+        if (current?.pendingInstall && !downloadBusy && pendingStartedFor !== current.id) {
+            pendingStartedFor = current.id;
+            StartPendingInstall(current);
+        }
+    });
 
-    afterUpdate(() => {
+    // Keep the build log scrolled to its newest line as output streams in
+    $effect(() => {
+        void buildLog.length;
         if (buildLogElement) buildLogElement.scrollTop = buildLogElement.scrollHeight;
     });
 
@@ -448,46 +457,40 @@
     TryFetchingLatestVersion();
 </script>
 
-<TabGroup
-    justify="justify-center"
-    active="variant-filled-primary"
-    hover="hover:variant-soft-primary"
-    flex="flex-1 lg:flex-none"
-    rounded=""
-    border=""
-    class="bg-surface-100-800-token w-full"
-    >
-    <Tab bind:group={homeSubTab} name="home-tab-overview" value={0}>
-        <svelte:fragment slot="lead"><i class="fa-solid fa-house"></i></svelte:fragment>
-        <span>{$_('home.tab.overview')}</span>
-    </Tab>
-    {#if assetsAvailable}
-    <Tab bind:group={homeSubTab} name="home-tab-skins" value={1}>
-        <svelte:fragment slot="lead"><i class="fa-solid fa-palette"></i></svelte:fragment>
-        <span>{$_('assets.tab.skins')}</span>
-    </Tab>
-    <Tab bind:group={homeSubTab} name="home-tab-characters" value={2}>
-        <svelte:fragment slot="lead"><i class="fa-solid fa-user"></i></svelte:fragment>
-        <span>{$_('assets.tab.characters')}</span>
-    </Tab>
-    <Tab bind:group={homeSubTab} name="home-tab-puchicharas" value={3}>
-        <svelte:fragment slot="lead"><i class="fa-solid fa-circle-half-stroke"></i></svelte:fragment>
-        <span>{$_('assets.tab.puchicharas')}</span>
-    </Tab>
-    {/if}
-    {#if docsAvailable}
-    <Tab bind:group={homeSubTab} name="home-tab-docs" value={4}>
-        <svelte:fragment slot="lead"><i class="fa-solid fa-book"></i></svelte:fragment>
-        <span>{$_('docs.title')}</span>
-    </Tab>
-    {/if}
-    {#if savesAvailable}
-    <Tab bind:group={homeSubTab} name="home-tab-saves" value={5}>
-        <svelte:fragment slot="lead"><i class="fa-solid fa-floppy-disk"></i></svelte:fragment>
-        <span>{$_('saves.tab')}</span>
-    </Tab>
-    {/if}
-</TabGroup>
+<Tabs value={String(homeSubTab)} onValueChange={(details) => homeSubTab = Number(details.value)} class="tab-bar w-full">
+    <Tabs.List class="justify-center">
+        <Tabs.Trigger value="0">
+            <i class="fa-solid fa-house"></i>
+            <span>{$_('home.tab.overview')}</span>
+        </Tabs.Trigger>
+        {#if assetsAvailable}
+        <Tabs.Trigger value="1">
+            <i class="fa-solid fa-palette"></i>
+            <span>{$_('assets.tab.skins')}</span>
+        </Tabs.Trigger>
+        <Tabs.Trigger value="2">
+            <i class="fa-solid fa-user"></i>
+            <span>{$_('assets.tab.characters')}</span>
+        </Tabs.Trigger>
+        <Tabs.Trigger value="3">
+            <i class="fa-solid fa-circle-half-stroke"></i>
+            <span>{$_('assets.tab.puchicharas')}</span>
+        </Tabs.Trigger>
+        {/if}
+        {#if docsAvailable}
+        <Tabs.Trigger value="4">
+            <i class="fa-solid fa-book"></i>
+            <span>{$_('docs.title')}</span>
+        </Tabs.Trigger>
+        {/if}
+        {#if savesAvailable}
+        <Tabs.Trigger value="5">
+            <i class="fa-solid fa-floppy-disk"></i>
+            <span>{$_('saves.tab')}</span>
+        </Tabs.Trigger>
+        {/if}
+    </Tabs.List>
+</Tabs>
 
 <!-- Overview (bottom padding keeps content scrollable above the fixed Hub-version footer) -->
 <div class="pb-24" style:display={homeSubTab === 0 ? null : 'none'}>
@@ -503,13 +506,13 @@
                 <div class="flex gap-4 flex-wrap items-center">
                     <span class="nowrap"><b>{$_('home.label.current_version')}</b></span>
                     {#if versionLoading}
-                        <div class="placeholder animate-pulse flex-1" />
+                        <div class="placeholder animate-pulse flex-1"></div>
                     {:else if downloadBusy === true}
                         <div class="progressbar">
                             {#if buildStage}
                                 <p class="text-sm mb-1"><i class="fa-solid fa-flask"></i> {$_(`home.experimental.stage.${buildStage}`)}</p>
                             {/if}
-                            <ProgressBar bind:value={progress} max={100} />
+                            <ProgressBar value={progress} max={100} />
                         </div>
                     {:else}
                         {#if currentVersion}
@@ -524,30 +527,30 @@
                         {:else}
                             <span>{$_('home.label.no_version_found')}</span>
                         {/if}
-                        <button type="button" on:click={LoadInstanceState} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.reload')}</button>
+                        <button type="button" onclick={LoadInstanceState} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.reload')}</button>
 
                         {#if !currentVersion}
                             <!-- Empty instance: pick which build to install -->
-                            <button type="button" on:click={() => showBuildPicker = true} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.install')}</button>
+                            <button type="button" onclick={() => showBuildPicker = true} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.install')}</button>
                         {:else if isIndev}
-                            <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
+                            <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
                             {#if indevUpdateAvailable}
-                                <button type="button" on:click={() => DownloadIndev(current.experimental)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
+                                <button type="button" onclick={() => DownloadIndev(current.experimental)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
                             {:else}
-                                <button type="button" on:click={() => DownloadIndev(current.experimental)} class="button-gray button-main"><i class="fa-solid fa-hammer"></i> {$_('home.button.rebuild')}</button>
+                                <button type="button" onclick={() => DownloadIndev(current.experimental)} class="button-gray button-main"><i class="fa-solid fa-hammer"></i> {$_('home.button.rebuild')}</button>
                             {/if}
                         {:else if isPrerelease}
-                            <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
-                            <button type="button" on:click={() => showBuildPicker = true} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
+                            <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
+                            <button type="button" onclick={() => showBuildPicker = true} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
                         {:else if latestVersion !== null && latestVersion !== currentVersion}
-                            <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
-                            <button type="button" on:click={DownloadStable} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
+                            <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
+                            <button type="button" onclick={DownloadStable} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
                             {#if checkSkinCompatibility(latestVersion, currentVersion) === false}
                                 <span class="text-red-500">{$_('home.warn.skin_update')}</span>
                             {/if}
                         {:else}
-                            <button type="button" on:click={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
-                            <button type="button" on:click={DownloadStable} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
+                            <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
+                            <button type="button" onclick={DownloadStable} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
                         {/if}
                     {/if}
                 </div>
@@ -558,7 +561,7 @@
                     {#if isIndev}
                         <span class="nowrap"><b>{$_('home.label.latest_experimental')}</b></span>
                         {#if indevLatestSha === null}
-                            <div class="placeholder animate-pulse flex-1" />
+                            <div class="placeholder animate-pulse flex-1"></div>
                         {:else}
                             <span>{current.experimental?.label} @{indevLatestSha.slice(0, 7)}</span>
                             {#if indevUpdateAvailable}
@@ -566,18 +569,18 @@
                             {:else}
                                 <span class="opacity-70">{$_('home.experimental.up_to_date')}</span>
                             {/if}
-                            <button type="button" on:click={CheckIndevUpdate} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
+                            <button type="button" onclick={CheckIndevUpdate} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
                         {/if}
                     {:else}
                         <span class="nowrap"><b>{$_('home.label.latest_version')}</b></span>
                         {#if latestVersionErrorFound === true}
                             <span class="fetch-error"><b>{$_('common.fetch_error')}</b></span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="button-red button-main"><i class="fa-solid fa-triangle-exclamation"></i> {$_('home.button.retry')}</button>
+                            <button type="button" onclick={TryFetchingLatestVersion} class="button-red button-main"><i class="fa-solid fa-triangle-exclamation"></i> {$_('home.button.retry')}</button>
                         {:else if latestLoading}
-                            <div class="placeholder animate-pulse flex-1" />
+                            <div class="placeholder animate-pulse flex-1"></div>
                         {:else}
                             <span>{latestVersion}</span>
-                            <button type="button" on:click={TryFetchingLatestVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
+                            <button type="button" onclick={TryFetchingLatestVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
                         {/if}
                     {/if}
                 </div>

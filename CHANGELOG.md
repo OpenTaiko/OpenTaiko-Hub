@@ -3,6 +3,11 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.2.4] - 2026-09-07 (Alpha)
+
+- [Chore] Upgraded to Svelte 5, Skeleton UI 5 with Tailwind 4, and Tauri 2.11
+- [Fix] Documentation tab showed "content.js failed to load" with the latest experimental builds
+
 ## [0.2.3] - 2026-09-06 (Alpha)
 
 - [Fix] Songs can be downloaded concurrently again: since 0.2.0 every Download / Update button was locked while any single song was downloading

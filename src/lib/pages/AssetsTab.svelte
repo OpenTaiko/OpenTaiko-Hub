@@ -1,7 +1,8 @@
 <script>
     // Dependencies
     import { onMount } from 'svelte';
-    import { ProgressBar, TabGroup, Tab } from '@skeletonlabs/skeleton';
+    import { Tabs } from '@skeletonlabs/skeleton-svelte';
+    import ProgressBar from '$lib/components/ProgressBar.svelte';
     import { mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
     import { fetch } from "@tauri-apps/plugin-http";
     import { path } from '@tauri-apps/api';
@@ -50,49 +51,48 @@ for (const file of files) {
         "Puchicharas": "Global/PuchiChara"
     };
 
-    $: optk_version = ($activeInstance && $instanceVersions[$activeInstance.id]) || "0.0.0.0";
-    $: isExperimental = $activeInstance?.channel === 'experimental';
 
     // When embedded in the Home sub-tabs the asset type is controlled by the parent
-    // and the internal tab bar is hidden
-    export let ShowTabs = true;
-    export let currentAsset = 0;
+    
+    /**
+     * @typedef {Object} Props
+     * @property {boolean} [ShowTabs] - and the internal tab bar is hidden
+     * @property {number} [currentAsset]
+     */
+
+    /** @type {Props} */
+    let { ShowTabs = true, currentAsset = $bindable(0) } = $props();
 
     // Rescan whenever another instance becomes active
-    let scannedInstanceId = null;
-    $: if ($activeInstance && !isExperimental && $activeInstance.id !== scannedInstanceId) {
-        scannedInstanceId = $activeInstance.id;
-        currentAssets = { "Skins": {}, "Characters": {}, "Puchicharas": {} };
-        crawlAssets();
-    }
+    let scannedInstanceId = null;   // bookkeeping only, never rendered
 
     const assetsInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/assets_info.json';
-    let assetsInfo = {
+    let assetsInfo = $state({
         "Skins":[],
         "Characters":[],
         "Puchicharas":[]
-    };
-    let currentAssets = {
+    });
+    let currentAssets = $state({
         "Skins":{},
         "Characters":{},
         "Puchicharas":{}
-    };
-    let assetScanning = false;
-    let assetDLProgress = {
+    });
+    let assetScanning = $state(false);
+    let assetDLProgress = $state({
         "Skins":{},
         "Characters":{},
         "Puchicharas":{}
-    };
+    });
     let assetCountProgress = {
         "Skins":0,
         "Characters":0,
         "Puchicharas":0
     };
-    let assetCountProgressBar = {
+    let assetCountProgressBar = $state({
         "Skins":null,
         "Characters":null,
         "Puchicharas":null
-    };
+    });
 
 
     const updateAssetsInfo = async () => {
@@ -353,6 +353,15 @@ for (const file of files) {
         // Local asset scanning is triggered reactively when the active instance is known
     });
 
+    let optk_version = $derived(($activeInstance && $instanceVersions[$activeInstance.id]) || "0.0.0.0");
+    let isExperimental = $derived($activeInstance?.channel === 'experimental');
+    $effect(() => {
+        if ($activeInstance && !isExperimental && $activeInstance.id !== scannedInstanceId) {
+            scannedInstanceId = $activeInstance.id;
+            currentAssets = { "Skins": {}, "Characters": {}, "Puchicharas": {} };
+            crawlAssets();
+        }
+    });
 </script>
 
 {#if isExperimental}
@@ -365,31 +374,24 @@ for (const file of files) {
 </section>
 {:else}
 {#if ShowTabs}
-<TabGroup
-	justify="justify-center"
-	active="variant-filled-primary"
-	hover="hover:variant-soft-primary"
-	flex="flex-1 lg:flex-none"
-	rounded=""
-	border=""
-	class="bg-surface-100-800-token w-full"
-	>
-	<Tab bind:group={currentAsset} name="tab1" value={0}>
-		<svelte:fragment slot="lead"><i class="fa-solid fa-palette"></i></svelte:fragment>
-		<span>{$_('assets.tab.skins')}</span>
-	</Tab>
-	<Tab bind:group={currentAsset} name="tab2" value={1}>
-		<svelte:fragment slot="lead"><i class="fa-solid fa-user"></i></svelte:fragment>
-		<span>{$_('assets.tab.characters')}</span>
-	</Tab>
-	<Tab bind:group={currentAsset} name="tab3" value={2}>
-		<svelte:fragment slot="lead"><i class="fa-solid fa-circle-half-stroke"></i></svelte:fragment>
-		<span>{$_('assets.tab.puchicharas')}</span>
-	</Tab>
-	<!-- ... -->
-</TabGroup>
+<Tabs value={String(currentAsset)} onValueChange={(details) => currentAsset = Number(details.value)} class="tab-bar w-full">
+	<Tabs.List class="justify-center">
+		<Tabs.Trigger value="0">
+			<i class="fa-solid fa-palette"></i>
+			<span>{$_('assets.tab.skins')}</span>
+		</Tabs.Trigger>
+		<Tabs.Trigger value="1">
+			<i class="fa-solid fa-user"></i>
+			<span>{$_('assets.tab.characters')}</span>
+		</Tabs.Trigger>
+		<Tabs.Trigger value="2">
+			<i class="fa-solid fa-circle-half-stroke"></i>
+			<span>{$_('assets.tab.puchicharas')}</span>
+		</Tabs.Trigger>
+	</Tabs.List>
+</Tabs>
 {/if}
-<div class="table-container text-token">
+<div class="table-wrap">
 	<table class="table table-hover">
 		<thead>
 			<tr>
@@ -408,9 +410,9 @@ for (const file of files) {
 				<th></th>
 				<th>
 					{#if assetCountProgressBar[AssetTabType(currentAsset)] !== null}
-					<ProgressBar bind:value={assetCountProgressBar[AssetTabType(currentAsset)]} max={100} />
+					<ProgressBar value={assetCountProgressBar[AssetTabType(currentAsset)]} max={100} />
 					{:else}
-					<button type="button" on:click={() => DownloadDisplayedAssets(AssetTabType(currentAsset))} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('assets.button.bulk_download')}</button>
+					<button type="button" onclick={() => DownloadDisplayedAssets(AssetTabType(currentAsset))} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('assets.button.bulk_download')}</button>
 					{/if}
 				</th>
 			</tr>

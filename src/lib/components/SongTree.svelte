@@ -4,9 +4,7 @@
     import { _ } from 'svelte-i18n';
     import SongTreeNode from '$lib/components/SongTreeNode.svelte';
 
-    export let Songs = [];        // scanned songs ({ relPath, uniqueId, title, tjaMd5s })
-    export let Genres = {};       // relPath → { title, ... }
-    export let CatalogById = new Map();
+    let { Songs = [], Genres = {}, CatalogById = new Map() } = $props();
 
     const makeNode = (name) => ({ name, title: null, children: new Map(), songs: [], count: 0 });
 
@@ -28,7 +26,7 @@
         return node.count;
     };
 
-    $: root = (() => {
+    let root = $derived((() => {
         const rootNode = makeNode('');
         for (const [relPath, genre] of Object.entries(Genres)) {
             nodeFor(rootNode, relPath).title = genre.title ?? null;
@@ -42,12 +40,12 @@
         }
         countSongs(rootNode);
         return rootNode;
-    })();
+    })());
 
-    $: topLevel = [...root.children.values()].sort((a, b) => a.name.localeCompare(b.name));
+    let topLevel = $derived([...root.children.values()].sort((a, b) => a.name.localeCompare(b.name)));
 </script>
 
-<div class="card p-4 space-y-1 text-token tree-root">
+<div class="card p-4 space-y-1 tree-root">
     {#if root.count === 0 && root.children.size === 0}
         <p class="opacity-70">{$_('songs.tree.empty')}</p>
     {:else}

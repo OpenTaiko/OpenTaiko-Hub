@@ -22,11 +22,17 @@
 
     const { TriggerError, TriggerSuccess } = getContext('toast');
 
-    export let Show = false;
-    export let OnClose = () => {};
+    /**
+     * @typedef {Object} Props
+     * @property {boolean} [Show]
+     * @property {any} [OnClose]
+     */
 
-    let newInstanceName = '';
-    let showBuildPicker = false;
+    /** @type {Props} */
+    let { Show = false, OnClose = () => {} } = $props();
+
+    let newInstanceName = $state('');
+    let showBuildPicker = $state(false);
 
     const channelLabel = (inst) => {
         if (inst.channel === 'experimental') return inst.experimental?.label ?? $_('instances.channel.experimental');
@@ -79,19 +85,19 @@
 </script>
 
 {#if Show}
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-<div class="modal-backdrop" on:click={OnClose}>
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="card p-6 space-y-4 modal-card" on:click|stopPropagation>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div class="modal-backdrop" onclick={OnClose}>
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
         <div class="flex justify-between items-center">
             <h2 class="h3">{$_('instances.title')}</h2>
-            <button class="button-red button-main" on:click={OnClose}>{$_('hof.close')}</button>
+            <button class="button-red button-main" onclick={OnClose}>{$_('hof.close')}</button>
         </div>
 
         {#if $instances.length === 0}
             <p class="opacity-70">{$_('instances.none')}</p>
         {:else}
-        <div class="table-container">
+        <div class="table-wrap">
             <table class="table table-hover">
                 <thead>
                     <tr>
@@ -108,9 +114,9 @@
                     <tr>
                         <td>
                             {#if inst.id === $activeInstanceId}
-                                <span class="badge variant-filled-success">{$_('instances.active')}</span>
+                                <span class="badge preset-filled-success-500">{$_('instances.active')}</span>
                             {:else}
-                                <button class="button-blue button-main" on:click={() => setActiveInstance(inst.id)}>{$_('instances.set_active')}</button>
+                                <button class="button-blue button-main" onclick={() => setActiveInstance(inst.id)}>{$_('instances.set_active')}</button>
                             {/if}
                         </td>
                         <td>{inst.name}</td>
@@ -118,10 +124,10 @@
                         <td>{$instanceVersions[inst.id] ?? '—'}</td>
                         <td class="path-cell" title={inst.path}>{inst.path}</td>
                         <td class="whitespace-nowrap">
-                            <button class="button-blue button-main" title={$_('instances.open_folder')} on:click={() => OpenFolder(inst)}>
+                            <button class="button-blue button-main" title={$_('instances.open_folder')} onclick={() => OpenFolder(inst)}>
                                 <i class="fa-solid fa-folder-open"></i>
                             </button>
-                            <button class="button-red button-main" title={$_('instances.detach')} on:click={() => DoDetach(inst)}>
+                            <button class="button-red button-main" title={$_('instances.detach')} onclick={() => DoDetach(inst)}>
                                 <i class="fa-solid fa-link-slash"></i>
                             </button>
                         </td>
@@ -137,16 +143,16 @@
         <hr />
 
         <div class="flex gap-3 flex-wrap items-center">
-            <button class="button-blue button-main" on:click={DoAttach}>
+            <button class="button-blue button-main" onclick={DoAttach}>
                 <i class="fa-solid fa-folder-plus"></i> {$_('instances.attach')}
             </button>
             <span class="opacity-50">|</span>
             <input
-                class="rounded-md px-3 py-2 text-blue-950"
+                class="rounded-md px-3 py-2 bg-white text-blue-950"
                 placeholder={$_('instances.create_name_placeholder')}
                 bind:value={newInstanceName}
             />
-            <button class="button-green button-main" on:click={() => showBuildPicker = true}>
+            <button class="button-green button-main" onclick={() => showBuildPicker = true}>
                 <i class="fa-solid fa-plus"></i> {$_('instances.create')}
             </button>
         </div>

@@ -10,18 +10,20 @@
 
     const { TriggerError, TriggerSuccess } = getContext('toast');
 
-    export let Candidate;              // { instance, srcPath, count }
-    export let GlobalPath;
-    export let CatalogById = new Map();
-    export let OnClose = () => {};
-    export let OnApplied = () => {};
+    let {
+        Candidate,
+        GlobalPath,
+        CatalogById = new Map(),
+        OnClose = () => {},
+        OnApplied = () => {}
+    } = $props();
 
-    let loading = true;
-    let applying = false;
-    let plan = null;
-    let conflicts = [];
+    let loading = $state(true);
+    let applying = $state(false);
+    let plan = $state(null);
+    let conflicts = $state([]);
     // srcRelPath -> 'keep_global' | 'use_instance'
-    let choices = {};
+    let choices = $state({});
 
     onMount(async () => {
         try {
@@ -88,17 +90,17 @@
     };
 </script>
 
-<!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-<div class="modal-backdrop" on:click={OnClose}>
-    <!-- svelte-ignore a11y-click-events-have-key-events a11y-no-static-element-interactions -->
-    <div class="card p-6 space-y-4 modal-card" on:click|stopPropagation>
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+<div class="modal-backdrop" onclick={OnClose}>
+    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
+    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
         <div class="flex justify-between items-center">
             <h2 class="h3">{$_('songs.migrate.modal_title', { values: { instance: Candidate.instance.name } })}</h2>
-            <button class="btn-icon btn-icon-sm variant-filled" on:click={OnClose} aria-label={$_('common.cancel')}>✕</button>
+            <button class="btn-icon btn-icon-sm preset-filled" onclick={OnClose} aria-label={$_('common.cancel')}>✕</button>
         </div>
 
         {#if loading}
-            <div class="placeholder animate-pulse w-full h-24" />
+            <div class="placeholder animate-pulse w-full h-24"></div>
         {:else if plan}
             <!-- Summary of the non-conflicting work -->
             <div class="space-y-1 text-sm">
@@ -121,8 +123,8 @@
                         <p class="text-sm opacity-70">{$_('songs.migrate.conflicts_hint')}</p>
                     </div>
                     <div class="flex gap-2">
-                        <button type="button" class="button-blue button-main" on:click={() => SetAll('keep_global')}>{$_('songs.migrate.bulk_keep_global')}</button>
-                        <button type="button" class="button-blue button-main" on:click={() => SetAll('use_instance')}>{$_('songs.migrate.bulk_use_instance')}</button>
+                        <button type="button" class="button-blue button-main" onclick={() => SetAll('keep_global')}>{$_('songs.migrate.bulk_keep_global')}</button>
+                        <button type="button" class="button-blue button-main" onclick={() => SetAll('use_instance')}>{$_('songs.migrate.bulk_use_instance')}</button>
                     </div>
                 </div>
 
@@ -137,7 +139,7 @@
                             <label class="conflict-option" class:selected={choices[item.src.relPath] === 'keep_global'}>
                                 <input type="radio" value="keep_global" bind:group={choices[item.src.relPath]} />
                                 <div class="opt-body">
-                                    <span class="badge variant-filled-primary">{$_('songs.migrate.col_global')}</span>
+                                    <span class="badge preset-filled-primary-500">{$_('songs.migrate.col_global')}</span>
                                     <span class="meta">{$_('songs.migrate.hash')}: <code>{ShortHash(item.dest)}</code></span>
                                     <span class="meta">{$_('songs.migrate.edited')}: {EditedDate(item.dest)}</span>
                                 </div>
@@ -145,7 +147,7 @@
                             <label class="conflict-option" class:selected={choices[item.src.relPath] === 'use_instance'}>
                                 <input type="radio" value="use_instance" bind:group={choices[item.src.relPath]} />
                                 <div class="opt-body">
-                                    <span class="badge variant-filled-warning">{$_('songs.migrate.col_instance')}</span>
+                                    <span class="badge preset-filled-warning-500">{$_('songs.migrate.col_instance')}</span>
                                     <span class="meta">{$_('songs.migrate.hash')}: <code>{ShortHash(item.src)}</code></span>
                                     <span class="meta">{$_('songs.migrate.edited')}: {EditedDate(item.src)}</span>
                                 </div>
@@ -157,8 +159,8 @@
             {/if}
 
             <div class="flex gap-3 justify-end">
-                <button type="button" class="button-gray button-main" on:click={OnClose}>{$_('common.cancel')}</button>
-                <button type="button" class="button-green button-main" disabled={applying} on:click={Apply}>
+                <button type="button" class="button-gray button-main" onclick={OnClose}>{$_('common.cancel')}</button>
+                <button type="button" class="button-green button-main" disabled={applying} onclick={Apply}>
                     <i class="fa-solid fa-right-left"></i> {$_('songs.migrate.apply')}
                 </button>
             </div>
@@ -217,8 +219,8 @@
         cursor: pointer;
     }
     .conflict-option.selected {
-        border-color: rgba(var(--color-primary-500) / 1);
-        background: rgba(var(--color-primary-500) / 0.08);
+        border-color: var(--color-primary-500);
+        background: color-mix(in oklab, var(--color-primary-500) 8%, transparent);
     }
     .opt-body {
         display: flex;

@@ -1,22 +1,21 @@
 <script>
     // Dependencies
     import { onMount } from 'svelte';
-    import { TabGroup, Tab } from '@skeletonlabs/skeleton';
-    import { Accordion, AccordionItem } from '@skeletonlabs/skeleton';
+    import { Tabs, Accordion } from '@skeletonlabs/skeleton-svelte';
     import { fetch } from "@tauri-apps/plugin-http";
     import { marked } from 'marked';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
-    let currentInfo = 0;
+    let currentInfo = $state(0);
 
     // Information
     const changelogUrl = 'https://raw.githubusercontent.com/0auBSQ/OpenTaiko/main/CHANGELOG.md';
-    let changelogContent = '';
+    let changelogContent = $state('');
     const hubChangelogUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Hub/main/CHANGELOG.md';
-    let hubChangelogContent = '';
+    let hubChangelogContent = $state('');
     const creditsUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Hub/main/CREDITS.md';
-    let creditsContent = '';
+    let creditsContent = $state('');
 
     const renderer = new marked.Renderer();
     renderer.link = function(href, title, text) {
@@ -79,41 +78,41 @@
 
 </script>
 
-<TabGroup
-	justify="justify-center"
-	active="variant-filled-primary"
-	hover="hover:variant-soft-primary"
-	flex="flex-1 lg:flex-none"
-	rounded=""
-	border=""
-	class="bg-surface-100-800-token w-full"
-	>
-	<Tab bind:group={currentInfo} name="tab1" value={0}>
-		<svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
-		<span>{$_('info.tab.changelog_game')}</span>
-	</Tab>
-	<Tab bind:group={currentInfo} name="tab2" value={1}>
-		<svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
-		<span>{$_('info.tab.changelog_hub')}</span>
-	</Tab>
-	<Tab bind:group={currentInfo} name="tab4" value={3}>
-		<svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
-		<span>{$_('info.tab.troubleshooting')}</span>
-	</Tab>
-	<Tab bind:group={currentInfo} name="tab5" value={4}>
-		<svelte:fragment slot="lead"><i class="fa-regular fa-file-lines"></i></svelte:fragment>
-		<span>{$_('info.tab.credits')}</span>
-	</Tab>
-	<!-- ... -->
-</TabGroup>
+<Tabs value={String(currentInfo)} onValueChange={(details) => currentInfo = Number(details.value)} class="tab-bar w-full">
+	<Tabs.List class="justify-center">
+		<Tabs.Trigger value="0">
+			<i class="fa-regular fa-file-lines"></i>
+			<span>{$_('info.tab.changelog_game')}</span>
+		</Tabs.Trigger>
+		<Tabs.Trigger value="1">
+			<i class="fa-regular fa-file-lines"></i>
+			<span>{$_('info.tab.changelog_hub')}</span>
+		</Tabs.Trigger>
+		<Tabs.Trigger value="3">
+			<i class="fa-regular fa-file-lines"></i>
+			<span>{$_('info.tab.troubleshooting')}</span>
+		</Tabs.Trigger>
+		<Tabs.Trigger value="4">
+			<i class="fa-regular fa-file-lines"></i>
+			<span>{$_('info.tab.credits')}</span>
+		</Tabs.Trigger>
+	</Tabs.List>
+</Tabs>
 
 <!-- OpenTaiko Changelogs or OpenTaiko Hub Changelogs -->
 {#if currentInfo === 0 || currentInfo === 1}
     <div class="content">
-        <Accordion class="card rounded-container-token">
-            <AccordionItem>
-                <svelte:fragment slot="summary"><b>{$_('info.legend.title')}</b></svelte:fragment>
-                <svelte:fragment slot="content">
+        <Accordion collapsible class="card rounded-container">
+            <Accordion.Item value="legend">
+                <h3>
+                    <Accordion.ItemTrigger class="flex items-center justify-between gap-2">
+                        <b>{$_('info.legend.title')}</b>
+                        <Accordion.ItemIndicator class="group">
+                            <i class="fa-solid fa-chevron-down transition group-data-[state=open]:rotate-180"></i>
+                        </Accordion.ItemIndicator>
+                    </Accordion.ItemTrigger>
+                </h3>
+                <Accordion.ItemContent>
                     <h2><b>[Feat]</b></h2>
                     <p>{$_('info.legend.feat')}</p>
 
@@ -134,8 +133,8 @@
                         <h2><b>[Theme]</b></h2>
                         <p>{$_('info.legend.theme')}</p>
                     {/if}
-                </svelte:fragment>
-            </AccordionItem>
+                </Accordion.ItemContent>
+            </Accordion.Item>
         </Accordion>
 
         <hr class="my-3">
@@ -180,5 +179,8 @@
 {/if}
 
 <style>
-    .content {@apply card w-full bg-surface-100-800-token p-4;}
+    /* Tailwind 4 compiles component styles in isolation: pull in the app theme for @apply */
+    @reference "../../app.css";
+
+    .content {@apply card w-full bg-surface-100-800 p-4;}
 </style>

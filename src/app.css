@@ -1,10 +1,43 @@
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+@import "tailwindcss";
+@import "@skeletonlabs/skeleton";
+@import "@skeletonlabs/skeleton-svelte";
+
+/* Skeleton preset themes offered in the Themes tab. These are the Skeleton v2 presets
+   the Hub shipped with (Skeleton redesigned its presets in later versions), converted to
+   the v5 theme format so they keep their v2 colors, fonts, radii and backgrounds. */
+@import "./lib/themes/presets/legacy.css";
+@import "./lib/themes/presets/wintry.css";
+@import "./lib/themes/presets/modern.css";
+@import "./lib/themes/presets/rocket.css";
+@import "./lib/themes/presets/seafoam.css";
+@import "./lib/themes/presets/vintage.css";
+@import "./lib/themes/presets/sahara.css";
+@import "./lib/themes/presets/hamlindigo.css";
+@import "./lib/themes/presets/nouveau.css";
+@import "./lib/themes/presets/crimson.css";
+
+/* OpenTaiko Hub themes */
+@import "./lib/themes/gleamingsky.css";
+@import "./lib/themes/dashy.css";
+@import "./lib/themes/deceiver.css";
+@import "./lib/themes/onyx.css";
+@import "./lib/themes/pearl.css";
+@import "./lib/themes/optkkun.css";
+
 @import "@fontsource/quicksand";
 @import "@fontsource/space-grotesk";
 @import "@fontsource/abril-fatface";
 @import "@fontsource/playfair-display";
+
+/* Skeleton components ship their markup pre-built; let Tailwind see their classes */
+@source "../node_modules/@skeletonlabs/skeleton-svelte/dist";
+
+/* Light/dark mode is switched from the Themes tab by setting data-mode on <html> */
+@custom-variant dark (&:where([data-mode=dark], [data-mode=dark] *));
+
+/* Difficulty chips build their color classes at runtime, so Tailwind cannot find them */
+@source inline("bg-{blue,green,yellow,red,purple,orange}-100");
+@source inline("text-{blue,green,yellow,red,purple,orange}-800");
 
 @layer base {
     h1 {@apply h1 text-2xl font-bold mb-2;}
@@ -17,54 +50,177 @@
     ol {@apply list-decimal list-inside ml-5;}
     li {@apply mb-2;}
     a {@apply underline;}
-    hr {@apply border-token;}
+    hr {@apply hr;}
 }
+
+/* Skeleton v2's surface pairing (100 in light mode, 800 in dark). v5 pairings must add
+   up to 1000, so it is re-created here to keep cards and bars the shade they were. */
+@utility bg-surface-100-800 {
+    background-color: light-dark(var(--color-surface-100), var(--color-surface-800));
+}
+
+@layer base {
+    /* Tailwind 4 preflight regressions: buttons lost their pointer cursor and form fields
+       lost their background (they became transparent) */
+    button:not(:disabled), [role="button"]:not(:disabled) {cursor: pointer;}
+}
+
+/* ------------------------------------------------------------------------------------
+   Skeleton v2 parity. The Hub was designed on Skeleton v2, whose element styles differ
+   from v5 in density, sizing and color; these rules restore the v2 values. They sit
+   outside the cascade layers on purpose so they win over Skeleton's utilities.
+   ------------------------------------------------------------------------------------ */
+
+/* v5 scales every text size by 1.067; v2 did not */
+[data-theme] {--text-scaling: 1;}
+
+/* Cards: surface background plus the faint inset ring v2 drew around them */
+.card {
+    @apply bg-surface-100-800;
+    box-shadow: inset 0 0 0 1px light-dark(rgb(23 23 23 / 0.05), rgb(250 250 250 / 0.05));
+}
+
+/* Tables: v2 layout (padded, bold capitalized headers on a darker strip, zebra rows) */
+.table-wrap {border-radius: var(--radius-container);}
+.table {
+    @apply bg-surface-100-800;
+    border-radius: var(--radius-container);
+    overflow: hidden;
+    font-size: inherit;
+    line-height: inherit;
+}
+.table thead {
+    background-color: light-dark(var(--color-surface-200), var(--color-surface-700));
+    border-bottom: 1px solid color-mix(in oklab, var(--color-surface-500) 20%, transparent);
+    color: inherit;
+}
+.table thead tr {text-align: left; text-transform: capitalize;}
+.table thead th {padding: 1rem; font-weight: 700;}
+.table tbody tr {border-bottom: 1px solid color-mix(in oklab, var(--color-surface-500) 20%, transparent);}
+.table tbody tr:nth-child(even) {background-color: color-mix(in oklab, var(--color-surface-500) 5%, transparent);}
+.table tbody td {white-space: nowrap; padding: 1rem 0.75rem; vertical-align: top; font-size: 0.875rem; line-height: 1.25rem;}
+.table-hover tbody tr:hover {background-color: color-mix(in oklab, var(--color-surface-500) 20%, transparent);}
+
+/* Badges and chips: v2 sizes (v5 badges are 20% smaller) */
+.badge {font-size: 0.75rem; line-height: 1rem; font-weight: 600; padding: 0.25rem 0.5rem; gap: 0.5rem;}
+.chip {font-size: 0.75rem; line-height: 1rem; padding: 0.375rem 0.75rem; border-radius: 0.25rem;}
+
+/* Loading placeholders */
+.placeholder {min-height: 1.25rem; background-color: light-dark(var(--color-surface-300), var(--color-surface-600));}
+
+/* Dividers */
+hr {border-color: light-dark(var(--color-surface-300), var(--color-surface-600));}
+
+/* Form fields: v2 colors, a plain border instead of v5's ring, and the container radius
+   so a select sits flush with the card that holds it */
+.input, .select {
+    background-color: light-dark(var(--color-surface-200), var(--color-surface-700));
+    color: inherit;
+    border: var(--default-border-width) solid light-dark(var(--color-surface-400), var(--color-surface-500));
+    border-radius: var(--radius-container);
+    box-shadow: none;
+}
+.input:focus, .select:focus {border-color: var(--color-primary-500); outline: none;}
+.select {padding: 0.5rem; padding-right: 2rem;}
+.select[size] {background-image: none; padding-right: 0.5rem;}
+.select option {padding: 0.5rem 1rem; cursor: pointer;}
+.select optgroup {font-weight: 700;}
+
+/* Navigation rail: v2 AppRail (80px wide, edge-to-edge square tiles, bold wrapped labels,
+   primary tint on hover, primary fill when active) */
+[data-scope='navigation'][data-part='root'] {@apply bg-surface-100-800; padding: 0; gap: 0.25rem;}
+[data-scope='navigation'][data-part='menu'] {gap: 0.25rem;}
+[data-scope='navigation'][data-part='trigger'],
+[data-scope='navigation'][data-part='trigger-anchor'] {
+    border-radius: 0;
+    max-width: none;
+    padding: 0.25rem 0;
+    gap: 0.25rem;
+    white-space: normal;
+    transition: background-color 150ms;
+}
+[data-scope='navigation'][data-part='trigger']:not([data-active]):hover,
+[data-scope='navigation'][data-part='trigger-anchor']:hover {
+    background-color: color-mix(in oklab, var(--color-primary-500) 10%, transparent);
+}
+[data-scope='navigation'][data-part='trigger'][data-active] {
+    background-color: var(--color-primary-500);
+    color: var(--color-primary-contrast-500);
+}
+[data-scope='navigation'][data-part='trigger-text'] {
+    font-size: 0.75rem;
+    line-height: 1rem;
+    font-weight: 700;
+    text-align: center;
+}
+
+/* Tab bars: v2 TabGroup as the Hub configured it (surface strip, centered tabs that stack
+   the icon over the label, primary fill when active, no divider line) */
+.tab-bar {@apply bg-surface-100-800 w-full;}
+.tab-bar [data-scope='tabs'][data-part='list'] {justify-content: center; border-bottom: 0; padding: 0; margin: 0; gap: 0;}
+.tab-bar [data-scope='tabs'][data-part='trigger'] {
+    flex: 1 1 0%;
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.5rem 1rem;
+    border-radius: 0;
+    line-height: 1.5rem;
+}
+@media (min-width: 1024px) {
+    .tab-bar [data-scope='tabs'][data-part='trigger'] {flex: none;}
+}
+.tab-bar [data-scope='tabs'][data-part='trigger']:not([data-selected]):hover {@apply preset-tonal-primary;}
+.tab-bar [data-scope='tabs'][data-part='trigger'][data-selected] {@apply preset-filled-primary-500;}
+
+/* Progress bars: v2 track and meter colors */
+[data-scope='progress'][data-part='track'] {background-color: light-dark(var(--color-surface-200), var(--color-surface-700));}
+[data-scope='progress'][data-part='range'] {background-color: light-dark(var(--color-surface-900), var(--color-surface-50));}
 
 /* Text */
 a {@apply text-primary-800 dark:text-primary-300;}
-.fetch-error {@apply text-red-800 dark:text-red-300 !important;}
+.fetch-error {@apply text-red-800! dark:text-red-300!;}
 .smalltext {font-size: 12px;}
 
 /* Buttons */
 .button-main {@apply font-medium rounded-lg text-sm px-3 py-1;}
-.button-blue {@apply bg-blue-600 text-neutral-200 !important;}
-.button-green {@apply bg-green-600 text-neutral-200 !important;}
-.button-gray {@apply bg-gray-600 text-neutral-200 !important;}
-.button-red {@apply bg-red-600 text-neutral-200 !important;}
+.button-blue {@apply bg-blue-600! text-neutral-200!;}
+.button-green {@apply bg-green-600! text-neutral-200!;}
+.button-gray {@apply bg-gray-600! text-neutral-200!;}
+.button-red {@apply bg-red-600! text-neutral-200!;}
 /* Button hover */
-.button-blue:hover {@apply bg-blue-700 text-neutral-200 !important;}
-.button-green:hover {@apply bg-green-700 text-neutral-200 !important;}
-.button-gray:hover {@apply bg-gray-700 text-neutral-200 !important;}
-.button-red:hover {@apply bg-red-700 text-neutral-200 !important;}
+.button-blue:hover {@apply bg-blue-700! text-neutral-200!;}
+.button-green:hover {@apply bg-green-700! text-neutral-200!;}
+.button-gray:hover {@apply bg-gray-700! text-neutral-200!;}
+.button-red:hover {@apply bg-red-700! text-neutral-200!;}
 
 /* Song tab */
-button.play {@apply bg-primary-500 !important;}
-button.play:hover {@apply bg-primary-400 !important;}
-button.play:active {@apply bg-primary-600 !important;}
-.slider {@apply bg-primary-800 !important;}
-.progress {@apply bg-primary-500 !important;}
+button.play {@apply bg-primary-500!;}
+button.play:hover {@apply bg-primary-400!;}
+button.play:active {@apply bg-primary-600!;}
+.slider {@apply bg-primary-800!;}
+.progress {@apply bg-primary-500!;}
 
 .time span {
 	font-size: 0.7em;
-    @apply text-black dark:text-white !important;
+    @apply text-black! dark:text-white!;
 }
 
 ::placeholder {
-    @apply text-stone-400 !important;
+    @apply text-stone-400!;
 }
 
 /* OpenTaiko Hub themes */
 [data-theme='gleamingsky'] {
     /* Buttons */
-    .button-blue {@apply bg-blue-500 text-black !important;}
-    .button-green {@apply bg-green-500 text-black !important;}
-    .button-gray {@apply bg-indigo-800 text-neutral-200 !important;}
-    .button-red {@apply bg-red-400 text-black !important;}
+    .button-blue {@apply bg-blue-500! text-black!;}
+    .button-green {@apply bg-green-500! text-black!;}
+    .button-gray {@apply bg-indigo-800! text-neutral-200!;}
+    .button-red {@apply bg-red-400! text-black!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-blue-600 text-black !important;}
-    .button-green:hover {@apply bg-green-600 text-black !important;}
-    .button-gray:hover {@apply bg-indigo-900 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-500 text-black !important;}
+    .button-blue:hover {@apply bg-blue-600! text-black!;}
+    .button-green:hover {@apply bg-green-600! text-black!;}
+    .button-gray:hover {@apply bg-indigo-900! text-neutral-200!;}
+    .button-red:hover {@apply bg-red-500! text-black!;}
 
     /* Background */
     background-color:rgb(255, 255, 255) !important;
@@ -84,15 +240,15 @@ button.play:active {@apply bg-primary-600 !important;}
 
 [data-theme='dashy'] {
     /* Buttons */
-    .button-blue {@apply bg-blue-500 text-black !important;}
-    .button-green {@apply bg-lime-800 text-neutral-200 !important;}
-    .button-gray {@apply bg-blue-900 text-neutral-200 !important;}
-    .button-red {@apply bg-red-700 text-neutral-200 !important;}
+    .button-blue {@apply bg-blue-500! text-black!;}
+    .button-green {@apply bg-lime-800! text-neutral-200!;}
+    .button-gray {@apply bg-blue-900! text-neutral-200!;}
+    .button-red {@apply bg-red-700! text-neutral-200!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-blue-600 text-black !important;}
-    .button-green:hover {@apply bg-lime-900 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-blue-950 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-blue-600! text-black!;}
+    .button-green:hover {@apply bg-lime-900! text-neutral-200!;}
+    .button-gray:hover {@apply bg-blue-950! text-neutral-200!;}
+    .button-red:hover {@apply bg-red-800! text-neutral-200!;}
 
     /* Background */
     background-color:rgb(185, 185, 185) !important;
@@ -110,20 +266,20 @@ button.play:active {@apply bg-primary-600 !important;}
     background-size: cover;
 
     /* Other stuff */
-    hr {@apply border-token dark:border-surface-700;} 
+    hr {@apply hr dark:border-surface-700;} 
 }
 
 [data-theme='deceiver'] {
     /* Buttons */
-    .button-blue {@apply bg-neutral-400 text-black !important;}
-    .button-green {@apply bg-green-800 text-neutral-200 !important;}
-    .button-gray {@apply bg-neutral-700 text-neutral-200 !important;}
-    .button-red {@apply bg-red-800 text-neutral-200 !important;}
+    .button-blue {@apply bg-neutral-400! text-black!;}
+    .button-green {@apply bg-green-800! text-neutral-200!;}
+    .button-gray {@apply bg-neutral-700! text-neutral-200!;}
+    .button-red {@apply bg-red-800! text-neutral-200!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-neutral-500 text-black !important;}
-    .button-green:hover {@apply bg-green-900 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-neutral-800 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-900 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-neutral-500! text-black!;}
+    .button-green:hover {@apply bg-green-900! text-neutral-200!;}
+    .button-gray:hover {@apply bg-neutral-800! text-neutral-200!;}
+    .button-red:hover {@apply bg-red-900! text-neutral-200!;}
 
     /* Background */
     background-color:rgb(136, 0, 0) !important;
@@ -143,15 +299,15 @@ button.play:active {@apply bg-primary-600 !important;}
 
 [data-theme='onyx'] {
     /* Buttons */
-    .button-blue {@apply bg-zinc-100 text-black !important;}
-    .button-green {@apply bg-emerald-300 text-black !important;}
-    .button-gray {@apply bg-zinc-700 text-neutral-200 !important;}
-    .button-red {@apply bg-red-400 text-black !important;}
+    .button-blue {@apply bg-zinc-100! text-black!;}
+    .button-green {@apply bg-emerald-300! text-black!;}
+    .button-gray {@apply bg-zinc-700! text-neutral-200!;}
+    .button-red {@apply bg-red-400! text-black!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-zinc-200 text-black !important;}
-    .button-green:hover {@apply bg-emerald-400 text-black !important;}
-    .button-gray:hover {@apply bg-zinc-800 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-500 text-black !important;}
+    .button-blue:hover {@apply bg-zinc-200! text-black!;}
+    .button-green:hover {@apply bg-emerald-400! text-black!;}
+    .button-gray:hover {@apply bg-zinc-800! text-neutral-200!;}
+    .button-red:hover {@apply bg-red-500! text-black!;}
 
     /* Background */
     background-color:rgb(0, 0, 0) !important;
@@ -171,15 +327,15 @@ button.play:active {@apply bg-primary-600 !important;}
 
 [data-theme='pearl'] {
     /* Buttons */
-    .button-blue {@apply bg-gray-400 text-black !important;}
-    .button-green {@apply bg-green-800 text-neutral-200 !important;}
-    .button-gray {@apply bg-gray-700 text-neutral-200 !important;}
-    .button-red {@apply bg-red-800 text-neutral-200 !important;}
+    .button-blue {@apply bg-gray-400! text-black!;}
+    .button-green {@apply bg-green-800! text-neutral-200!;}
+    .button-gray {@apply bg-gray-700! text-neutral-200!;}
+    .button-red {@apply bg-red-800! text-neutral-200!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-gray-500 text-black !important;}
-    .button-green:hover {@apply bg-green-900 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-gray-800 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-900 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-gray-500! text-black!;}
+    .button-green:hover {@apply bg-green-900! text-neutral-200!;}
+    .button-gray:hover {@apply bg-gray-800! text-neutral-200!;}
+    .button-red:hover {@apply bg-red-900! text-neutral-200!;}
 
     /* Background */
     background-color:rgb(155, 155, 155) !important;
@@ -197,20 +353,20 @@ button.play:active {@apply bg-primary-600 !important;}
     background-size: cover;
 
     /* Other stuff */
-    hr {@apply border-token dark:border-surface-700;} 
+    hr {@apply hr dark:border-surface-700;} 
 }
 
 [data-theme='optkkun'] {
     /* Buttons */
-    .button-blue {@apply bg-blue-400 text-black !important;}
-    .button-green {@apply bg-emerald-400 text-black !important;}
-    .button-gray {@apply bg-gray-600 text-neutral-200 !important;}
-    .button-red {@apply bg-red-700 text-neutral-200 !important;}
+    .button-blue {@apply bg-blue-400! text-black!;}
+    .button-green {@apply bg-emerald-400! text-black!;}
+    .button-gray {@apply bg-gray-600! text-neutral-200!;}
+    .button-red {@apply bg-red-700! text-neutral-200!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-blue-500 text-black !important;}
-    .button-green:hover {@apply bg-emerald-500 text-black !important;}
-    .button-gray:hover {@apply bg-gray-700 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-blue-500! text-black!;}
+    .button-green:hover {@apply bg-emerald-500! text-black!;}
+    .button-gray:hover {@apply bg-gray-700! text-neutral-200!;}
+    .button-red:hover {@apply bg-red-800! text-neutral-200!;}
 
     /* Background */
     background-color:rgb(10, 32, 82) !important;
@@ -229,147 +385,147 @@ button.play:active {@apply bg-primary-600 !important;}
 }
 
 /* Skeleton preset themes */
-[data-theme='skeleton'] {
+[data-theme='legacy'] {
     /* Buttons */
-    .button-blue {@apply bg-secondary-500 text-neutral-200 !important;}
-    .button-green {@apply bg-primary-500 text-black !important;}
-    .button-gray {@apply bg-gray-600 text-neutral-200 !important;}
-    .button-red {@apply bg-red-700 text-neutral-200 !important;}
+    .button-blue {@apply bg-secondary-500! text-neutral-200!;}
+    .button-green {@apply bg-primary-500! text-black!;}
+    .button-gray {@apply bg-gray-600! text-neutral-200!;}
+    .button-red {@apply bg-red-700! text-neutral-200!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-secondary-600 text-neutral-200 !important;}
-    .button-green:hover {@apply bg-primary-600 text-black !important;}
-    .button-gray:hover {@apply bg-gray-700 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-red-800 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-secondary-600! text-neutral-200!;}
+    .button-green:hover {@apply bg-primary-600! text-black!;}
+    .button-gray:hover {@apply bg-gray-700! text-neutral-200!;}
+    .button-red:hover {@apply bg-red-800! text-neutral-200!;}
 }
 
 [data-theme='crimson'] {
     /* Buttons */
-    .button-blue {@apply bg-secondary-400 text-black !important;}
-    .button-green {@apply bg-emerald-500 text-black !important;}
-    .button-gray {@apply bg-tertiary-500 text-black !important;}
-    .button-red {@apply bg-error-500 text-black !important;}
+    .button-blue {@apply bg-secondary-400! text-black!;}
+    .button-green {@apply bg-emerald-500! text-black!;}
+    .button-gray {@apply bg-tertiary-500! text-black!;}
+    .button-red {@apply bg-error-500! text-black!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-secondary-500 text-black !important;}
-    .button-green:hover {@apply bg-emerald-600 text-black !important;}
-    .button-gray:hover {@apply bg-tertiary-600 text-black !important;}
-    .button-red:hover {@apply bg-error-600 text-black !important;}
+    .button-blue:hover {@apply bg-secondary-500! text-black!;}
+    .button-green:hover {@apply bg-emerald-600! text-black!;}
+    .button-gray:hover {@apply bg-tertiary-600! text-black!;}
+    .button-red:hover {@apply bg-error-600! text-black!;}
 }
 
-[data-theme='gold-nouveau'] {
+[data-theme='nouveau'] {
     h1, h2, h3, h4, h5, h6 {font-family: 'Quicksand', sans-serif !important;}
 
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-neutral-200 dark:text-black !important;}
-    .button-green {@apply bg-secondary-400 text-black !important;}
-    .button-gray {@apply bg-neutral-600 text-neutral-200 !important;}
-    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    .button-blue {@apply bg-primary-500! text-neutral-200! dark:text-black!;}
+    .button-green {@apply bg-secondary-400! text-black!;}
+    .button-gray {@apply bg-neutral-600! text-neutral-200!;}
+    .button-red {@apply bg-error-500! text-neutral-200!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-neutral-200 dark:text-black !important;}
-    .button-green:hover {@apply bg-secondary-500 text-black !important;}
-    .button-gray:hover {@apply bg-neutral-700 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-primary-600! text-neutral-200! dark:text-black!;}
+    .button-green:hover {@apply bg-secondary-500! text-black!;}
+    .button-gray:hover {@apply bg-neutral-700! text-neutral-200!;}
+    .button-red:hover {@apply bg-error-600! text-neutral-200!;}
 }
 
 [data-theme='hamlindigo'] {
     h1, h2, h3, h4, h5, h6 {font-family: serif !important;}
 
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-success-700 text-neutral-200 !important;}
-    .button-gray {@apply bg-neutral-600 text-neutral-200 !important;}
-    .button-red {@apply bg-error-700 text-neutral-200 !important;}
+    .button-blue {@apply bg-primary-500! text-black!;}
+    .button-green {@apply bg-success-700! text-neutral-200!;}
+    .button-gray {@apply bg-neutral-600! text-neutral-200!;}
+    .button-red {@apply bg-error-700! text-neutral-200!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-success-800 text-neutral-200 !important;}
-    .button-gray:hover {@apply bg-neutral-700 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-800 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-primary-600! text-black!;}
+    .button-green:hover {@apply bg-success-800! text-neutral-200!;}
+    .button-gray:hover {@apply bg-neutral-700! text-neutral-200!;}
+    .button-red:hover {@apply bg-error-800! text-neutral-200!;}
 }
 
 [data-theme='modern'] {
     body {font-family: 'Quicksand', sans-serif !important;}
 
     /* Buttons */
-    .button-main {@apply font-bold !important;}
-    .button-blue {@apply bg-secondary-500 text-black !important;}
-    .button-green {@apply bg-success-500 text-black !important;}
-    .button-gray {@apply bg-zinc-600 text-neutral-200 !important;}
-    .button-red {@apply bg-error-500 text-black !important;}
+    .button-main {@apply font-bold!;}
+    .button-blue {@apply bg-secondary-500! text-black!;}
+    .button-green {@apply bg-success-500! text-black!;}
+    .button-gray {@apply bg-zinc-600! text-neutral-200!;}
+    .button-red {@apply bg-error-500! text-black!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-secondary-600 text-black !important;}
-    .button-green:hover {@apply bg-success-600 text-black !important;}
-    .button-gray:hover {@apply bg-zinc-700 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-600 text-black !important;}
+    .button-blue:hover {@apply bg-secondary-600! text-black!;}
+    .button-green:hover {@apply bg-success-600! text-black!;}
+    .button-gray:hover {@apply bg-zinc-700! text-neutral-200!;}
+    .button-red:hover {@apply bg-error-600! text-black!;}
 }
 
 [data-theme='rocket'] {
     h1, h2, h3, h4, h5, h6 {font-family: 'Space Grotesk', sans-serif !important;}
 
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-success-500 text-black !important;}
-    .button-gray {@apply bg-sky-900 text-neutral-200 !important;}
-    .button-red {@apply bg-error-500 text-neutral-200 !important;}
+    .button-blue {@apply bg-primary-500! text-black!;}
+    .button-green {@apply bg-success-500! text-black!;}
+    .button-gray {@apply bg-sky-900! text-neutral-200!;}
+    .button-red {@apply bg-error-500! text-neutral-200!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-success-600 text-black !important;}
-    .button-gray:hover {@apply bg-sky-950 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-600 text-neutral-200 !important;}
+    .button-blue:hover {@apply bg-primary-600! text-black!;}
+    .button-green:hover {@apply bg-success-600! text-black!;}
+    .button-gray:hover {@apply bg-sky-950! text-neutral-200!;}
+    .button-red:hover {@apply bg-error-600! text-neutral-200!;}
 }
 
 [data-theme='sahara'] {
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-success-500 text-black !important;}
-    .button-gray {@apply bg-orange-800 text-neutral-200 !important;}
-    .button-red {@apply bg-error-500 text-black !important;}
+    .button-blue {@apply bg-primary-500! text-black!;}
+    .button-green {@apply bg-success-500! text-black!;}
+    .button-gray {@apply bg-orange-800! text-neutral-200!;}
+    .button-red {@apply bg-error-500! text-black!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-success-600 text-black !important;}
-    .button-gray:hover {@apply bg-orange-900 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-600 text-black !important;}
+    .button-blue:hover {@apply bg-primary-600! text-black!;}
+    .button-green:hover {@apply bg-success-600! text-black!;}
+    .button-gray:hover {@apply bg-orange-900! text-neutral-200!;}
+    .button-red:hover {@apply bg-error-600! text-black!;}
 }
 
 [data-theme='seafoam'] {
     h1, h2, h3, h4, h5, h6 {font-family: 'Playfair Display', sans-serif !important;}
 
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-success-500 text-black !important;}
-    .button-gray {@apply bg-secondary-500 text-neutral-200 !important;}
-    .button-red {@apply bg-error-400 text-black !important;}
+    .button-blue {@apply bg-primary-500! text-black!;}
+    .button-green {@apply bg-success-500! text-black!;}
+    .button-gray {@apply bg-secondary-500! text-neutral-200!;}
+    .button-red {@apply bg-error-400! text-black!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-success-600 text-black !important;}
-    .button-gray:hover {@apply bg-secondary-600 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-500 text-black !important;}
+    .button-blue:hover {@apply bg-primary-600! text-black!;}
+    .button-green:hover {@apply bg-success-600! text-black!;}
+    .button-gray:hover {@apply bg-secondary-600! text-neutral-200!;}
+    .button-red:hover {@apply bg-error-500! text-black!;}
 }
 
 [data-theme='vintage'] {
     h1, h2, h3, h4, h5, h6 {font-family: 'Abril Fatface', sans-serif !important;}
 
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-success-500 text-black !important;}
-    .button-gray {@apply bg-amber-900 text-neutral-200 !important;}
-    .button-red {@apply bg-error-500 text-black !important;}
+    .button-blue {@apply bg-primary-500! text-black!;}
+    .button-green {@apply bg-success-500! text-black!;}
+    .button-gray {@apply bg-amber-900! text-neutral-200!;}
+    .button-red {@apply bg-error-500! text-black!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-success-600 text-black !important;}
-    .button-gray:hover {@apply bg-amber-950 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-600 text-black !important;}
+    .button-blue:hover {@apply bg-primary-600! text-black!;}
+    .button-green:hover {@apply bg-success-600! text-black!;}
+    .button-gray:hover {@apply bg-amber-950! text-neutral-200!;}
+    .button-red:hover {@apply bg-error-600! text-black!;}
 }
 
 [data-theme='wintry'] {
     /* Buttons */
-    .button-blue {@apply bg-primary-500 text-black !important;}
-    .button-green {@apply bg-success-500 text-black !important;}
-    .button-gray {@apply bg-cyan-900 text-neutral-200 !important;}
-    .button-red {@apply bg-error-400 text-black !important;}
+    .button-blue {@apply bg-primary-500! text-black!;}
+    .button-green {@apply bg-success-500! text-black!;}
+    .button-gray {@apply bg-cyan-900! text-neutral-200!;}
+    .button-red {@apply bg-error-400! text-black!;}
     /* Button hover */
-    .button-blue:hover {@apply bg-primary-600 text-black !important;}
-    .button-green:hover {@apply bg-success-600 text-black !important;}
-    .button-gray:hover {@apply bg-cyan-950 text-neutral-200 !important;}
-    .button-red:hover {@apply bg-error-500 text-black !important;}
+    .button-blue:hover {@apply bg-primary-600! text-black!;}
+    .button-green:hover {@apply bg-success-600! text-black!;}
+    .button-gray:hover {@apply bg-cyan-950! text-neutral-200!;}
+    .button-red:hover {@apply bg-error-500! text-black!;}
 }
 /* Scrollbars
    Without explicit styling the WebView draws them in a colour that blends into the

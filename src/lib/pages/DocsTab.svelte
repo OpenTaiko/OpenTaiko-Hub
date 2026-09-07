@@ -2,26 +2,35 @@
     // Renders the documentation shipped inside the selected OpenTaiko instance
     // (<instance>/docs/index.html) entirely locally: the page and every resource it
     // references (stylesheets, scripts, images) are read from disk and inlined into a
-    // single self-contained document displayed through the iframe's srcdoc. No
-    // requests of any kind are made — the file is read and rendered as is.
+    // single self-contained document handed to an iframe as a Blob URL. No requests of
+    // any kind are made — the file is read and rendered as is.
     import { exists, readTextFile, readFile, readDir } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
     import { _ } from 'svelte-i18n';
 
     import { activeInstance } from "../stores/instances.js";
 
-    let docsHtml = null;
-    let notFound = false;
-    let loading = false;
+    let docsHtml = $state(null);
+    let docsUrl = $state(null);
+    let notFound = $state(false);
+    let loading = $state(false);
     let refreshToken = 0;
-    let renderedFor = null;
+    let renderedFor = null;   // bookkeeping only, never rendered
 
-    // Only (re)build when the active instance actually changes — building inlines the
-    // whole docs site, so avoid redundant rebuilds on unrelated store updates.
-    $: if ($activeInstance && renderedFor !== $activeInstance.id) {
-        renderedFor = $activeInstance.id;
-        Refresh($activeInstance);
-    }
+    // The built page is served to the iframe through a Blob URL rather than srcdoc. A
+    // srcdoc document borrows the Hub's own URL as its base, so when the docs' router
+    // calls location.replace("#/en/...") the iframe navigates to the Hub itself. A Blob
+    // URL is the document's own base, and hash changes stay inside the docs.
+    $effect(() => {
+        if (docsHtml === null) {
+            docsUrl = null;
+            return;
+        }
+        const url = URL.createObjectURL(new Blob([docsHtml], { type: 'text/html' }));
+        docsUrl = url;
+        return () => URL.revokeObjectURL(url);
+    });
+
 
     const IMAGE_MIME = {
         png: 'image/png',
@@ -62,6 +71,11 @@
         const STYLE_OPEN = '<' + 'style>';
         const STYLE_CLOSE = '</' + 'style>';
 
+        // The replacement is passed as a function: given as a string, String.replace
+        // expands "$" patterns inside it ("$'" inserts the rest of the document), and
+        // file contents such as Prism's source do contain those sequences.
+        const swapTag = (tag, replacement) => html.replace(tag, () => replacement);
+
         // Inline stylesheets
         const linkTags = [...html.matchAll(/<link\b[^>]*>/gi)];
         for (const [tag] of linkTags) {
@@ -69,25 +83,27 @@
             if (!href) continue;
             if (/rel="stylesheet"/i.test(tag)) {
                 const css = await readDocsAsset(docsDir, href);
-                html = html.replace(tag, css !== null ? `${STYLE_OPEN}\n${css}\n${STYLE_CLOSE}` : '');
+                html = swapTag(tag, css !== null ? `${STYLE_OPEN}\n${css}\n${STYLE_CLOSE}` : '');
             } else if (/rel="icon"/i.test(tag)) {
-                html = html.replace(tag, '');
+                html = swapTag(tag, '');
             }
         }
 
-        // Inline scripts (in document order)
-        const SCRIPT_OPEN = '<' + 'script>';
+        // Inline scripts (in document order), keeping the tag's other attributes
+        // (e.g. Prism's data-manual, which turns off highlighting on load)
         const SCRIPT_CLOSE = '</' + 'script>';
-        const scriptTags = [...html.matchAll(/<script\b[^>]*\bsrc="([^"]+)"[^>]*><\/script>/gi)];
-        for (const [tag, src] of scriptTags) {
+        const scriptTags = [...html.matchAll(/<script\b([^>]*)\bsrc="([^"]+)"([^>]*)><\/script>/gi)];
+        for (const [tag, before, src, after] of scriptTags) {
             const js = await readDocsAsset(docsDir, src);
             if (js !== null) {
                 // "</script" inside inlined code would end the tag early; escape it
                 // (only occurs inside string literals, where "<\/script" is equivalent)
                 const safe = js.replace(/<\/script/gi, '<\\/script');
-                html = html.replace(tag, `${SCRIPT_OPEN}\n${safe}\n${SCRIPT_CLOSE}`);
+                const attributes = `${before} ${after}`.trim();
+                const scriptOpen = '<' + 'script' + (attributes ? ` ${attributes}` : '') + '>';
+                html = swapTag(tag, `${scriptOpen}\n${safe}\n${SCRIPT_CLOSE}`);
             } else {
-                html = html.replace(tag, '');
+                html = swapTag(tag, '');
             }
         }
 
@@ -107,6 +123,7 @@
             // No media folder: nothing to embed
         }
 
+        const SCRIPT_OPEN = '<' + 'script>';
         const mediaFixer = `${SCRIPT_OPEN}
 (function () {
     var MEDIA = ${JSON.stringify(mediaMap)};
@@ -122,7 +139,7 @@
     document.addEventListener('DOMContentLoaded', function () { fix(document); });
 })();
 ${SCRIPT_CLOSE}`;
-        html = html.includes('</body>') ? html.replace('</body>', `${mediaFixer}\n</body>`) : html + mediaFixer;
+        html = html.includes('</body>') ? html.replace('</body>', () => `${mediaFixer}\n</body>`) : html + mediaFixer;
 
         return html;
     };
@@ -155,6 +172,14 @@ ${SCRIPT_CLOSE}`;
             }
         }
     };
+    // Only (re)build when the active instance actually changes — building inlines the
+    // whole docs site, so avoid redundant rebuilds on unrelated store updates.
+    $effect(() => {
+        if ($activeInstance && renderedFor !== $activeInstance.id) {
+            renderedFor = $activeInstance.id;
+            Refresh($activeInstance);
+        }
+    });
 </script>
 
 {#if notFound}
@@ -164,10 +189,10 @@ ${SCRIPT_CLOSE}`;
             <p class="opacity-70">{$_('docs.not_found_hint')}</p>
         </div>
     </section>
-{:else if docsHtml !== null}
-    <iframe srcdoc={docsHtml} title={$_('docs.title')} class="docs-frame"></iframe>
+{:else if docsUrl !== null}
+    <iframe src={docsUrl} title={$_('docs.title')} class="docs-frame"></iframe>
 {:else if loading}
-    <div class="placeholder animate-pulse w-full h-24" />
+    <div class="placeholder animate-pulse w-full h-24"></div>
 {/if}
 
 <style>
