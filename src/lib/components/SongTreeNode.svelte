@@ -3,6 +3,7 @@
     import SongTreeNode from './SongTreeNode.svelte';
     import { _ } from 'svelte-i18n';
     import type { ScannedSong, SongTreeFolder, SoundtrackEntry } from '$lib/types';
+    import { FormatLevel } from '$lib/utils/levels';
 
     interface Props {
         Node: SongTreeFolder;
@@ -49,13 +50,6 @@
             .map((course) => ({ course, abbr: DIFF_ABBR[course] ?? course, level: levels[course] }));
     };
 
-    // Fractional levels: 10 and above use the Taiko "+" convention (10.5+ → "10+",
-    // 10.4 → "10"); below 10 the integer is shown.
-    const FormatLevel = (level: number): string => {
-        const base = Math.floor(level);
-        if (level >= 10 && level - base >= 0.5) return `${base}+`;
-        return `${base}`;
-    };
     let folders = $derived([...Node.children.values()].sort((a, b) => a.name.localeCompare(b.name)));
     let songs = $derived([...Node.songs].sort((a, b) => SongLabel(a).localeCompare(SongLabel(b))));
 </script>

@@ -2,6 +2,7 @@
 import { _ } from 'svelte-i18n';
 import { get } from 'svelte/store';
 import type { CourseName, SoundtrackEntry } from '$lib/types';
+import { FormatLevel } from '$lib/utils/levels';
 
 interface Props {
     SongInfo: SoundtrackEntry;
@@ -10,14 +11,6 @@ interface Props {
 }
 
 let { SongInfo, Difficulty = "Easy", OnCrownClick = undefined }: Props = $props();
-
-// Fractional levels: 10 and above use the Taiko "+" convention (10.5+ → "10+",
-// 10.4 → "10"); below 10 the integer is shown.
-const FormatLevel = (level: number): string => {
-    const base = Math.floor(level);
-    if (level >= 10 && level - base >= 0.5) return `${base}+`;
-    return `${base}`;
-};
 
 const CHIP_COLORS: Record<CourseName, string> = {
     "Easy": "blue",
