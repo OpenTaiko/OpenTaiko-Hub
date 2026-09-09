@@ -1,9 +1,14 @@
-<script>
+<script lang="ts">
     import { _ } from 'svelte-i18n';
     import { openPath } from '@tauri-apps/plugin-opener';
-    import { instances, activeInstanceId, activeInstance, setActiveInstance, instanceVersions } from '$lib/stores/instances.js';
+    import { instances, activeInstanceId, activeInstance, setActiveInstance, instanceVersions } from '$lib/stores/instances';
+    import type { Instance } from '$lib/types';
 
-    let { OnManage = () => {} } = $props();
+    interface Props {
+        OnManage?: () => void;
+    }
+
+    let { OnManage = () => {} }: Props = $props();
 
     const OpenActiveFolder = async () => {
         const inst = $activeInstance;
@@ -15,7 +20,7 @@
         }
     };
 
-    const channelKey = (inst) => {
+    const channelKey = (inst: Instance | null): 'stable' | 'experimental' | 'empty' => {
         if (!inst?.channel) return 'empty';
         return inst.channel;
     };
@@ -29,7 +34,7 @@
         <select
             class="select flex-1 max-w-md"
             value={$activeInstanceId}
-            onchange={(e) => setActiveInstance(e.target.value)}
+            onchange={(e) => setActiveInstance(e.currentTarget.value)}
         >
             {#each $instances as inst (inst.id)}
                 <option value={inst.id}>{inst.name}</option>

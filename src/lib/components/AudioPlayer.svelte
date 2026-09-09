@@ -1,12 +1,18 @@
-<script>
+<script lang="ts">
 	import { _ } from 'svelte-i18n';
-	let { songInfo } = $props();
+	import type { SoundtrackEntry } from '$lib/types';
+
+	interface Props {
+		songInfo: SoundtrackEntry;
+	}
+
+	let { songInfo }: Props = $props();
 
 	let time = $state(0);
 	let duration = $state(0);
 	let paused = $state(true);
 
-	function format(time) {
+	function format(time: number): string {
 		if (isNaN(time)) return '...';
 
 		const minutes = Math.floor(time / 60);
@@ -44,10 +50,16 @@
 			<span>{format(time)}</span>
 			<div
 				class="slider"
+				role="slider"
+				tabindex="0"
+				aria-label={$_('player.play')}
+				aria-valuemin={0}
+				aria-valuemax={duration || 0}
+				aria-valuenow={time}
 				onpointerdown={e => {
 					const div = e.currentTarget;
 					
-					function seek(e) {
+					function seek(e: PointerEvent) {
 						const { left, width } = div.getBoundingClientRect();
 
 						let p = (e.clientX - left) / width;

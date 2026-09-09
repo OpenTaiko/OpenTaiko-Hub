@@ -74,6 +74,7 @@
 /* v5 scales every text size by 1.067; v2 did not */
 [data-theme] {--text-scaling: 1;}
 
+
 /* Cards: surface background plus the faint inset ring v2 drew around them */
 .card {
     @apply bg-surface-100-800;
@@ -137,7 +138,7 @@ hr {border-color: light-dark(var(--color-surface-300), var(--color-surface-600))
     padding: 0.25rem 0;
     gap: 0.25rem;
     white-space: normal;
-    transition: background-color 150ms;
+    transition: none;   /* v2 tiles switched instantly */
 }
 [data-scope='navigation'][data-part='trigger']:not([data-active]):hover,
 [data-scope='navigation'][data-part='trigger-anchor']:hover {
@@ -165,6 +166,7 @@ hr {border-color: light-dark(var(--color-surface-300), var(--color-surface-600))
     padding: 0.5rem 1rem;
     border-radius: 0;
     line-height: 1.5rem;
+    transition: color 100ms, background-color 100ms;   /* v2 tabs: transition-colors duration-100 */
 }
 @media (min-width: 1024px) {
     .tab-bar [data-scope='tabs'][data-part='trigger'] {flex: none;}

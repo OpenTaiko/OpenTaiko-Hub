@@ -1,50 +1,56 @@
-<script>
+<script lang="ts">
     import "../app.css";
     import "../lite-yt-embed.css";
     import "../lite-yt-embed.js";
 
-    import { onMount, setContext } from 'svelte';
+    import { onMount, setContext, type Snippet } from 'svelte';
     import { Toast } from '@skeletonlabs/skeleton-svelte';
     import { download } from "@tauri-apps/plugin-upload";
     import { readTextFile } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
 
-    import { setupI18n } from '$lib/i18n/index.js';
+    import { setupI18n } from '$lib/i18n';
     import { _, isLoading, locale } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
-    import { GetPreferencesPath } from '$lib/utils/path.js';
-    import { toaster } from '$lib/utils/toaster.js';
-    /**
-     * @typedef {Object} Props
-     * @property {import('svelte').Snippet} [children]
-     */
+    import { GetPreferencesPath } from '$lib/utils/path';
+    import { toaster } from '$lib/utils/toaster';
+    import type { ProgressPayload, ToastContext } from '$lib/types';
 
-    /** @type {Props} */
-    let { children } = $props();
+    interface Props {
+        children?: Snippet;
+    }
+
+    let { children }: Props = $props();
 
     setupI18n();
 
-    const TriggerError = (msg) => {
+    const TriggerError = (msg: string) => {
         console.error(msg);
         toaster.error({ description: msg, duration: 4000 });
     };
 
-    const TriggerWarning = (msg) => {
+    const TriggerWarning = (msg: string) => {
         console.warn(msg);
         toaster.warning({ description: msg, duration: 4000 });
     };
 
-    const TriggerSuccess = (msg) => {
+    const TriggerSuccess = (msg: string) => {
         console.log(msg);
         toaster.success({ description: msg, duration: 4000 });
     };
 
-    const wait = (ms) => {
+    const wait = (ms: number): Promise<void> => {
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    const backoffDownload = async (url, path, prfunc, n = 10, t = 1000) => {
+    const backoffDownload = async (
+        url: string,
+        path: string,
+        prfunc?: (progress: ProgressPayload) => void,
+        n = 10,
+        t = 1000
+    ): Promise<boolean> => {
         for (let attempt = 1; attempt <= n; attempt++) {
             try {
                 await download(url, path, prfunc);
@@ -60,9 +66,11 @@
                 await wait(t);
             }
         }
+        return false;
     }
 
-    setContext('toast', { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, wait });
+    const toastContext: ToastContext = { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, wait };
+    setContext('toast', toastContext);
 
     onMount(async () => {
         // Restore persisted locale
@@ -70,7 +78,7 @@
             const prefsDir = await GetPreferencesPath();
             const langFilePath = await path.join(prefsDir, 'language.json');
             const langFile = await readTextFile(langFilePath);
-            const { locale: savedLocale } = JSON.parse(langFile);
+            const { locale: savedLocale } = JSON.parse(langFile) as { locale?: string };
             if (savedLocale) locale.set(savedLocale);
         } catch {
             // First launch or missing file — getLocaleFromNavigator() already applied

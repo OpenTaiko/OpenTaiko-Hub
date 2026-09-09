@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     // Dependencies
     import { onMount } from 'svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
@@ -9,15 +9,32 @@
     import { path } from '@tauri-apps/api';
     import { invoke, Channel } from '@tauri-apps/api/core';
     import { getContext } from 'svelte';
-    const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext('toast');
+    import type { Database } from 'sql.js';
+    import type {
+        ArtistLinks,
+        CourseName,
+        DuplicateCandidate,
+        DuplicateFolder,
+        HoFScore,
+        LocalSong,
+        MigrationCandidate,
+        ScanProgressEvent,
+        ScanResult,
+        ScannedGenre,
+        ScannedSong,
+        SongArtists,
+        SoundtrackEntry,
+        ToastContext
+    } from '$lib/types';
+    const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
-    import { getSQL } from '$lib/utils/sqljs.js';
+    import { getSQL } from '$lib/utils/sqljs';
 
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
-    import { GetGlobalSongsPath, GetTmpPath } from "../utils/path.js";
-    import { instances } from "../stores/instances.js";
+    import { GetGlobalSongsPath, GetTmpPath } from "../utils/path";
+    import { instances } from "../stores/instances";
 
     // Song management
     import AudioPlayer from '$lib/components/AudioPlayer.svelte';
@@ -27,69 +44,69 @@
 
     // Soundtrack
     const soundtrackInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/soundtrack_info.json';
-    let soundtrackInfo = $state([]);
+    let soundtrackInfo = $state<SoundtrackEntry[]>([]);
     let catalogFetchFailed = $state(false);
-    let currentSongs = $state({});          // uniqueId → { chartMD5s: string[], chartRelativePath }
-    let allScannedSongs = $state([]);       // every scanned song, catalog or custom
-    let scannedGenres = $state({});         // relPath → { title, boxDefSha1, preimageSha1 }
+    let currentSongs = $state<Record<string, LocalSong>>({});          // uniqueId → local chart
+    let allScannedSongs = $state<ScannedSong[]>([]);       // every scanned song, catalog or custom
+    let scannedGenres = $state<Record<string, ScannedGenre>>({});         // relPath → genre folder
     let scanStats = $state({ dirs: 0, found: 0 });
     let scanning = $state(false);
-    let viewMode = $state('list');          // 'list' | 'tree'
+    let viewMode = $state<'list' | 'tree'>('list');
     let searchSong = $state("");
     let searchGenre = $state("");
     let songPreviousSort = "none";
-    let songDLProgress = $state({});
+    let songDLProgress = $state<Record<string, number>>({});
     let songCountProgress = 0;
-    let songCountProgressBar = $state(null);
+    let songCountProgressBar = $state<number | null>(null);
     let bulkBusy = $state(false);          // a bulk download is running
     let activeSingleDownloads = $state(0);  // single-song downloads currently in flight (they run concurrently)
     let songBusy = $derived(activeSingleDownloads > 0);
 
     // Git blob SHAs of the soundtrack repository (path → sha), fetched once per session
     // and used to detect outdated box.def / default.png files
-    let remoteShaMap = null;
-    let remoteShaMapFetch = null;   // in-flight fetch, shared by downloads that start together
+    let remoteShaMap: Map<string, string> | null = null;
+    let remoteShaMapFetch: Promise<Map<string, string> | null> | null = null;   // in-flight fetch, shared by downloads that start together
 
     // Songs found inside attached instances that can be moved to the shared library
-    let migrationCandidates = $state([]);
-    let migrationCandidate = $state(null);   // the instance whose migration modal is open
-    let migrationGlobalPath = $state(null);
+    let migrationCandidates = $state<MigrationCandidate[]>([]);
+    let migrationCandidate = $state<MigrationCandidate | null>(null);   // the instance whose migration modal is open
+    let migrationGlobalPath = $state<string | null>(null);
 
     // Chart-less folders in an instance that the shared library already provides: the
     // game reads both paths, so each one shows up as a duplicate, empty box
-    let duplicateCandidates = $state([]);
+    let duplicateCandidates = $state<DuplicateCandidate[]>([]);
     let duplicateBusy = $state(false);
 
-    let catalogById = $derived(new Map(Array.isArray(soundtrackInfo) ? soundtrackInfo.map((s) => [s.uniqueId, s]) : []));
+    let catalogById = $derived(new Map<string, SoundtrackEntry>(soundtrackInfo.map((s) => [s.uniqueId, s])));
 
     // Hall of Fame
     const hofDbUrl = 'https://opentaiko.github.io/hof.db3';
-    const hofDifficultyMap    = { 0: "Easy", 1: "Normal", 2: "Hard", 3: "Oni", 4: "Edit" };
-    const hofDifficultyRevMap = { "Easy": 0, "Normal": 1, "Hard": 2, "Oni": 3, "Edit": 4 };
-    const hofDiffShortMap     = { "Easy": "EZ", "Normal": "NM", "Hard": "HD", "Oni": "EX", "Edit": "EXEX" };
-    let hofDb = null;
+    const hofDifficultyMap: Record<number, CourseName>    = { 0: "Easy", 1: "Normal", 2: "Hard", 3: "Oni", 4: "Edit" };
+    const hofDifficultyRevMap: Partial<Record<CourseName, number>> = { "Easy": 0, "Normal": 1, "Hard": 2, "Oni": 3, "Edit": 4 };
+    const hofDiffShortMap: Partial<Record<CourseName, string>>     = { "Easy": "EZ", "Normal": "NM", "Hard": "HD", "Oni": "EX", "Edit": "EXEX" };
+    let hofDb: Database | null = null;
     // uniqueId → { difficultyString → globalRank }
-    let hofMap = $state({});
+    let hofMap = $state<Record<string, Partial<Record<CourseName, number>>>>({});
 
     // Modal state
     let hofModalOpen = $state(false);
-    let hofModalSongInfo = $state(null);
-    let hofModalDifficulty = $state(null);
-    let hofModalScores = $state([]);
+    let hofModalSongInfo = $state<SoundtrackEntry | null>(null);
+    let hofModalDifficulty = $state<CourseName | null>(null);
+    let hofModalScores = $state<HoFScore[]>([]);
     let hofModalMaxListPoints = $state(0);
 
     // Max list points decay per rank, matching the website: 0.95 up to rank 20, then
     // 0.96 up to rank 50, then 0.98, so the drop flattens out for later ranks. The
     // tiers chain from one another (no reset), which keeps the curve continuous.
-    const ComputeMaxListPoints = (rank) => {
+    const ComputeMaxListPoints = (rank: number): number => {
         const r = Math.max(1, rank);
         const steps95 = Math.min(r, 20) - 1;
         const steps96 = Math.min(Math.max(r - 20, 0), 30);
         const steps98 = Math.max(r - 50, 0);
-        return parseInt(1000 * Math.pow(0.95, steps95) * Math.pow(0.96, steps96) * Math.pow(0.98, steps98));
+        return Math.trunc(1000 * Math.pow(0.95, steps95) * Math.pow(0.96, steps96) * Math.pow(0.98, steps98));
     };
 
-    const ScoreToListPointsRatio = (score) => {
+    const ScoreToListPointsRatio = (score: Pick<HoFScore, 'goodCount' | 'okCount' | 'badCount' | 'status'>): number => {
         const total = score.goodCount + score.okCount + score.badCount;
         if (total === 0) return 0;
         const accuracy = (score.goodCount + score.okCount * 0.5) / total;
@@ -120,10 +137,10 @@
 
             if (result.length > 0) {
                 let globalRank = 0;
-                for (const [uniqueId, difficulty, _idx] of result[0].values) {
+                for (const [uniqueId, difficulty] of result[0].values) {
                     globalRank++;
-                    const diffStr = hofDifficultyMap[difficulty];
-                    if (diffStr && uniqueId) {
+                    const diffStr = hofDifficultyMap[Number(difficulty)];
+                    if (diffStr && typeof uniqueId === 'string') {
                         if (!hofMap[uniqueId]) hofMap[uniqueId] = {};
                         hofMap[uniqueId][diffStr] = globalRank;
                     }
@@ -140,12 +157,11 @@
         }
     };
 
-    const openHoFModal = (songInfo, difficulty) => {
+    const openHoFModal = (songInfo: SoundtrackEntry, difficulty: CourseName) => {
         if (!hofDb) return;
         const rank = hofMap[songInfo.uniqueId]?.[difficulty];
-        if (rank === undefined) return;
-
         const diffInt = hofDifficultyRevMap[difficulty];
+        if (rank === undefined || diffInt === undefined) return;
         const result = hofDb.exec(
             `SELECT player, status, score, grade, goodCount, okCount, badCount, videoLink, imageLink
              FROM scores WHERE entryId = ? AND difficulty = ?`,
@@ -157,17 +173,16 @@
 
         hofModalScores = result.length > 0
             ? result[0].values
-                .map((row) => {
+                .map((row): Omit<HoFScore, 'rank'> => {
                     const s = {
-                        player: row[0], status: row[1], score: row[2], grade: row[3],
-                        goodCount: row[4], okCount: row[5], badCount: row[6],
-                        videoLink: row[7], imageLink: row[8]
+                        player: String(row[0] ?? ''), status: String(row[1] ?? ''), score: Number(row[2] ?? 0), grade: String(row[3] ?? ''),
+                        goodCount: Number(row[4] ?? 0), okCount: Number(row[5] ?? 0), badCount: Number(row[6] ?? 0),
+                        videoLink: row[7] == null ? null : String(row[7]), imageLink: row[8] == null ? null : String(row[8])
                     };
-                    s.listPoints = Math.round(maxListPoints * ScoreToListPointsRatio(s));
-                    return s;
+                    return { ...s, listPoints: Math.round(maxListPoints * ScoreToListPointsRatio(s)) };
                 })
                 .sort((a, b) => b.listPoints - a.listPoints || b.score - a.score)
-                .map((s, i) => ({ ...s, rank: i + 1 }))
+                .map((s, i): HoFScore => ({ ...s, rank: i + 1 }))
             : [];
 
         hofModalSongInfo = songInfo;
@@ -175,12 +190,12 @@
         hofModalOpen = true;
     };
 
-    const filter1 = (sInfo) => {
+    const filter1 = (sInfo: SoundtrackEntry[]): SoundtrackEntry[] => {
         const uids = ["losTPEtAlSwANDERRBHLiXoUNdsetSUnaN"];
         return sInfo.filter(obj => !uids.includes(obj.uniqueId));
     }
 
-    const filter2 = (sInfo) => {
+    const filter2 = (sInfo: SoundtrackEntry[]): SoundtrackEntry[] => {
         return sInfo;
     }
 
@@ -190,7 +205,7 @@
             const response = await fetch(soundtrackInfoUrl);
         if (response.ok) {
             const text = await response.text();
-            soundtrackInfo = JSON.parse(text);
+            soundtrackInfo = JSON.parse(text) as SoundtrackEntry[];
 
             if (navigator.language === "zh-CN") {
                 soundtrackInfo = filter1(soundtrackInfo);
@@ -213,12 +228,12 @@
     const crawlSongs = async () => {
         scanning = true;
         scanStats = { dirs: 0, found: 0 };
-        let liveSongs = {};
-        let liveAll = [];
+        let liveSongs: Record<string, LocalSong> = {};
+        let liveAll: ScannedSong[] = [];
         currentSongs = {};
         allScannedSongs = [];
 
-        const registerSong = (map, list, song) => {
+        const registerSong = (map: Record<string, LocalSong>, list: ScannedSong[], song: ScannedSong) => {
             list.push(song);
             if (song.uniqueId) {
                 map[song.uniqueId] = {
@@ -231,7 +246,7 @@
         try {
             const baseDirPath = await GetGlobalSongsPath();
 
-            const channel = new Channel();
+            const channel = new Channel<ScanProgressEvent>();
             channel.onmessage = (message) => {
                 if (message.type !== 'progress') return;
                 scanStats = { dirs: message.scannedDirs, found: message.songsFound };
@@ -242,11 +257,11 @@
                 }
             };
 
-            const result = await invoke('scan_songs', { baseDir: baseDirPath, onEvent: channel });
+            const result = await invoke<ScanResult>('scan_songs', { baseDir: baseDirPath, onEvent: channel });
 
             // The command result is authoritative; events were only for live display
-            const finalSongs = {};
-            const finalAll = [];
+            const finalSongs: Record<string, LocalSong> = {};
+            const finalAll: ScannedSong[] = [];
             for (const song of result.songs) registerSong(finalSongs, finalAll, song);
             currentSongs = finalSongs;
             allScannedSongs = finalAll;
@@ -254,7 +269,7 @@
             scanStats = { dirs: scanStats.dirs, found: finalAll.length };
         } catch (error) {
             console.error('Song scan failed:', error);
-            TriggerError(get(_)('songs.error.scan_failed', { values: { error } }));
+            TriggerError(get(_)('songs.error.scan_failed', { values: { error: String(error) } }));
         }
         scanning = false;
         CheckMigrations();
@@ -263,16 +278,16 @@
     // Looks inside every attached (non-experimental) instance for songs that could be
     // moved to the shared library
     const CheckMigrations = async () => {
-        const candidates = [];
+        const candidates: MigrationCandidate[] = [];
         try {
             const globalSongs = await GetGlobalSongsPath();
-            const norm = (p) => p.replace(/\//g, '\\').replace(/[\\]+$/, '').toLowerCase();
+            const norm = (p: string): string => p.replace(/\//g, '\\').replace(/[\\]+$/, '').toLowerCase();
             for (const inst of get(instances)) {
                 const instSongs = await path.join(inst.path, 'Songs');
                 if (norm(instSongs) === norm(globalSongs)) continue;
                 try {
-                    const probe = new Channel();
-                    const result = await invoke('scan_songs', { baseDir: instSongs, onEvent: probe });
+                    const probe = new Channel<ScanProgressEvent>();
+                    const result = await invoke<ScanResult>('scan_songs', { baseDir: instSongs, onEvent: probe });
                     if (result.baseExists && result.songs.length > 0) {
                         candidates.push({ instance: inst, count: result.songs.length, srcPath: instSongs });
                     }
@@ -289,13 +304,13 @@
 
     // Looks for chart-less folders an instance duplicates from the shared library
     const CheckDuplicates = async () => {
-        const found = [];
+        const found: DuplicateCandidate[] = [];
         try {
             const globalSongs = await GetGlobalSongsPath();
             for (const inst of get(instances)) {
                 const instSongs = await path.join(inst.path, 'Songs');
                 try {
-                    const folders = await invoke('find_duplicate_song_folders', {
+                    const folders = await invoke<DuplicateFolder[]>('find_duplicate_song_folders', {
                         instanceSongs: instSongs,
                         globalSongs
                     });
@@ -312,11 +327,11 @@
         duplicateCandidates = found;
     }
 
-    const CleanDuplicates = async (candidate) => {
+    const CleanDuplicates = async (candidate: DuplicateCandidate) => {
         if (duplicateBusy) return;
         duplicateBusy = true;
         try {
-            const removed = await invoke('remove_duplicate_song_folders', {
+            const removed = await invoke<number>('remove_duplicate_song_folders', {
                 instanceSongs: candidate.srcPath,
                 globalSongs: candidate.globalSongs,
                 relPaths: candidate.folders.map((f) => f.relPath)
@@ -324,20 +339,20 @@
             TriggerSuccess(get(_)('songs.duplicates.success', { values: { count: removed } }));
             duplicateCandidates = duplicateCandidates.filter((c) => c !== candidate);
         } catch (error) {
-            TriggerError(get(_)('songs.duplicates.error', { values: { error } }));
+            TriggerError(get(_)('songs.duplicates.error', { values: { error: String(error) } }));
         }
         duplicateBusy = false;
     }
 
     // Opens the resolve/transfer modal for one instance (conflicts are decided there)
-    const OpenMigration = async (candidate) => {
+    const OpenMigration = async (candidate: MigrationCandidate) => {
         migrationGlobalPath = await GetGlobalSongsPath();
         migrationCandidate = candidate;
     }
 
     // Called by the modal after a plan was applied; the resolved instance is emptied,
     // so it drops out of the candidate list and won't prompt again.
-    const OnMigrationApplied = (candidate) => {
+    const OnMigrationApplied = (candidate: MigrationCandidate) => {
         migrationCandidates = migrationCandidates.filter((c) => c !== candidate);
         migrationCandidate = null;
         crawlSongs();
@@ -349,13 +364,13 @@
             await mkdir(songsDir, { recursive: true });
             await openPath(songsDir);
         } catch (error) {
-            TriggerError(get(_)('home.error.launch', { values: { error } }));
+            TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
         }
     }
 
     // Fetches the soundtrack repository's git tree once so local box.def / default.png
     // files can be compared against their upstream version by git blob SHA
-    const EnsureRemoteShaMap = async () => {
+    const EnsureRemoteShaMap = async (): Promise<Map<string, string> | null> => {
         if (remoteShaMap) return remoteShaMap;
         // Downloads started back to back share one request instead of each hitting the
         // GitHub API (rate limited) for the same tree
@@ -364,11 +379,11 @@
                 try {
                     const response = await fetch('https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/main?recursive=1');
                     if (response.ok) {
-                        const data = await response.json();
+                        const data = (await response.json()) as { tree?: { type: string; path: string; sha: string }[] };
                         remoteShaMap = new Map(
                             (data.tree ?? [])
                                 .filter((entry) => entry.type === 'blob')
-                                .map((entry) => [entry.path, entry.sha])
+                                .map((entry): [string, string] => [entry.path, entry.sha])
                         );
                     }
                 } catch (error) {
@@ -383,28 +398,28 @@
     }
 
 
-    let GetFilteredSInfo = $derived((SInfo) => {
-        const bInNameFilter = SInfo.chartTitle.toLowerCase().includes(searchSong.toLowerCase()) || SInfo.chartSubtitle?.toLowerCase().includes(searchSong.toLowerCase());
+    let GetFilteredSInfo = $derived((SInfo: SoundtrackEntry): boolean => {
+        const bInNameFilter = SInfo.chartTitle.toLowerCase().includes(searchSong.toLowerCase()) || (SInfo.chartSubtitle?.toLowerCase().includes(searchSong.toLowerCase()) ?? false);
         const bInGenreFilter = SInfo.tjaGenreFolder.toLowerCase().includes(searchGenre.toLowerCase());
 
         return bInGenreFilter && bInNameFilter;
     })
 
     // Reactive so status cells re-render as scan results stream in
-    let IsSongUpToDate = $derived((SInfo) => {
+    let IsSongUpToDate = $derived((SInfo: SoundtrackEntry): boolean => {
         const localSong = currentSongs[SInfo.uniqueId];
         return !!localSong && (localSong.chartMD5s ?? []).includes(SInfo.tjaMD5);
     })
 
-    const GetFilteredAvailableSInfo = (SInfo) => {
+    const GetFilteredAvailableSInfo = (SInfo: SoundtrackEntry): boolean => {
         return !IsSongUpToDate(SInfo) && GetFilteredSInfo(SInfo);
     }
 
-    const UndefinedToMinusOne = (val) => {
+    const UndefinedToMinusOne = (val: number | undefined | null): number => {
         return (val === undefined || val === null) ? -1 : val;
     }
 
-    const AlterValueTowerDan = (a, b, og) => {
+    const AlterValueTowerDan = (a: SoundtrackEntry, b: SoundtrackEntry, og: number): number => {
         const aTD = (a.chartDifficulties.Tower !== undefined || a.chartDifficulties.Dan !== undefined);
         const bTD = (b.chartDifficulties.Tower !== undefined || b.chartDifficulties.Dan !== undefined);
         if (aTD) return 2147483647;
@@ -412,7 +427,7 @@
         return og;
     }
 
-    const SortSongsByColumn = (column) => {
+    const SortSongsByColumn = (column: string) => {
         const wasClickedPreviously = `${column} asc` === songPreviousSort;
         const mult = (wasClickedPreviously) ? -1 : 1;
         songPreviousSort = (wasClickedPreviously) ? `${column} desc` : `${column} asc`;
@@ -524,14 +539,14 @@
     // Calls are serialized: songs download concurrently, and two songs of the same
     // genre would otherwise copy the same box.def on top of each other. Once the first
     // one has written it, the next sees the updated local SHA and skips the file.
-    let genreMetadataLock = Promise.resolve();
-    const EnsureGenreMetadata = (genrePath, tmpFolder) => {
+    let genreMetadataLock: Promise<unknown> = Promise.resolve();
+    const EnsureGenreMetadata = (genrePath: string, tmpFolder: string): Promise<boolean> => {
         const run = genreMetadataLock.then(() => EnsureGenreMetadataUnlocked(genrePath, tmpFolder));
         genreMetadataLock = run.catch(() => {});
         return run;
     }
 
-    const EnsureGenreMetadataUnlocked = async (genrePath, tmpFolder) => {
+    const EnsureGenreMetadataUnlocked = async (genrePath: string, tmpFolder: string): Promise<boolean> => {
         const baseDirPath = await GetGlobalSongsPath();
         const genreFullPath = await path.join(baseDirPath, genrePath);
         let changed = false;
@@ -542,7 +557,7 @@
             const localSha = fileName === 'box.def' ? localGenre?.boxDefSha1 : localGenre?.preimageSha1;
             const remoteSha = remoteShaMap?.get(`${genrePath}/${fileName}`);
 
-            let needsDownload;
+            let needsDownload: boolean;
             if (remoteShaMap) {
                 needsDownload = !!remoteSha && localSha !== remoteSha;
             } else {
@@ -584,7 +599,7 @@
         return updated;
     }
 
-    const DownloadSong = async (songObj, currentObj, songNb = undefined, songTotal = undefined) => {
+    const DownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, songNb?: number, songTotal?: number) => {
         // Never write into the library while it is still being scanned, the scan's
         // final result would otherwise clobber this download's bookkeeping.
         if (scanning) {
@@ -613,7 +628,7 @@
         }
     }
 
-    const RunDownloadSong = async (songObj, currentObj, songNb, songTotal) => {
+    const RunDownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, songNb?: number, songTotal?: number) => {
         await EnsureRemoteShaMap();
 
         const baseDirPath = await GetGlobalSongsPath();
@@ -631,14 +646,14 @@
             await mkdir(chartDownloadFolder, {recursive: true});
 
         try {
-            let fileNames = [];
+            let fileNames: string[] = [];
 
             let totbyts = 0;
             for (const filePath of songObj.tjaFilesPath) {
                 // forbid non-children paths
                 let localFilePath = (filePath.startsWith(songObj.tjaFolderPath + '\\') || filePath.startsWith(songObj.tjaFolderPath + '/')) ?
                     filePath.slice(songObj.tjaFolderPath.length + 1)
-                    : filePath.split("\\").pop();
+                    : filePath.split("\\").pop() ?? filePath;
 
                 const tjaFileUrl = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${filePath}`;
                 const dlPath = await path.join(chartDownloadFolder, localFilePath.replace(/\\/g, '/'));
@@ -708,11 +723,11 @@
 
     // Artists info
     const artistsDbUrl = 'https://opentaiko.github.io/artists_info.db3';
-    let songArtistsMap = $state({}); // songUid → { artists: ArtistObj[], link }
-    let expandedSongUid = $state(null);
+    let songArtistsMap = $state<Record<string, SongArtists>>({}); // songUid → artists and links
+    let expandedSongUid = $state<string | null>(null);
 
     const updateArtistInfo = async () => {
-        let db = null;
+        let db: Database | null = null;
         try {
             const SQL = await getSQL();
             const response = await fetch(artistsDbUrl);
@@ -720,22 +735,26 @@
             db = new SQL.Database(new Uint8Array(buffer));
 
             const artistsResult = db.exec('SELECT entryId, artist, youtube, soundcloud, spotify, bandcamp, bilibili, other FROM artists');
-            const artistsById = {};
+            const link = (value: unknown): string | null => (value == null ? null : String(value));
+            const artistsById: Record<string, ArtistLinks> = {};
             if (artistsResult.length > 0) {
                 for (const [entryId, artist, youtube, soundcloud, spotify, bandcamp, bilibili, other] of artistsResult[0].values) {
-                    artistsById[entryId] = { artist, youtube, soundcloud, spotify, bandcamp, bilibili, other };
+                    artistsById[String(entryId)] = {
+                        artist: String(artist ?? ''),
+                        youtube: link(youtube), soundcloud: link(soundcloud), spotify: link(spotify),
+                        bandcamp: link(bandcamp), bilibili: link(bilibili), other: link(other)
+                    };
                 }
             }
 
             const songsResult = db.exec('SELECT songUid, artists, link FROM songs');
             if (songsResult.length > 0) {
-                for (const [songUid, artistsJson, link] of songsResult[0].values) {
-                    const artistIds = JSON.parse(artistsJson || '[]');
-                    const artists = artistIds.map(id => artistsById[id]).filter(Boolean);
-                    songArtistsMap[songUid] = { artists, link };
+                for (const [songUid, artistsJson, songLink] of songsResult[0].values) {
+                    const artistIds = JSON.parse(String(artistsJson || '[]')) as (string | number)[];
+                    const artists = artistIds.map((id) => artistsById[String(id)]).filter((a): a is ArtistLinks => !!a);
+                    songArtistsMap[String(songUid)] = { artists, link: link(songLink) };
                 }
             }
-            songArtistsMap = songArtistsMap;
         } catch (e) {
             console.error('Failed to load artist info:', e);
         } finally {
@@ -743,7 +762,7 @@
         }
     };
 
-    const toggleExpand = (uid) => {
+    const toggleExpand = (uid: string) => {
         expandedSongUid = expandedSongUid === uid ? null : uid;
     };
 
@@ -973,7 +992,7 @@
 </div>
 {/if}
 
-{#if hofModalOpen && hofModalSongInfo}
+{#if hofModalOpen && hofModalSongInfo && hofModalDifficulty}
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div class="modal-backdrop" onclick={() => hofModalOpen = false}>
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
@@ -1036,13 +1055,14 @@
 </div>
 {/if}
 
-{#if migrationCandidate}
+{#if migrationCandidate && migrationGlobalPath}
+{@const candidate = migrationCandidate}
 <SongMigrationModal
-	Candidate={migrationCandidate}
+	Candidate={candidate}
 	GlobalPath={migrationGlobalPath}
 	CatalogById={catalogById}
 	OnClose={() => migrationCandidate = null}
-	OnApplied={() => OnMigrationApplied(migrationCandidate)}
+	OnApplied={() => OnMigrationApplied(candidate)}
 />
 {/if}
 

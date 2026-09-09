@@ -31,6 +31,8 @@ Open terminal, `cd` into the OpenTaiko-Hub directory, run `npm install` to insta
 
 Then run `npm run tauri dev`, and then wait the project to build and the OpenTaiko-Hub window to boot.
 
+The frontend is TypeScript: run `npm run check` to type-check it (the Rust backend is checked with `cargo check` in `src-tauri`).
+
 ## How to Build Locally
 
 Use the release build from GitHub action is usually enough. However, you can still run `npm run tauri build` to build the build.

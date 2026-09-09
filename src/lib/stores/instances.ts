@@ -1,15 +1,13 @@
 // Registry of managed OpenTaiko instances, persisted in the Hub preferences folder.
-// Each instance: { id, name, path, channel: 'stable' | 'experimental' | null,
-//                  experimental: null | { kind: 'indev', branch, label, sha, builtAt }
-//                               | { kind: 'prerelease', tag, label },
-//                  createdAt }
-// channel === null means no build has been installed into the folder yet.
+// See `Instance` in $lib/types for the record shape; channel === null means no build
+// has been installed into the folder yet.
 import { writable, derived, get } from 'svelte/store';
 import { readTextFile, writeTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
 import { join, basename } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
-import { GetPreferencesPath, GetRootPath, GetGlobalSongsPath, GetLegacyInstancePath } from '../utils/path.js';
-import { isVersionInSeries } from '../utils/versions.js';
+import { GetPreferencesPath, GetRootPath, GetGlobalSongsPath, GetLegacyInstancePath } from '../utils/path';
+import { isVersionInSeries } from '../utils/versions';
+import type { Instance, InstanceRegistry } from '$lib/types';
 
 const REGISTRY_FILE = 'instances.json';
 
@@ -18,37 +16,51 @@ const REGISTRY_FILE = 'instances.json';
 // TJAPath. Every other version (0.6.1 experimental today, the official 0.6.1, and
 // anything later such as a direct 0.6.0 to 0.7.0 update) reads the shared library alone.
 // Matching the series rather than a "below 0.6.1" range keeps this exact.
-const LOCAL_BOXES_SERIES = [0, 6, 0];
+const LOCAL_BOXES_SERIES: [number, number, number] = [0, 6, 0];
 
-export const instances = writable([]);
-export const activeInstanceId = writable(null);
+export const instances = writable<Instance[]>([]);
+export const activeInstanceId = writable<string | null>(null);
 export const activeInstance = derived(
     [instances, activeInstanceId],
     ([$instances, $id]) => $instances.find((inst) => inst.id === $id) ?? null
 );
 // id → version string read from the game binary (null = no build detected)
-export const instanceVersions = writable({});
+export const instanceVersions = writable<Record<string, string | null>>({});
 export const instancesReady = writable(false);
 
-const registryPath = async () => join(await GetPreferencesPath(), REGISTRY_FILE);
+const registryPath = async (): Promise<string> => join(await GetPreferencesPath(), REGISTRY_FILE);
 
-const normalizePath = (p) => {
+const normalizePath = (p: string | null | undefined): string => {
     const normalized = (p ?? '').replace(/\//g, '\\').replace(/[\\]+$/, '');
     // Only Windows paths are case-insensitive; Linux paths must keep their case
     const isWindowsPath = /^[a-z]:\\/i.test(normalized) || normalized.startsWith('\\\\');
     return isWindowsPath ? normalized.toLowerCase() : normalized;
 };
 
-const persist = async () => {
+const persist = async (): Promise<void> => {
     const prefsDir = await GetPreferencesPath();
     await mkdir(prefsDir, { recursive: true });
-    const data = {
+    const data: InstanceRegistry = {
         version: 1,
         activeId: get(activeInstanceId),
         instances: get(instances)
     };
     await writeTextFile(await registryPath(), JSON.stringify(data, null, 2));
 };
+
+export interface ResolveInstancesInput {
+    storedList: unknown;
+    storedActiveId: string | null;
+    legacyPath: string | null;
+    pathExists: (path: string) => Promise<boolean>;
+    makeInstance: (path: string) => Instance;
+}
+
+export interface ResolvedInstances {
+    list: Instance[];
+    activeId: string | null;
+    adopted: boolean;
+}
 
 // Decides the instance list and the selected instance from what was stored plus what
 // is on disk. Kept pure (all IO passed in) so the upgrade paths can be tested.
@@ -58,10 +70,10 @@ const persist = async () => {
 // has never been added. Adoption therefore runs on every load, not only when the
 // registry is missing, which is what made an existing OpenTaiko install invisible after
 // updating the Hub.
-export const resolveInstances = async ({ storedList, storedActiveId, legacyPath, pathExists, makeInstance }) => {
-    let list = Array.isArray(storedList) ? storedList : [];
+export const resolveInstances = async ({ storedList, storedActiveId, legacyPath, pathExists, makeInstance }: ResolveInstancesInput): Promise<ResolvedInstances> => {
+    let list: Instance[] = Array.isArray(storedList) ? (storedList as Instance[]) : [];
 
-    let adopted = null;
+    let adopted: Instance | null = null;
     const known = new Set(list.map((inst) => normalizePath(inst.path)));
     if (legacyPath && !known.has(normalizePath(legacyPath)) && (await pathExists(legacyPath))) {
         adopted = makeInstance(legacyPath);
@@ -70,7 +82,7 @@ export const resolveInstances = async ({ storedList, storedActiveId, legacyPath,
 
     // A freshly adopted folder is this install's own game, so select it. Otherwise keep
     // the stored selection, falling back to an instance that still exists on disk.
-    let active = adopted ?? list.find((inst) => inst.id === storedActiveId) ?? null;
+    let active: Instance | null = adopted ?? list.find((inst) => inst.id === storedActiveId) ?? null;
     if (!active && list.length > 0) {
         for (const inst of list) {
             if (await pathExists(inst.path)) {
@@ -84,13 +96,13 @@ export const resolveInstances = async ({ storedList, storedActiveId, legacyPath,
     return { list, activeId: active?.id ?? null, adopted: !!adopted };
 };
 
-export const loadInstances = async () => {
-    let storedList = [];
-    let storedActiveId = null;
+export const loadInstances = async (): Promise<void> => {
+    let storedList: unknown = [];
+    let storedActiveId: string | null = null;
     let registryFound = false;
     try {
         const content = await readTextFile(await registryPath());
-        const data = JSON.parse(content);
+        const data = JSON.parse(content) as Partial<InstanceRegistry>;
         storedList = Array.isArray(data.instances) ? data.instances : [];
         storedActiveId = data.activeId ?? null;
         registryFound = true;
@@ -98,7 +110,7 @@ export const loadInstances = async () => {
         // No registry yet: first run of 0.2, or a fresh install
     }
 
-    let legacyPath = null;
+    let legacyPath: string | null = null;
     try {
         legacyPath = await GetLegacyInstancePath();
     } catch (error) {
@@ -132,23 +144,23 @@ export const loadInstances = async () => {
     instancesReady.set(true);
 };
 
-export const setActiveInstance = async (id) => {
+export const setActiveInstance = async (id: string): Promise<void> => {
     activeInstanceId.set(id);
     await persist();
 };
 
-export const updateInstance = async (id, patch) => {
+export const updateInstance = async (id: string, patch: Partial<Instance>): Promise<Instance | null> => {
     instances.update((list) => list.map((inst) => (inst.id === id ? { ...inst, ...patch } : inst)));
     await persist();
     return get(instances).find((inst) => inst.id === id) ?? null;
 };
 
-export const createInstance = async (name) => {
+export const createInstance = async (name: string | null | undefined): Promise<Instance> => {
     const root = await GetRootPath();
     const folderName = `OpenTaiko-${crypto.randomUUID()}`;
     const path = await join(root, folderName);
     await mkdir(path, { recursive: true });
-    const instance = {
+    const instance: Instance = {
         id: crypto.randomUUID(),
         name: name?.trim() || folderName,
         path,
@@ -162,14 +174,14 @@ export const createInstance = async (name) => {
     return instance;
 };
 
-export const attachInstance = async (path, name = null) => {
+export const attachInstance = async (path: string, name: string | null = null): Promise<Instance> => {
     const existing = get(instances).find((inst) => normalizePath(inst.path) === normalizePath(path));
     if (existing) {
         activeInstanceId.set(existing.id);
         await persist();
         return existing;
     }
-    const instance = {
+    const instance: Instance = {
         id: crypto.randomUUID(),
         name: name?.trim() || (await basename(path)),
         path,
@@ -184,7 +196,7 @@ export const attachInstance = async (path, name = null) => {
 };
 
 // Removes the instance from the registry only; no files are deleted.
-export const detachInstance = async (id) => {
+export const detachInstance = async (id: string): Promise<void> => {
     instances.update((list) => list.filter((inst) => inst.id !== id));
     if (get(activeInstanceId) === id) {
         activeInstanceId.set(get(instances)[0]?.id ?? null);
@@ -192,12 +204,12 @@ export const detachInstance = async (id) => {
     await persist();
 };
 
-export const refreshInstanceVersion = async (id) => {
+export const refreshInstanceVersion = async (id: string): Promise<string | null> => {
     const instance = get(instances).find((inst) => inst.id === id);
     if (!instance) return null;
-    let version = null;
+    let version: string | null = null;
     try {
-        version = await invoke('get_game_version', { instanceDir: instance.path });
+        version = await invoke<string | null>('get_game_version', { instanceDir: instance.path });
     } catch (error) {
         console.error('get_game_version failed:', error);
     }
@@ -205,7 +217,7 @@ export const refreshInstanceVersion = async (id) => {
         // Fallback: version.json written by pre-0.2 Hub versions
         try {
             const raw = await readTextFile(await join(instance.path, 'version.json'));
-            version = JSON.parse(raw).version ?? null;
+            version = (JSON.parse(raw) as { version?: string }).version ?? null;
         } catch {
             version = null;
         }
@@ -221,7 +233,7 @@ export const refreshInstanceVersion = async (id) => {
 // Points the instance's Config.ini ([System] TJAPath) at the shared Songs library.
 // Only 0.6.0.x instances also keep their own Songs folder in TJAPath, because that is
 // where their Favorite / Recent / Search boxes live (see LOCAL_BOXES_SERIES).
-export const linkGlobalSongs = async (instance) => {
+export const linkGlobalSongs = async (instance: Instance | null | undefined): Promise<void> => {
     if (!instance) return;
     try {
         let version = get(instanceVersions)[instance.id] ?? null;

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     // Resolves an instance's local Songs folder into the shared library. New charts are
     // moved, byte-identical charts are dropped, and charts that clash with a different
     // version already in the library are resolved by the user — per chart (showing each
@@ -7,8 +7,27 @@
     import { invoke } from '@tauri-apps/api/core';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
+    import type {
+        MigrateSummary,
+        MigrationAction,
+        MigrationCandidate,
+        MigrationDecision,
+        MigrationItem,
+        MigrationPlan,
+        MigrationSongEntry,
+        SoundtrackEntry,
+        ToastContext
+    } from '$lib/types';
 
-    const { TriggerError, TriggerSuccess } = getContext('toast');
+    const { TriggerError, TriggerSuccess } = getContext<ToastContext>('toast');
+
+    interface Props {
+        Candidate: MigrationCandidate;
+        GlobalPath: string;
+        CatalogById?: Map<string, SoundtrackEntry>;
+        OnClose?: () => void;
+        OnApplied?: () => void;
+    }
 
     let {
         Candidate,
@@ -16,54 +35,57 @@
         CatalogById = new Map(),
         OnClose = () => {},
         OnApplied = () => {}
-    } = $props();
+    }: Props = $props();
+
+    type ConflictChoice = 'keep_global' | 'use_instance';
 
     let loading = $state(true);
     let applying = $state(false);
-    let plan = $state(null);
-    let conflicts = $state([]);
+    let plan = $state<MigrationPlan | null>(null);
+    let conflicts = $state<MigrationItem[]>([]);
     // srcRelPath -> 'keep_global' | 'use_instance'
-    let choices = $state({});
+    let choices = $state<Record<string, ConflictChoice>>({});
 
     onMount(async () => {
         try {
-            plan = await invoke('plan_migration', {
+            plan = await invoke<MigrationPlan>('plan_migration', {
                 srcSongs: Candidate.srcPath,
                 destSongs: GlobalPath
             });
             conflicts = plan.items.filter((item) => item.status === 'conflict');
             // Default: keep the version already in the shared library
-            choices = Object.fromEntries(conflicts.map((item) => [item.src.relPath, 'keep_global']));
+            choices = Object.fromEntries(conflicts.map((item) => [item.src.relPath, 'keep_global' as const]));
         } catch (error) {
-            TriggerError(get(_)('songs.migrate.error', { values: { error } }));
+            TriggerError(get(_)('songs.migrate.error', { values: { error: String(error) } }));
             OnClose();
         }
         loading = false;
     });
 
-    const Label = (entry) => {
+    const Label = (entry: MigrationSongEntry): string => {
         const catalogEntry = entry.uniqueId ? CatalogById.get(entry.uniqueId) : null;
-        return catalogEntry?.chartTitle ?? entry.title ?? entry.relPath.split('/').pop();
+        return catalogEntry?.chartTitle ?? entry.title ?? entry.relPath.split('/').pop() ?? entry.relPath;
     };
-    const ShortHash = (entry) => {
-        if (!entry.md5s || entry.md5s.length === 0) return '—';
+    const ShortHash = (entry: MigrationSongEntry | null): string => {
+        if (!entry?.md5s || entry.md5s.length === 0) return '—';
         const head = entry.md5s[0].slice(0, 10);
         return entry.md5s.length > 1 ? `${head} +${entry.md5s.length - 1}` : head;
     };
-    const EditedDate = (entry) => {
-        if (!entry.modified) return '—';
+    const EditedDate = (entry: MigrationSongEntry | null): string => {
+        if (!entry?.modified) return '—';
         return new Date(entry.modified * 1000).toLocaleString();
     };
 
-    const SetAll = (action) => {
+    const SetAll = (action: ConflictChoice) => {
         choices = Object.fromEntries(conflicts.map((item) => [item.src.relPath, action]));
     };
 
     const Apply = async () => {
+        if (!plan) return;
         applying = true;
         try {
-            const decisions = plan.items.map((item) => {
-                let action;
+            const decisions: MigrationDecision[] = plan.items.map((item) => {
+                let action: MigrationAction;
                 if (item.status === 'new') action = 'move';
                 else if (item.status === 'identical') action = 'keep_global';
                 else action = choices[item.src.relPath] ?? 'keep_global';
@@ -74,7 +96,7 @@
                 };
             });
 
-            const summary = await invoke('apply_migration', {
+            const summary = await invoke<MigrateSummary>('apply_migration', {
                 srcSongs: Candidate.srcPath,
                 destSongs: GlobalPath,
                 decisions
@@ -84,7 +106,7 @@
             }));
             OnApplied();
         } catch (error) {
-            TriggerError(get(_)('songs.migrate.error', { values: { error } }));
+            TriggerError(get(_)('songs.migrate.error', { values: { error: String(error) } }));
         }
         applying = false;
     };

@@ -1,23 +1,19 @@
-<script>
+<script lang="ts">
+    interface Props {
+        Url?: string;
+        ImageSrc?: string;
+        CardTitle?: string;
+        CardSubtitle?: string;
+        CardText?: string;
+    }
 
-    /**
-     * @typedef {Object} Props
-     * @property {string} [Url]
-     * @property {string} [ImageSrc]
-     * @property {string} [CardTitle]
-     * @property {string} [CardSubtitle]
-     * @property {string} [CardText]
-     */
-
-    /** @type {Props} */
     let {
         Url = "",
         ImageSrc = "",
         CardTitle = "",
         CardSubtitle = "",
         CardText = ""
-    } = $props();
-
+    }: Props = $props();
 </script>
 
 <a class="card bg-initial overflow-hidden no-underline" href={Url} target="_blank">

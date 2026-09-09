@@ -1,42 +1,48 @@
-<script>
+<script lang="ts">
     // A component may import itself for recursion (replaces <svelte:self>)
     import SongTreeNode from './SongTreeNode.svelte';
     import { _ } from 'svelte-i18n';
+    import type { ScannedSong, SongTreeFolder, SoundtrackEntry } from '$lib/types';
 
-    /**
-     * @typedef {Object} Props
-     * @property {any} Node
-     * @property {any} [CatalogById]
-     * @property {number} [Depth]
-     */
+    interface Props {
+        Node: SongTreeFolder;
+        CatalogById?: Map<string, SoundtrackEntry>;
+        Depth?: number;
+    }
 
-    /** @type {Props} */
-    let { Node, CatalogById = new Map(), Depth = 0 } = $props();
+    let { Node, CatalogById = new Map(), Depth = 0 }: Props = $props();
 
     // Depth only seeds the initial state: folders start expanded at the top level
     // svelte-ignore state_referenced_locally
     let open = $state(Depth < 1);
 
-
     const DIFF_ORDER = ['Easy', 'Normal', 'Hard', 'Oni', 'Edit', 'Tower', 'Dan'];
-    const DIFF_ABBR = { Easy: 'EZ', Normal: 'NM', Hard: 'HD', Oni: 'EX', Edit: 'EXEX', Tower: 'Tower', Dan: 'Dan' };
+    const DIFF_ABBR: Record<string, string> = { Easy: 'EZ', Normal: 'NM', Hard: 'HD', Oni: 'EX', Edit: 'EXEX', Tower: 'Tower', Dan: 'Dan' };
 
-    const IsCatalog = (song) => !!(song.uniqueId && CatalogById.has(song.uniqueId));
+    type SongStatus = 'custom' | 'up_to_date' | 'outdated';
 
-    const SongLabel = (song) => {
+    interface DiffChip {
+        course: string;
+        abbr: string;
+        level: number;
+    }
+
+    const IsCatalog = (song: ScannedSong): boolean => !!(song.uniqueId && CatalogById.has(song.uniqueId));
+
+    const SongLabel = (song: ScannedSong): string => {
         const catalogEntry = song.uniqueId ? CatalogById.get(song.uniqueId) : null;
-        return catalogEntry?.chartTitle ?? song.title ?? song.relPath.split('/').pop();
+        return catalogEntry?.chartTitle ?? song.title ?? song.relPath.split('/').pop() ?? song.relPath;
     };
 
-    const SongStatus = (song) => {
+    const SongStatus = (song: ScannedSong): SongStatus => {
         const catalogEntry = song.uniqueId ? CatalogById.get(song.uniqueId) : null;
         if (!catalogEntry) return 'custom';
         return (song.tjaMd5s ?? []).includes(catalogEntry.tjaMD5) ? 'up_to_date' : 'outdated';
     };
 
     // Difficulty chips from the locally scanned chart, ordered Easy → Dan
-    const DiffList = (song) => {
-        const levels = {};
+    const DiffList = (song: ScannedSong): DiffChip[] => {
+        const levels: Record<string, number> = {};
         for (const d of song.difficulties ?? []) levels[d.course] = d.level;
         return DIFF_ORDER
             .filter((course) => course in levels)
@@ -45,7 +51,7 @@
 
     // Fractional levels: 10 and above use the Taiko "+" convention (10.5+ → "10+",
     // 10.4 → "10"); below 10 the integer is shown.
-    const FormatLevel = (level) => {
+    const FormatLevel = (level: number): string => {
         const base = Math.floor(level);
         if (level >= 10 && level - base >= 0.5) return `${base}+`;
         return `${base}`;

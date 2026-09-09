@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     // Images
     import optkkunUrl from '$lib/optkkun.png';
     import { _ } from 'svelte-i18n';

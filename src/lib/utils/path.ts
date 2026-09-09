@@ -1,7 +1,8 @@
 import { resourceDir, documentDir, homeDir, appConfigDir, join } from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
+import type { HubOS } from '$lib/types';
 
-export const GetOS = async () => {
+export const GetOS = async (): Promise<HubOS> => {
     const currentPlatform = await type();
     switch (currentPlatform) {
         case "linux":
@@ -17,11 +18,11 @@ export const GetOS = async () => {
     }
 }
 
-export const GetPreferencesPath = async () => {
+export const GetPreferencesPath = async (): Promise<string> => {
     return await appConfigDir();
 }
 
-export const GetRootPath = async () => {
+export const GetRootPath = async (): Promise<string> => {
     const _os = await GetOS();
 
     if (_os === "Win") {
@@ -40,16 +41,16 @@ export const GetRootPath = async () => {
 }
 
 // Shared Songs library used by every OpenTaiko instance
-export const GetGlobalSongsPath = async () => {
+export const GetGlobalSongsPath = async (): Promise<string> => {
     return await join(await GetRootPath(), 'Songs');
 }
 
-export const GetTmpPath = async (subFolder = null) => {
+export const GetTmpPath = async (subFolder: string | null = null): Promise<string> => {
     const tmp = await join(await GetRootPath(), 'tmp');
     return subFolder ? await join(tmp, subFolder) : tmp;
 }
 
 // Pre-0.2 single-instance game folder, adopted as the first instance on upgrade
-export const GetLegacyInstancePath = async () => {
+export const GetLegacyInstancePath = async (): Promise<string> => {
     return await join(await GetRootPath(), 'OpenTaiko');
 }

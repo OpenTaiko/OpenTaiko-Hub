@@ -3,6 +3,11 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.2.5] - 2026-09-09 (Alpha)
+
+- [Chore] Frontend ported to TypeScript (strict), with `npm run check` for type checking
+- [Fix] Installing a prerelease build failed with "asset not found"
+
 ## [0.2.4] - 2026-09-07 (Alpha)
 
 - [Chore] Upgraded to Svelte 5, Skeleton UI 5 with Tailwind 4, and Tauri 2.11

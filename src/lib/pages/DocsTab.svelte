@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     // Renders the documentation shipped inside the selected OpenTaiko instance
     // (<instance>/docs/index.html) entirely locally: the page and every resource it
     // references (stylesheets, scripts, images) are read from disk and inlined into a
@@ -8,14 +8,15 @@
     import { path } from '@tauri-apps/api';
     import { _ } from 'svelte-i18n';
 
-    import { activeInstance } from "../stores/instances.js";
+    import { activeInstance } from "../stores/instances";
+    import type { Instance } from '$lib/types';
 
-    let docsHtml = $state(null);
-    let docsUrl = $state(null);
+    let docsHtml = $state<string | null>(null);
+    let docsUrl = $state<string | null>(null);
     let notFound = $state(false);
     let loading = $state(false);
     let refreshToken = 0;
-    let renderedFor = null;   // bookkeeping only, never rendered
+    let renderedFor: string | null = null;   // bookkeeping only, never rendered
 
     // The built page is served to the iframe through a Blob URL rather than srcdoc. A
     // srcdoc document borrows the Hub's own URL as its base, so when the docs' router
@@ -32,7 +33,7 @@
     });
 
 
-    const IMAGE_MIME = {
+    const IMAGE_MIME: Record<string, string> = {
         png: 'image/png',
         jpg: 'image/jpeg',
         jpeg: 'image/jpeg',
@@ -42,7 +43,7 @@
         webp: 'image/webp'
     };
 
-    const toBase64 = (bytes) => {
+    const toBase64 = (bytes: Uint8Array): string => {
         let binary = '';
         const chunkSize = 0x8000;
         for (let i = 0; i < bytes.length; i += chunkSize) {
@@ -52,7 +53,7 @@
     };
 
     // Reads a file referenced by index.html; only plain relative child paths are accepted
-    const readDocsAsset = async (docsDir, relPath) => {
+    const readDocsAsset = async (docsDir: string, relPath: string): Promise<string | null> => {
         if (relPath.includes('..') || relPath.startsWith('/') || /^[a-z]+:/i.test(relPath)) return null;
         try {
             // path.join normalizes forward slashes for the current platform
@@ -62,7 +63,7 @@
         }
     };
 
-    const BuildInlinedDocs = async (docsDir) => {
+    const BuildInlinedDocs = async (docsDir: string): Promise<string> => {
         const indexPath = await path.join(docsDir, 'index.html');
         let html = await readTextFile(indexPath);
 
@@ -74,7 +75,7 @@
         // The replacement is passed as a function: given as a string, String.replace
         // expands "$" patterns inside it ("$'" inserts the rest of the document), and
         // file contents such as Prism's source do contain those sequences.
-        const swapTag = (tag, replacement) => html.replace(tag, () => replacement);
+        const swapTag = (tag: string, replacement: string): string => html.replace(tag, () => replacement);
 
         // Inline stylesheets
         const linkTags = [...html.matchAll(/<link\b[^>]*>/gi)];
@@ -108,12 +109,12 @@
         }
 
         // Embed the media folder as data URIs and fix rendered <img> tags pointing at it
-        const mediaMap = {};
+        const mediaMap: Record<string, string> = {};
         try {
             const mediaDir = await path.join(docsDir, 'media');
             for (const entry of await readDir(mediaDir)) {
                 if (!entry.isFile) continue;
-                const ext = entry.name.split('.').pop()?.toLowerCase();
+                const ext = entry.name.split('.').pop()?.toLowerCase() ?? '';
                 const mime = IMAGE_MIME[ext];
                 if (!mime) continue;
                 const bytes = await readFile(await path.join(mediaDir, entry.name));
@@ -144,7 +145,7 @@ ${SCRIPT_CLOSE}`;
         return html;
     };
 
-    const Refresh = async (instance) => {
+    const Refresh = async (instance: Instance) => {
         const token = ++refreshToken;
         docsHtml = null;
         notFound = false;

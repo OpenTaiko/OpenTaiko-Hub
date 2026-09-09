@@ -1,24 +1,36 @@
-<script>
+<script lang="ts">
     // Tree view of the whole scanned Songs library, grouped per genre folder, including
     // custom charts/songs that are not part of the official catalog.
     import { _ } from 'svelte-i18n';
     import SongTreeNode from '$lib/components/SongTreeNode.svelte';
+    import type { ScannedGenre, ScannedSong, SongTreeFolder, SoundtrackEntry } from '$lib/types';
 
-    let { Songs = [], Genres = {}, CatalogById = new Map() } = $props();
+    interface Props {
+        Songs?: ScannedSong[];
+        /** Scanned genre folders keyed by relative path. */
+        Genres?: Record<string, ScannedGenre>;
+        CatalogById?: Map<string, SoundtrackEntry>;
+    }
 
-    const makeNode = (name) => ({ name, title: null, children: new Map(), songs: [], count: 0 });
+    let { Songs = [], Genres = {}, CatalogById = new Map() }: Props = $props();
 
-    const nodeFor = (root, relPath) => {
+    const makeNode = (name: string): SongTreeFolder => ({ name, title: null, children: new Map(), songs: [], count: 0 });
+
+    const nodeFor = (root: SongTreeFolder, relPath: string): SongTreeFolder => {
         if (!relPath) return root;
         let node = root;
         for (const part of relPath.split('/')) {
-            if (!node.children.has(part)) node.children.set(part, makeNode(part));
-            node = node.children.get(part);
+            let child = node.children.get(part);
+            if (!child) {
+                child = makeNode(part);
+                node.children.set(part, child);
+            }
+            node = child;
         }
         return node;
     };
 
-    const countSongs = (node) => {
+    const countSongs = (node: SongTreeFolder): number => {
         node.count = node.songs.length;
         for (const child of node.children.values()) {
             node.count += countSongs(child);

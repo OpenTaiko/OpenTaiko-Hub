@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     // Dependencies
     import { onMount } from 'svelte';
     import { Tabs, Accordion } from '@skeletonlabs/skeleton-svelte';
@@ -17,10 +17,12 @@
     const creditsUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Hub/main/CREDITS.md';
     let creditsContent = $state('');
 
+    // External links open in the system browser and pick up the app's link styling
     const renderer = new marked.Renderer();
-    renderer.link = function(href, title, text) {
-        let link = marked.Renderer.prototype.link.call(this, href, title, text);
-        return link.replace("<a","<a target='_blank' class='text-blue-600 underline'");
+    const renderLink = renderer.link.bind(renderer);
+    renderer.link = function (token) {
+        const link = renderLink(token);
+        return link.replace("<a", "<a target='_blank' class='text-blue-600 underline'");
     };
     marked.setOptions({
         renderer: renderer,
@@ -33,12 +35,12 @@
             const response = await fetch(changelogUrl);
         if (response.ok) {
             const text = await response.text();
-            changelogContent = marked(text);
+            changelogContent = await marked(text);
         } else {
             changelogContent = `<p>${get(_)('info.error.changelog')}</p>`;
         }
         } catch (error) {
-            changelogContent = `<p>${get(_)('info.error.generic', { values: { error: error.message } })}</p>`;
+            changelogContent = `<p>${get(_)('info.error.generic', { values: { error: String(error) } })}</p>`;
         }
     }
 
@@ -47,12 +49,12 @@
             const response = await fetch(hubChangelogUrl);
         if (response.ok) {
             const text = await response.text();
-            hubChangelogContent = marked(text);
+            hubChangelogContent = await marked(text);
         } else {
             hubChangelogContent = `<p>${get(_)('info.error.changelog')}</p>`;
         }
         } catch (error) {
-            hubChangelogContent = `<p>${get(_)('info.error.generic', { values: { error: error.message } })}</p>`;
+            hubChangelogContent = `<p>${get(_)('info.error.generic', { values: { error: String(error) } })}</p>`;
         }
     }
 
@@ -61,12 +63,12 @@
             const response = await fetch(creditsUrl);
         if (response.ok) {
             const text = await response.text();
-            creditsContent = marked(text);
+            creditsContent = await marked(text);
         } else {
             creditsContent = `<p>${get(_)('info.error.credits')}</p>`;
         }
         } catch (error) {
-            creditsContent = `<p>${get(_)('info.error.generic', { values: { error: error.message } })}</p>`;
+            creditsContent = `<p>${get(_)('info.error.generic', { values: { error: String(error) } })}</p>`;
         }
     }
 

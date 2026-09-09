@@ -1,9 +1,10 @@
-<script>
+<script lang="ts">
     // Dependencies
     import { onMount } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
-    import { GetOS } from '$lib/utils/path.js';
+    import { GetOS } from '$lib/utils/path';
     import { _ } from 'svelte-i18n';
+    import type { HubOS } from '$lib/types';
 
     // Tools
     import ToolCard from '$lib/components/ToolCard.svelte';
@@ -18,7 +19,7 @@
 	import songSuggestionScreenshotUrl from '$lib/songsuggestion.png';
 
     let currentTab = $state(0);
-	let optk_OS = $state("Win");
+	let optk_OS = $state<HubOS>("Win");
 
 	onMount(async () => {
         optk_OS = await GetOS();

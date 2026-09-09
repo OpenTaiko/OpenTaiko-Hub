@@ -1,14 +1,18 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
     import SecretButton from '$lib/components/SecretButton.svelte';
 
+    const secretInput = (): HTMLInputElement | null => document.getElementById("secret") as HTMLInputElement | null;
+
     const setColor = () => {
-        document.getElementById("secret").style.backgroundColor = "white"
+        const input = secretInput();
+        if (input) input.style.backgroundColor = "white";
     }
 
-    const getSecret = async () => {
-        const secret = document.getElementById("secret").value;
-        if (secret === "" || !secret) return;
+    const getSecret = async (): Promise<string | undefined> => {
+        const input = secretInput();
+        const secret = input?.value;
+        if (!input || !secret) return;
 
         const secret_value = btoa(secret).replaceAll("+", "-").replaceAll("/", "_").replaceAll("=", "");
 
@@ -17,13 +21,13 @@
 
         if (response.ok) {
             console.log("Secret found!");
-            document.getElementById("secret").style.backgroundColor = "rgb(150,255,150)";
+            input.style.backgroundColor = "rgb(150,255,150)";
             setTimeout(setColor, 2000);
             return url;
         }
         else {
-            console.log("Secret not found. Created '" + secret_value + "' from '" + secret + "'.");
-            document.getElementById("secret").style.backgroundColor = "rgb(255,150,150)";
+            console.log(`Secret not found. Created "${secret_value}" from "${secret}".`);
+            input.style.backgroundColor = "rgb(255,150,150)";
             setTimeout(setColor, 2000);
             return;
         }
@@ -40,7 +44,7 @@
         }
     }
 
-    const onSubmit = (event) => {
+    const onSubmit = (event: SubmitEvent) => {
         event.preventDefault();
         fetchSecret();
     }

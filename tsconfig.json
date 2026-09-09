@@ -1,0 +1,21 @@
+{
+	"extends": "./.svelte-kit/tsconfig.json",
+	"compilerOptions": {
+		"strict": true,
+		"noImplicitOverride": true,
+		"noUncheckedIndexedAccess": false,
+		"allowJs": true,
+		"checkJs": false,
+		"esModuleInterop": true,
+		"forceConsistentCasingInFileNames": true,
+		"resolveJsonModule": true,
+		"skipLibCheck": true,
+		"sourceMap": true,
+		"moduleResolution": "bundler",
+		"module": "esnext",
+		"target": "es2022",
+		"types": ["vite/client"]
+	}
+	// Path aliases ($lib) and the include/exclude lists come from the generated
+	// .svelte-kit/tsconfig.json; run `npm run dev` or `npm run build` once to create it.
+}

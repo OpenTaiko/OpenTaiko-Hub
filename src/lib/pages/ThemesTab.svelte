@@ -1,12 +1,13 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
     import { readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
 
     import { getContext } from 'svelte';
-    const { TriggerWarning, TriggerSuccess } = getContext('toast');
+    import type { ToastContext } from '$lib/types';
+    const { TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
-    import { GetPreferencesPath } from "$lib/utils/path.js";
-    import { applyTheme, applyMode, getAppliedTheme, normalizeThemeName, DEFAULT_THEME, DEFAULT_MODE } from "$lib/utils/appearance.js";
+    import { GetPreferencesPath } from "$lib/utils/path";
+    import { applyTheme, applyMode, getAppliedTheme, normalizeThemeName, DEFAULT_THEME, DEFAULT_MODE, type ThemeMode } from "$lib/utils/appearance";
 
     import { path } from '@tauri-apps/api';
 
@@ -23,10 +24,10 @@
         debugMode = false;
     }
 
-    let currentThemeModeDebug = $state('dark');
+    let currentThemeModeDebug = $state<ThemeMode>('dark');
 
-    const ThemeChangerDebug = async (e) => {
-        const themevalue = e.target.value;
+    const ThemeChangerDebug = async (e: Event) => {
+        const themevalue = (e.currentTarget as HTMLSelectElement).value;
 
         if (getAppliedTheme() == themevalue) {
             TriggerWarning(get(_)('themes.warn.same_theme_debug'));
@@ -38,21 +39,20 @@
         }
     }
 
-    const ThemeModeChangerDebug = async (mode) => {
-        currentThemeModeDebug = mode;
+    const ThemeModeChangerDebug = async (mode: string) => {
+        currentThemeModeDebug = mode === 'light' ? 'light' : 'dark';
         applyMode(mode);
         console.log(`DEBUG: mode has been changed to ${mode}`)
     }
 
-    /**
-     * @typedef {Object} Props
-     * @property {number} [currentTile] - Theme code
-     */
+    interface Props {
+        /** Selected navigation tile; the tab renders only while it is the Themes one. */
+        currentTile?: number;
+    }
 
-    /** @type {Props} */
-    let { currentTile = 0 } = $props();
+    let { currentTile = 0 }: Props = $props();
 
-    let currentTheme = $state(DEFAULT_THEME);
+    let currentTheme = $state<string>(DEFAULT_THEME);
 
     const TryFetchingCurrentTheme = async () => {
         const prefsDir = await GetPreferencesPath();
@@ -60,7 +60,7 @@
         const themeFilePath = await path.join(prefsDir, 'theme.json');
         try {
             const fileContentTheme = await readTextFile(themeFilePath);
-            const jsonDataTheme = JSON.parse(fileContentTheme);
+            const jsonDataTheme = JSON.parse(fileContentTheme) as { theme?: string };
             // Preferences written by older Hub versions use the Skeleton v2 preset names
             currentTheme = normalizeThemeName(jsonDataTheme.theme);
         } catch {
@@ -71,8 +71,8 @@
         applyTheme(currentTheme);
     }
 
-    const ThemeChanger = async (e) => {
-        const themevalue = e.target.value;
+    const ThemeChanger = async (e: Event) => {
+        const themevalue = (e.currentTarget as HTMLSelectElement).value;
 
         if (getAppliedTheme() == themevalue) {
             TriggerWarning(get(_)('themes.warn.same_theme'));
@@ -90,7 +90,7 @@
     }
 
     // Theme mode
-    let currentThemeMode = $state('Loading...');
+    let currentThemeMode = $state<ThemeMode | 'Loading...'>('Loading...');
 
     const TryFetchingCurrentThemeMode = async () => {
         const prefsDir = await GetPreferencesPath();
@@ -98,8 +98,8 @@
         const modeFilePath = await path.join(prefsDir, 'thememode.json');
         try {
             const fileContentMode = await readTextFile(modeFilePath);
-            const jsonDataMode = JSON.parse(fileContentMode);
-            currentThemeMode = jsonDataMode.thememode ?? DEFAULT_MODE;
+            const jsonDataMode = JSON.parse(fileContentMode) as { thememode?: string };
+            currentThemeMode = jsonDataMode.thememode === 'light' ? 'light' : DEFAULT_MODE;
         } catch {
             // File missing on first run — silently use default and write it
             currentThemeMode = DEFAULT_MODE;
@@ -110,8 +110,8 @@
         console.log(`mode has been changed to ${currentThemeMode}`)
     }
 
-    const ThemeModeChanger = async (mode) => {
-        currentThemeMode = mode;
+    const ThemeModeChanger = async (mode: string) => {
+        currentThemeMode = mode === 'light' ? 'light' : 'dark';
         const prefsDir = await GetPreferencesPath();
         await mkdir(prefsDir, { recursive: true });
         const thememode_settings = await path.join(prefsDir, 'thememode.json');
@@ -122,7 +122,7 @@
     }
 
     // Language persistence
-    const SaveLocale = async (selectedLocale) => {
+    const SaveLocale = async (selectedLocale: string | null | undefined) => {
         try {
             const prefsDir = await GetPreferencesPath();
             await mkdir(prefsDir, { recursive: true });
@@ -233,7 +233,7 @@
                         <div class="flex items-center gap-2">
                             <SegmentedControl
                                 value={debugMode ? currentThemeModeDebug : currentThemeMode}
-                                onValueChange={(details) => (debugMode ? ThemeModeChangerDebug : ThemeModeChanger)(details.value)}
+                                onValueChange={(details) => (debugMode ? ThemeModeChangerDebug : ThemeModeChanger)(details.value ?? DEFAULT_MODE)}
                             >
                                 <SegmentedControl.Control>
                                     <SegmentedControl.Indicator />

@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { getContext } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
@@ -9,26 +9,27 @@
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
-    const { TriggerError, TriggerSuccess, backoffDownload } = getContext('toast');
+    import type { BuildOption, GitHubRelease, HubOS, IndevBuildInfo, Instance, ToastContext } from '$lib/types';
+    const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
-    import { GetOS, GetTmpPath } from "$lib/utils/path.js";
-    import { isVersionAtLeast } from "$lib/utils/versions.js";
+    import { GetOS, GetTmpPath } from "$lib/utils/path";
+    import { isVersionAtLeast } from "$lib/utils/versions";
     import {
         repoOwner,
         repoName,
         INDEV_BRANCH,
         INDEV_LABEL,
         fetchLatestRelease,
-        fetchExperimentalOptions,
+        fetchReleaseByTag,
         fetchBranchHeadSha
-    } from "$lib/utils/builds.js";
+    } from "$lib/utils/builds";
     import {
         activeInstance,
         instanceVersions,
         refreshInstanceVersion,
         updateInstance,
         linkGlobalSongs
-    } from "$lib/stores/instances.js";
+    } from "$lib/stores/instances";
 
     // Components
     import HubVersionCheck from '$lib/components/HubVersionCheck.svelte';
@@ -40,38 +41,45 @@
     // Images
     import optkLogoUrl from '$lib/optk.png';
 
-    let optk_OS = $state('Win');
+    let optk_OS = $state<HubOS>('Win');
     GetOS().then((os) => optk_OS = os);
 
     // Sub-tabs: 0 Overview, 1 Skins, 2 Characters, 3 Puchicharas, 4 Docs
     let homeSubTab = $state(0);
 
     // Latest stable release
-    let latestVersion = $state(null);
-    let latestRelease = null;
+    let latestVersion = $state<string | null>(null);
+    let latestRelease: GitHubRelease | null = null;
     let latestLoading = $state(true);
     let latestVersionErrorFound = $state(false);
 
     // Active instance state
     let versionLoading = $state(false);
-    let versionLoadedFor = null;       // bookkeeping only, never rendered
-    let indevLatestSha = $state(null);
+    let versionLoadedFor: string | null = null;       // bookkeeping only, never rendered
+    let indevLatestSha = $state<string | null>(null);
 
     // Download / build state
     let downloadBusy = $state(false);
-    let progress = $state(0);
-    let buildStage = $state(null);
-    let buildLog = $state([]);
-    let buildLogElement = $state(null);
+    // undefined renders an indeterminate bar
+    let progress = $state<number | undefined>(0);
+    let buildStage = $state<BuildStage | null>(null);
+    let buildLog = $state<string[]>([]);
+    let buildLogElement = $state<HTMLPreElement | null>(null);
+
+    type BuildStage = 'check_sdk' | 'fetch' | 'download' | 'extract' | 'build' | 'install';
 
     // Build picker
     let showBuildPicker = $state(false);
 
     let current = $derived($activeInstance);
     let currentVersion = $derived(current ? ($instanceVersions[current.id] ?? null) : null);
-    let isIndev = $derived(current?.channel === 'experimental' && current?.experimental?.kind === 'indev');
+    // The experimental build record, narrowed to the branch-built kind
+    let indevBuild = $derived<IndevBuildInfo | null>(
+        current?.channel === 'experimental' && current.experimental?.kind === 'indev' ? current.experimental : null
+    );
+    let isIndev = $derived(indevBuild !== null);
     let isPrerelease = $derived(current?.channel === 'experimental' && current?.experimental?.kind === 'prerelease');
-    let indevUpdateAvailable = $derived(isIndev && indevLatestSha !== null && indevLatestSha !== current?.experimental?.sha);
+    let indevUpdateAvailable = $derived(indevBuild !== null && indevLatestSha !== null && indevLatestSha !== indevBuild.sha);
 
     // Sub-tab availability
     let assetsAvailable = $derived(current !== null && current.channel !== 'experimental' && currentVersion !== null);
@@ -89,7 +97,7 @@
     });
 
     // An instance created through the build picker carries its chosen build; start it
-    let pendingStartedFor = null;      // bookkeeping only, never rendered
+    let pendingStartedFor: string | null = null;      // bookkeeping only, never rendered
     $effect(() => {
         if (current?.pendingInstall && !downloadBusy && pendingStartedFor !== current.id) {
             pendingStartedFor = current.id;
@@ -104,27 +112,28 @@
     });
 
     const LoadInstanceState = async () => {
+        if (!current) return;
         versionLoading = true;
         indevLatestSha = null;
         await refreshInstanceVersion(current.id);
         versionLoading = false;
-        if (current?.channel === 'experimental' && current?.experimental?.kind === 'indev') {
+        if (indevBuild) {
             CheckIndevUpdate();
         }
     };
 
     const CheckIndevUpdate = async () => {
         try {
-            indevLatestSha = await fetchBranchHeadSha(current?.experimental?.branch ?? INDEV_BRANCH);
+            indevLatestSha = await fetchBranchHeadSha(indevBuild?.branch ?? INDEV_BRANCH);
         } catch (error) {
             console.error('Failed to check the experimental branch:', error);
         }
     };
 
-    const checkSkinCompatibility = (version1, version2) => {
+    const checkSkinCompatibility = (version1: string | null, version2: string | null): boolean => {
         const regex = /^\d+\.\d+\.\d+\.\d+$/; // Match versions in the form <main>.<major>.<minor>.<patch>
 
-        if (!regex.test(version1) || !regex.test(version2)) {
+        if (!version1 || !version2 || !regex.test(version1) || !regex.test(version2)) {
             return false;
         }
 
@@ -142,12 +151,12 @@
             latestVersion = latestRelease.tag_name; // Latest tag version number
         } catch (err) {
             latestVersionErrorFound = true;
-            TriggerError(get(_)('home.error.fetch_release', { values: { error: err } }));
+            TriggerError(get(_)('home.error.fetch_release', { values: { error: String(err) } }));
         }
         latestLoading = false;
     }
 
-    const StartPendingInstall = async (instance) => {
+    const StartPendingInstall = async (instance: Instance) => {
         const build = instance.pendingInstall;
         await updateInstance(instance.id, { pendingInstall: null });
         if (!build) return;
@@ -160,7 +169,7 @@
         }
     };
 
-    const OnBuildPicked = async (build) => {
+    const OnBuildPicked = async (build: BuildOption) => {
         if (!current) return;
         pendingStartedFor = null;
         await updateInstance(current.id, {
@@ -169,7 +178,7 @@
         });
     };
 
-    const WriteVersionJson = async (instancePath, version) => {
+    const WriteVersionJson = async (instancePath: string, version: string | null) => {
         // Backwards compatibility with pre-0.2 Hub versions
         try {
             const versionFile = await path.join(instancePath, 'version.json');
@@ -181,7 +190,7 @@
 
     // A finished install must at least contain the game executable; a missing one
     // means the install was interrupted or the build output is broken.
-    const VerifyInstall = async (instancePath) => {
+    const VerifyInstall = async (instancePath: string) => {
         const exeName = optk_OS === 'Win' ? 'OpenTaiko.exe' : 'OpenTaiko';
         if (!(await exists(await path.join(instancePath, exeName)))) {
             throw new Error(get(_)('home.error.incomplete_build'));
@@ -189,7 +198,7 @@
     };
 
     // Downloads a release zip and merges its content into the instance folder.
-    const DownloadAndInstallZip = async (url, instancePath) => {
+    const DownloadAndInstallZip = async (url: string, instancePath: string): Promise<boolean> => {
         const tmpDir = await GetTmpPath(crypto.randomUUID());
         await mkdir(tmpDir, { recursive: true });
         const zipPath = await path.join(tmpDir, 'OpenTaiko.zip');
@@ -211,12 +220,12 @@
             TriggerSuccess(get(_)('home.success.unzipping'));
             progress = undefined;
 
-            const unlisten = await listen('extract-progress', (event) => {
+            const unlisten = await listen<number>('extract-progress', (event) => {
                 progress = event.payload;
             });
-            let sourceFolder;
+            let sourceFolder: string;
             try {
-                sourceFolder = await invoke('unzip_and_get_first_folder', { zipPath });
+                sourceFolder = await invoke<string>('unzip_and_get_first_folder', { zipPath });
             } finally {
                 unlisten();
             }
@@ -263,12 +272,12 @@
                 TriggerSuccess(get(_)('home.success.installed'));
             }
         } catch (err) {
-            TriggerError(get(_)('home.error.download_failed', { values: { error: err } }));
+            TriggerError(get(_)('home.error.download_failed', { values: { error: String(err) } }));
         }
         downloadBusy = false;
     };
 
-    const DownloadPrerelease = async (option) => {
+    const DownloadPrerelease = async (option: { tag: string; label: string }) => {
         if (downloadBusy === true) {
             TriggerError(get(_)('home.error.already_downloading'));
             return;
@@ -278,12 +287,8 @@
         const instance = current;
 
         try {
-            let release = option.release;
-            if (!release) {
-                const options = await fetchExperimentalOptions(latestVersion);
-                release = options.find((o) => o.kind === 'prerelease' && o.tag === option.tag)?.release;
-            }
-            const asset = release?.assets?.find((asset) => asset.name.endsWith(`${optk_OS}.x64.zip`));
+            const release = await fetchReleaseByTag(option.tag);
+            const asset = release.assets?.find((asset) => asset.name.endsWith(`${optk_OS}.x64.zip`));
             if (!asset) {
                 throw new Error('Desired asset not found in the prerelease');
             }
@@ -303,14 +308,14 @@
                 TriggerSuccess(get(_)('home.success.installed'));
             }
         } catch (err) {
-            TriggerError(get(_)('home.error.download_failed', { values: { error: err } }));
+            TriggerError(get(_)('home.error.download_failed', { values: { error: String(err) } }));
         }
         downloadBusy = false;
     };
 
     // Fetches the experimental branch source at its current head commit, builds it with
     // the .NET SDK and installs the publish output into the instance folder.
-    const DownloadIndev = async (option) => {
+    const DownloadIndev = async (option: { branch?: string; label?: string }) => {
         if (downloadBusy === true) {
             TriggerError(get(_)('home.error.already_downloading'));
             return;
@@ -321,18 +326,18 @@
 
         downloadBusy = true;
         buildLog = [];
-        let tmpDir = null;
+        let tmpDir: string | null = null;
 
         try {
             // 1. The build requires the .NET SDK 8
             buildStage = 'check_sdk';
             progress = undefined;
-            const sdkLines = [];
-            const sdkChannel = new Channel();
+            const sdkLines: string[] = [];
+            const sdkChannel = new Channel<string>();
             sdkChannel.onmessage = (line) => sdkLines.push(line);
             let sdkExitCode = -1;
             try {
-                sdkExitCode = await invoke('run_streamed', {
+                sdkExitCode = await invoke<number>('run_streamed', {
                     program: 'dotnet',
                     args: ['--list-sdks'],
                     cwd: null,
@@ -377,12 +382,12 @@
             // 4. Extract
             buildStage = 'extract';
             progress = 0;
-            const unlisten = await listen('extract-progress', (event) => {
+            const unlisten = await listen<number>('extract-progress', (event) => {
                 progress = event.payload;
             });
-            let srcFolder;
+            let srcFolder: string;
             try {
-                srcFolder = await invoke('unzip_and_get_first_folder', { zipPath: srcZip });
+                srcFolder = await invoke<string>('unzip_and_get_first_folder', { zipPath: srcZip });
             } finally {
                 unlisten();
             }
@@ -392,11 +397,11 @@
             buildStage = 'build';
             progress = undefined;
             const rid = optk_OS === 'Win' ? 'win-x64' : 'linux-x64';
-            const logChannel = new Channel();
+            const logChannel = new Channel<string>();
             logChannel.onmessage = (line) => {
                 buildLog = [...buildLog.slice(-199), line];
             };
-            const exitCode = await invoke('run_streamed', {
+            const exitCode = await invoke<number>('run_streamed', {
                 program: 'dotnet',
                 args: ['publish', 'OpenTaiko/OpenTaiko.csproj', '--configuration', 'Release', '--self-contained', '-p:PublishSingleFile=true', '--runtime', rid],
                 cwd: srcFolder,
@@ -432,7 +437,7 @@
 
             TriggerSuccess(get(_)('home.success.installed'));
         } catch (err) {
-            TriggerError(get(_)('home.error.download_failed', { values: { error: err } }));
+            TriggerError(get(_)('home.error.download_failed', { values: { error: String(err) } }));
         } finally {
             if (tmpDir) {
                 try { await remove(tmpDir, { recursive: true }); } catch {}
@@ -443,11 +448,12 @@
     };
 
     const LaunchOpenTaiko = async () => {
+        if (!current) return;
         try {
             const appPath = await path.join(current.path, "OpenTaiko");
             await invoke('execute_external_app', { os: optk_OS, path: appPath });
         } catch (error) {
-            TriggerError(get(_)('home.error.launch', { values: { error } }));
+            TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
         }
     }
 
@@ -519,7 +525,7 @@
                             <span>
                                 {currentVersion}
                                 {#if current.channel === 'experimental'}
-                                    ({current.experimental?.label ?? $_('instances.channel.experimental')}{#if isIndev && current.experimental?.sha}&nbsp;@{current.experimental.sha.slice(0, 7)}{/if})
+                                    ({current.experimental?.label ?? $_('instances.channel.experimental')}{#if indevBuild?.sha}&nbsp;@{indevBuild.sha.slice(0, 7)}{/if})
                                 {:else}
                                     ({optk_OS})
                                 {/if}
@@ -535,9 +541,9 @@
                         {:else if isIndev}
                             <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
                             {#if indevUpdateAvailable}
-                                <button type="button" onclick={() => DownloadIndev(current.experimental)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
+                                <button type="button" onclick={() => DownloadIndev(indevBuild ?? {})} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
                             {:else}
-                                <button type="button" onclick={() => DownloadIndev(current.experimental)} class="button-gray button-main"><i class="fa-solid fa-hammer"></i> {$_('home.button.rebuild')}</button>
+                                <button type="button" onclick={() => DownloadIndev(indevBuild ?? {})} class="button-gray button-main"><i class="fa-solid fa-hammer"></i> {$_('home.button.rebuild')}</button>
                             {/if}
                         {:else if isPrerelease}
                             <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>

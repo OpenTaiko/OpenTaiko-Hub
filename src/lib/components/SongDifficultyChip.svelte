@@ -1,35 +1,37 @@
-<script>
-
+<script lang="ts">
 import { _ } from 'svelte-i18n';
 import { get } from 'svelte/store';
+import type { CourseName, SoundtrackEntry } from '$lib/types';
 
-    /**
-     * @typedef {Object} Props
-     * @property {any} SongInfo
-     * @property {string} [Difficulty]
-     * @property {any} [OnCrownClick]
-     */
+interface Props {
+    SongInfo: SoundtrackEntry;
+    Difficulty?: CourseName;
+    OnCrownClick?: (song: SoundtrackEntry, difficulty: CourseName) => void;
+}
 
-    /** @type {Props} */
-    let { SongInfo, Difficulty = "Easy", OnCrownClick = undefined } = $props();
-
-
-
-
-
+let { SongInfo, Difficulty = "Easy", OnCrownClick = undefined }: Props = $props();
 
 // Fractional levels: 10 and above use the Taiko "+" convention (10.5+ → "10+",
 // 10.4 → "10"); below 10 the integer is shown.
-const FormatLevel = (level) => {
+const FormatLevel = (level: number): string => {
     const base = Math.floor(level);
     if (level >= 10 && level - base >= 0.5) return `${base}+`;
     return `${base}`;
 };
 
+const CHIP_COLORS: Record<CourseName, string> = {
+    "Easy": "blue",
+    "Normal": "green",
+    "Hard": "yellow",
+    "Oni": "red",
+    "Edit": "purple",
+    "Tower": "orange",
+    "Dan": "blue"
+};
 
 let HoFRank = $derived(SongInfo.chartHoFRanks?.[Difficulty]);
 let Level = $derived(SongInfo.chartDifficulties[Difficulty]);
-let HoFCrownColorClass = $derived((HoFRank !== undefined)
+let HoFCrownColorClass = $derived((HoFRank !== undefined && Level !== undefined)
     ? (HoFRank === 1 || Level >= 13)
         ? "text-yellow-500"
         : (HoFRank === 2 || Level >= 12)
@@ -38,17 +40,9 @@ let HoFCrownColorClass = $derived((HoFRank !== undefined)
                 ? "text-amber-800"
                 : "text-green-400"
     : "");
-let ChipColor = $derived({
-    "Easy": "blue",
-    "Normal": "green",
-    "Hard": "yellow",
-    "Oni": "red",
-    "Edit": "purple",
-    "Tower": "orange",
-    "Dan": "blue"
-}[Difficulty]);
+let ChipColor = $derived(CHIP_COLORS[Difficulty]);
 let Prefix = $derived(["Easy", "Normal", "Hard", "Oni", "Edit"].includes(Difficulty) ? "★" : `${Difficulty} ★`);
-let Maker = $derived(["Easy", "Normal", "Hard", "Oni", "Edit", "Tower"].includes(Difficulty) ? `${get(_)('songs.col.charter')}${SongInfo.chartMakers[Difficulty]}` : undefined);
+let Maker = $derived(["Easy", "Normal", "Hard", "Oni", "Edit", "Tower"].includes(Difficulty) ? `${get(_)('songs.col.charter')}${SongInfo.chartMakers[Difficulty] ?? ''}` : undefined);
 </script>
 
 

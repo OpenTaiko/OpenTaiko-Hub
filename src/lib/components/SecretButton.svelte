@@ -1,21 +1,19 @@
-<script>
-    /**
-     * @typedef {Object} Props
-     * @property {string} [color1]
-     * @property {string} [color2]
-     * @property {any} [OnClick]
-     * @property {string} [text]
-     * @property {string} [textColor]
-     */
+<script lang="ts">
+    interface Props {
+        color1?: string;
+        color2?: string;
+        OnClick?: () => void;
+        text?: string;
+        textColor?: string;
+    }
 
-    /** @type {Props} */
     let {
         color1 = "rgb(255, 133, 62)",
         color2 = "rgb(255, 102, 42)",
         OnClick = () => {},
         text = "",
         textColor = ""
-    } = $props();
+    }: Props = $props();
 </script>
 
 

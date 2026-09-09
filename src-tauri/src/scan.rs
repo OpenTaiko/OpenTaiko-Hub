@@ -102,17 +102,12 @@ fn directive_value(line: &[u8], key: &[u8]) -> Option<String> {
     Some(String::from_utf8_lossy(value).trim().to_string())
 }
 
+/// Always "Ex" or "Normal" (the frontend's `TowerSide`): the game treats any side that
+/// is not the Ex/Spicy one as the Sweet side, so unknown values map to "Normal".
 fn normalize_side(raw: &str) -> String {
     match raw.trim().to_lowercase().as_str() {
         "2" | "ex" | "ura" => "Ex".to_string(),
-        "1" | "normal" | "omote" => "Normal".to_string(),
-        other => {
-            let mut chars = other.chars();
-            match chars.next() {
-                Some(first) => first.to_uppercase().collect::<String>() + chars.as_str(),
-                None => String::new(),
-            }
-        }
+        _ => "Normal".to_string(),
     }
 }
 
@@ -392,6 +387,8 @@ mod tests {
         assert_eq!(parse_side(b"TITLE:T\nSIDE:Ex\nCOURSE:Tower\n").as_deref(), Some("Ex"));
         assert_eq!(parse_side(b"SIDE:2\n").as_deref(), Some("Ex"));
         assert_eq!(parse_side(b"SIDE:1\n").as_deref(), Some("Normal"));
+        // Anything that is not the Ex side is the Sweet side
+        assert_eq!(parse_side(b"SIDE:whatever\n").as_deref(), Some("Normal"));
         assert_eq!(parse_side(b"TITLE:no side\n"), None);
     }
 

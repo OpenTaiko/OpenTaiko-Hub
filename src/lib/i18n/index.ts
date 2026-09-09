@@ -11,7 +11,7 @@ register('nl',      () => import('./nl.json'));
 register('ko',      () => import('./ko.json'));
 register('ru',      () => import('./ru.json'));
 
-function resolveLocale() {
+function resolveLocale(): string {
     const nav = getLocaleFromNavigator() ?? '';
 
     if (/^zh(-Hans(-|$)|-(CN|SG|MY)(-|$))/i.test(nav) || /^zh$/i.test(nav)) {
@@ -31,6 +31,6 @@ function resolveLocale() {
     return 'en';
 }
 
-export function setupI18n() {
+export function setupI18n(): void {
     init({ fallbackLocale: 'en', initialLocale: resolveLocale() });
 }

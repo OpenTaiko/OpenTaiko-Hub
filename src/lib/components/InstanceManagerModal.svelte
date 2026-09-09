@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { getContext } from 'svelte';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -16,25 +16,24 @@
         refreshInstanceVersion,
         updateInstance,
         linkGlobalSongs
-    } from '$lib/stores/instances.js';
+    } from '$lib/stores/instances';
+    import type { BuildOption, Instance, ToastContext } from '$lib/types';
 
     import BuildPickerModal from '$lib/components/BuildPickerModal.svelte';
 
-    const { TriggerError, TriggerSuccess } = getContext('toast');
+    const { TriggerError, TriggerSuccess } = getContext<ToastContext>('toast');
 
-    /**
-     * @typedef {Object} Props
-     * @property {boolean} [Show]
-     * @property {any} [OnClose]
-     */
+    interface Props {
+        Show?: boolean;
+        OnClose?: () => void;
+    }
 
-    /** @type {Props} */
-    let { Show = false, OnClose = () => {} } = $props();
+    let { Show = false, OnClose = () => {} }: Props = $props();
 
     let newInstanceName = $state('');
     let showBuildPicker = $state(false);
 
-    const channelLabel = (inst) => {
+    const channelLabel = (inst: Instance): string => {
         if (inst.channel === 'experimental') return inst.experimental?.label ?? $_('instances.channel.experimental');
         if (inst.channel === 'stable') return $_('instances.channel.stable');
         return $_('instances.channel.empty');
@@ -49,13 +48,13 @@
             await linkGlobalSongs(get(instances).find((i) => i.id === instance.id));
             TriggerSuccess(get(_)('instances.success.attached', { values: { name: instance.name } }));
         } catch (error) {
-            TriggerError(get(_)('instances.error.attach_failed', { values: { error } }));
+            TriggerError(get(_)('instances.error.attach_failed', { values: { error: String(error) } }));
         }
     };
 
     // Creating an instance asks which build to install (Stable / Experimental);
     // the download starts automatically on the Home tab once the instance is created.
-    const DoCreate = async (build) => {
+    const DoCreate = async (build: BuildOption) => {
         try {
             const instance = await createInstance(newInstanceName);
             newInstanceName = '';
@@ -66,20 +65,20 @@
             TriggerSuccess(get(_)('instances.success.created', { values: { name: instance.name } }));
             OnClose();
         } catch (error) {
-            TriggerError(get(_)('instances.error.create_failed', { values: { error } }));
+            TriggerError(get(_)('instances.error.create_failed', { values: { error: String(error) } }));
         }
     };
 
-    const DoDetach = async (inst) => {
+    const DoDetach = async (inst: Instance) => {
         await detachInstance(inst.id);
         TriggerSuccess(get(_)('instances.success.detached', { values: { name: inst.name } }));
     };
 
-    const OpenFolder = async (inst) => {
+    const OpenFolder = async (inst: Instance) => {
         try {
             await openPath(inst.path);
         } catch (error) {
-            TriggerError(get(_)('home.error.launch', { values: { error } }));
+            TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
         }
     };
 </script>

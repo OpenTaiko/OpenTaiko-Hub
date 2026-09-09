@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
     import { Navigation } from '@skeletonlabs/skeleton-svelte';
     import { _ } from 'svelte-i18n';
@@ -24,22 +24,29 @@
         loadInstances,
         refreshInstanceVersion,
         linkGlobalSongs
-    } from '$lib/stores/instances.js';
+    } from '$lib/stores/instances';
 
     // Themes
     const themetarget = document.getElementById('themetarget');
+
+    interface NavTile {
+        value: number;
+        icon: string;
+        label: string;
+        tooltip: string;
+    }
 
     // Navigation (tile ids are stable: ThemesTab compares against 7)
     let currentTile = $state(0);
     let showInstanceManager = $state(false);
 
-    const mainTiles = [
+    const mainTiles: NavTile[] = [
         { value: 0, icon: 'fa-solid fa-home', label: 'nav.home', tooltip: 'nav.tooltip.home' },
         { value: 1, icon: 'fa-solid fa-music', label: 'nav.songlist', tooltip: 'nav.tooltip.songlist' },
         { value: 3, icon: 'fa-solid fa-screwdriver-wrench', label: 'nav.tools', tooltip: 'nav.tooltip.tools' },
         { value: 4, icon: 'fa-solid fa-question', label: 'nav.secrets', tooltip: 'nav.tooltip.secrets' }
     ];
-    const trailTiles = [
+    const trailTiles: NavTile[] = [
         { value: 5, icon: 'fa-regular fa-file-lines', label: 'nav.information', tooltip: 'nav.tooltip.information' },
         { value: 6, icon: 'fa-solid fa-globe', label: 'nav.links', tooltip: 'nav.tooltip.links' },
         { value: 7, icon: 'fa-solid fa-palette', label: 'nav.themes', tooltip: 'nav.tooltip.themes' }
@@ -58,7 +65,7 @@
             console.error('Instance initialization failed:', error);
         } finally {
             // The body starts hidden (app.html) to avoid a theme flash; always unhide
-            themetarget.setAttribute("style", "");
+            themetarget?.setAttribute("style", "");
         }
     });
 </script>

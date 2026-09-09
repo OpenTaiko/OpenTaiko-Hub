@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     // Dependencies
     import { onMount } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
@@ -8,16 +8,17 @@
     import { path } from '@tauri-apps/api';
     import { invoke } from '@tauri-apps/api/core';
     import { listen } from '@tauri-apps/api/event';
+    import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, LocalAsset, ToastContext } from '$lib/types';
 
-    const copyAllFilesRecursive = async (src, dst) => {
+    const copyAllFilesRecursive = async (src: string, dst: string): Promise<void> => {
         let files;
         try {
-            files = await readDir(src, { recursive: false });
+            files = await readDir(src);
         } catch (error) {
             console.error(`Error reading directory ${src}:`, error);
             return;
         }
-for (const file of files) {
+        for (const file of files) {
             const srcPath = `${src}/${file.name}`;
             const dstPath = `${dst}/${file.name}`;
             try {
@@ -33,10 +34,10 @@ for (const file of files) {
         }
     }
     import { getContext } from 'svelte';
-    const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext('toast');
+    const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
-    import { GetTmpPath } from "$lib/utils/path.js";
-    import { activeInstance, instanceVersions } from "$lib/stores/instances.js";
+    import { GetTmpPath } from "$lib/utils/path";
+    import { activeInstance, instanceVersions } from "$lib/stores/instances";
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
@@ -45,50 +46,44 @@ for (const file of files) {
     import VersionNumberChip from '$lib/components/VersionNumberChip.svelte';
 
     // Asset folders relative to an instance
-    const assetBaseDirs = {
+    const assetBaseDirs: Record<AssetType, string> = {
         "Skins": "System",
         "Characters": "Global/Characters",
         "Puchicharas": "Global/PuchiChara"
     };
 
+    const ASSET_TYPES: AssetType[] = ["Skins", "Characters", "Puchicharas"];
+
+    type LocalAssets = Record<AssetType, Record<string, LocalAsset>>;
+    type ProgressByType = Record<AssetType, Record<string, number>>;
+
+    const emptyCatalog = (): AssetCatalog => ({ "Skins": [], "Characters": [], "Puchicharas": [] });
+    const emptyByType = <T,>(): Record<AssetType, Record<string, T>> => ({ "Skins": {}, "Characters": {}, "Puchicharas": {} });
 
     // When embedded in the Home sub-tabs the asset type is controlled by the parent
-    
-    /**
-     * @typedef {Object} Props
-     * @property {boolean} [ShowTabs] - and the internal tab bar is hidden
-     * @property {number} [currentAsset]
-     */
+    interface Props {
+        /** false when embedded in the Home sub-tabs: the internal tab bar is hidden. */
+        ShowTabs?: boolean;
+        /** 0 Skins, 1 Characters, 2 Puchicharas. */
+        currentAsset?: number;
+    }
 
-    /** @type {Props} */
-    let { ShowTabs = true, currentAsset = $bindable(0) } = $props();
+    let { ShowTabs = true, currentAsset = $bindable(0) }: Props = $props();
 
     // Rescan whenever another instance becomes active
-    let scannedInstanceId = null;   // bookkeeping only, never rendered
+    let scannedInstanceId: string | null = null;   // bookkeeping only, never rendered
 
     const assetsInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/assets_info.json';
-    let assetsInfo = $state({
-        "Skins":[],
-        "Characters":[],
-        "Puchicharas":[]
-    });
-    let currentAssets = $state({
-        "Skins":{},
-        "Characters":{},
-        "Puchicharas":{}
-    });
+    let assetsInfo = $state<AssetCatalog>(emptyCatalog());
+    let currentAssets = $state<LocalAssets>(emptyByType<LocalAsset>());
     let assetScanning = $state(false);
-    let assetDLProgress = $state({
-        "Skins":{},
-        "Characters":{},
-        "Puchicharas":{}
-    });
-    let assetCountProgress = {
+    let assetDLProgress = $state<ProgressByType>(emptyByType<number>());
+    let assetCountProgress: Record<AssetType, number> = {
         "Skins":0,
         "Characters":0,
         "Puchicharas":0
     };
-    let assetCountProgressBar = $state({
+    let assetCountProgressBar = $state<Record<AssetType, number | null>>({
         "Skins":null,
         "Characters":null,
         "Puchicharas":null
@@ -98,22 +93,14 @@ for (const file of files) {
     const updateAssetsInfo = async () => {
         try {
             const response = await fetch(assetsInfoUrl);
-        if (response.ok) {
-            const text = await response.text();
-            assetsInfo = JSON.parse(text);
-        } else {
-            assetsInfo = {
-                "Skins":[],
-                "Characters":[],
-                "Puchicharas":[]
-            };
-        }
+            if (response.ok) {
+                const text = await response.text();
+                assetsInfo = JSON.parse(text) as AssetCatalog;
+            } else {
+                assetsInfo = emptyCatalog();
+            }
         } catch (error) {
-            assetsInfo = {
-                "Skins":[],
-                "Characters":[],
-                "Puchicharas":[]
-            };
+            assetsInfo = emptyCatalog();
         }
     }
 
@@ -121,29 +108,29 @@ for (const file of files) {
         const instance = get(activeInstance);
         if (!instance) return;
         assetScanning = true;
-        const scanned = {
-            "Skins": await crawlAsset(instance, "Skins"),
-            "Characters": await crawlAsset(instance, "Characters"),
-            "Puchicharas": await crawlAsset(instance, "Puchicharas")
+        const scanned: LocalAssets = {
+            "Skins": await crawlAsset(instance.path, "Skins"),
+            "Characters": await crawlAsset(instance.path, "Characters"),
+            "Puchicharas": await crawlAsset(instance.path, "Puchicharas")
         };
         // Reassign so the status cells react (Svelte 4 needs a fresh reference)
         if (get(activeInstance)?.id === instance.id) currentAssets = scanned;
         assetScanning = false;
     }
 
-    const crawlAsset = async (instance, assetType) => {
-        const targetFile = {
+    const crawlAsset = async (instancePath: string, assetType: AssetType): Promise<Record<string, LocalAsset>> => {
+        const targetFile: Record<AssetType, string> = {
             "Skins": "SkinConfig.ini",
             "Characters": "CharaConfig.txt",
             "Puchicharas": "PuchiConfig.txt"
-        }[assetType];
+        };
 
         // Native single-call scan: walking a full build's asset tree (thousands of
         // files) from JS with per-file IPC would flood the event loop and freeze the UI.
-        const scanned = {};
+        const scanned: Record<string, LocalAsset> = {};
         try {
-            const baseDir = await path.join(instance.path, assetBaseDirs[assetType]);
-            const found = await invoke('scan_asset_versions', { baseDir, targetFile });
+            const baseDir = await path.join(instancePath, assetBaseDirs[assetType]);
+            const found = await invoke<AssetVersion[]>('scan_asset_versions', { baseDir, targetFile: targetFile[assetType] });
             for (const { relPath, version } of found) {
                 scanned[relPath] = { assetFolderName: relPath, assetVersion: version };
             }
@@ -153,14 +140,20 @@ for (const file of files) {
         return scanned;
     }
 
-    const AssetPrefix = (assetType) => (assetType === "Skins") ? "skin" : "chara";
+    const AssetPrefix = (assetType: AssetType): AssetKeyPrefix => (assetType === "Skins") ? "skin" : "chara";
     // Total function: an out-of-range index falls back to Skins instead of returning
     // undefined — `assetsInfo[undefined]` would make `{#each}` throw during render,
     // which breaks Svelte's update cycle and softlocks the whole app.
-    const AssetTabType = (currentAsset) => ["Skins", "Characters", "Puchicharas"][currentAsset] ?? "Skins";
-    const AssetTabPrefix = (currentAsset) => AssetPrefix(AssetTabType(currentAsset));
+    const AssetTabType = (currentAsset: number): AssetType => ASSET_TYPES[currentAsset] ?? "Skins";
+    const AssetTabPrefix = (currentAsset: number): AssetKeyPrefix => AssetPrefix(AssetTabType(currentAsset));
 
-    const DownloadDisplayedAssets = async (assetType) => {
+    // Catalog entries prefix their keys with the asset kind ("skinName" / "charaName")
+    const Field = (info: AssetInfo, prefix: AssetKeyPrefix, name: string): string =>
+        String((info as Record<string, unknown>)[`${prefix}${name}`] ?? '');
+    const SizeMb = (info: AssetInfo, prefix: AssetKeyPrefix): number =>
+        Number((info as Record<string, unknown>)[`${prefix}Size`] ?? 0);
+
+    const DownloadDisplayedAssets = async (assetType: AssetType) => {
         if (assetScanning === true) {
             const translatedType = get(_)(`assets.type.${assetType.toLowerCase()}`);
             TriggerError(get(_)('assets.error.scanning', { values: { type: translatedType } }));
@@ -169,9 +162,10 @@ for (const file of files) {
 
         const assetPrefix = AssetPrefix(assetType);
 
-        const _filter = (a) => {
-            const _notdownloaded = !Object.keys(currentAssets[assetType]).includes(a[`${assetPrefix}Folder`]);
-            const _outdated = _notdownloaded || currentAssets[assetType][a[`${assetPrefix}Folder`]].assetVersion !== a[`${assetPrefix}Version`];
+        const _filter = (a: AssetInfo): boolean => {
+            const local = currentAssets[assetType][Field(a, assetPrefix, 'Folder')];
+            const _notdownloaded = local === undefined;
+            const _outdated = _notdownloaded || local.assetVersion !== Field(a, assetPrefix, 'Version');
             return _notdownloaded || _outdated;
         };
 
@@ -187,15 +181,14 @@ for (const file of files) {
 
         assetCountProgress[assetType] = 0;
         for (const Aif of AInfo) {
-            const assetRelpath = Aif[`${AssetPrefix(assetType)}Folder`];
+            const assetRelpath = Field(Aif, assetPrefix, 'Folder');
 
             assetCountProgressBar[assetType] = 100 * (assetCountProgress[assetType] / assetCount);
 
             console.log(`Downloading ${assetType} ${assetCountProgress[assetType] + 1} out of ${assetCount}...`);
             console.log(Aif);
 
-            let curObj = null;
-            if (Object.keys(currentAssets[assetType]).includes(assetRelpath)) curObj = currentAssets[assetType][assetRelpath];
+            const curObj = currentAssets[assetType][assetRelpath] ?? null;
 
             await DownloadAsset(Aif, curObj, assetType, assetCountProgress[assetType] + 1, assetCount);
             assetCountProgress[assetType]++;
@@ -203,7 +196,7 @@ for (const file of files) {
         assetCountProgressBar[assetType] = null
     }
 
-    const DownloadAsset = async (assetObj, currentObj, assetType, assetNb = undefined, assetTotal = undefined) => {
+    const DownloadAsset = async (assetObj: AssetInfo, currentObj: LocalAsset | null, assetType: AssetType, assetNb?: number, assetTotal?: number) => {
         const instance = get(activeInstance);
         if (!instance) return;
         if (instance.channel === 'experimental') {
@@ -214,9 +207,9 @@ for (const file of files) {
 
         const baseDir = assetBaseDirs[assetType];
         const assetPrefix = AssetPrefix(assetType);
-        const assetRelpath = assetObj[`${assetPrefix}Folder`];
-        const assetSize = assetObj[`${assetPrefix}Size`];
-        const assetVersion = assetObj[`${assetPrefix}Version`];
+        const assetRelpath = Field(assetObj, assetPrefix, 'Folder');
+        const assetSize = SizeMb(assetObj, assetPrefix);
+        const assetVersion = Field(assetObj, assetPrefix, 'Version');
 
         assetDLProgress[assetType][assetRelpath] = 0;
 
@@ -233,7 +226,7 @@ for (const file of files) {
 
         if (assetType === "Skins") {
             // Zip name: spaces → dots, parentheses stripped (matches release asset naming)
-            const zipName = assetObj.skinFolder.replace(/[()]/g, '').replace(/ /g, '.') + '.zip';
+            const zipName = assetRelpath.replace(/[()]/g, '').replace(/ /g, '.') + '.zip';
             const zipUrl = `https://github.com/OpenTaiko/OpenTaiko-Skins/releases/download/system-assets/${zipName}`;
             const zipPath = await path.join(assetDownloadFolder, 'skin.zip');
 
@@ -244,7 +237,6 @@ for (const file of files) {
                 (pr) => {
                     totbyts += pr.progress;
                     assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
-                    assetDLProgress = assetDLProgress;
                 }
             );
 
@@ -257,15 +249,13 @@ for (const file of files) {
             }
 
             assetDLProgress[assetType][assetRelpath] = 0;
-            assetDLProgress = assetDLProgress;
 
             let extracting = true;
             const capturedRelpath = assetRelpath;
             const capturedType = assetType;
-            const unlisten = await listen('extract-progress', (event) => {
+            const unlisten = await listen<number>('extract-progress', (event) => {
                 if (!extracting) return;
                 assetDLProgress[capturedType][capturedRelpath] = event.payload;
-                assetDLProgress = assetDLProgress;
             });
 
             await invoke('unzip_and_get_first_folder', { zipPath });
@@ -282,10 +272,10 @@ for (const file of files) {
         } else {
             // Per-file download for Characters and Puchicharas
             const subDir = "Global";
-            const assetFpath = assetObj.charaFilesPath;
+            const assetFpath = (assetObj as CharaInfo).charaFilesPath;
             const baseDirPath = await path.join(res, baseDir);
 
-            let fileNames = [];
+            let fileNames: string[] = [];
             let totbyts = 0;
 
             for (const filePath of assetFpath) {
@@ -303,7 +293,6 @@ for (const file of files) {
                     (pr) => {
                         totbyts += pr.progress;
                         assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
-                        assetDLProgress = assetDLProgress;
                     }
                 );
 
@@ -345,7 +334,6 @@ for (const file of files) {
         };
 
         delete assetDLProgress[assetType][assetRelpath];
-        assetDLProgress = assetDLProgress;
     }
 
     onMount(async () => {
@@ -358,7 +346,7 @@ for (const file of files) {
     $effect(() => {
         if ($activeInstance && !isExperimental && $activeInstance.id !== scannedInstanceId) {
             scannedInstanceId = $activeInstance.id;
-            currentAssets = { "Skins": {}, "Characters": {}, "Puchicharas": {} };
+            currentAssets = emptyByType<LocalAsset>();
             crawlAssets();
         }
     });
@@ -418,15 +406,15 @@ for (const file of files) {
 			</tr>
 		</thead>
 		<tbody>
-			{#each assetsInfo[AssetTabType(currentAsset)] ?? [] as info}
+			{#each assetsInfo[AssetTabType(currentAsset)] ?? [] as info (Field(info, AssetTabPrefix(currentAsset), 'Folder'))}
 			<tr>
-				<td>{info[`${AssetTabPrefix(currentAsset)}Name`]}</td>
+				<td>{Field(info, AssetTabPrefix(currentAsset), 'Name')}</td>
 				<td>
-					<VersionNumberChip LatestVersion={info[`${AssetTabPrefix(currentAsset)}Version`]} CurrentVersion={optk_version} Strictness="Error" />
+					<VersionNumberChip LatestVersion={Field(info, AssetTabPrefix(currentAsset), 'Version')} CurrentVersion={optk_version} Strictness="Error" />
 				</td>
-				<td>{info[`${AssetTabPrefix(currentAsset)}Resolution`]}</td>
-				<td>{info[`${AssetTabPrefix(currentAsset)}Creator`]}</td>
-				<td>{info[`${AssetTabPrefix(currentAsset)}Size`]}Mb</td>
+				<td>{Field(info, AssetTabPrefix(currentAsset), 'Resolution')}</td>
+				<td>{Field(info, AssetTabPrefix(currentAsset), 'Creator')}</td>
+				<td>{SizeMb(info, AssetTabPrefix(currentAsset))}Mb</td>
 				<td>
 					<AssetStatusCell
 						IsScanning={assetScanning}
@@ -434,7 +422,7 @@ for (const file of files) {
 						AssetInfo={info}
 						CurrentAssets={currentAssets}
 						DownloadMethod={DownloadAsset}
-						Progress={assetDLProgress[AssetTabType(currentAsset)][info[`${AssetTabPrefix(currentAsset)}Folder`]]}
+						Progress={assetDLProgress[AssetTabType(currentAsset)][Field(info, AssetTabPrefix(currentAsset), 'Folder')]}
 						/>
 				</td>
 			</tr>

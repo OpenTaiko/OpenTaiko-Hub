@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
     // Per-save export / import for the active instance's Saves.db3.
     //
     // Each save (a slot identified by its player name) is exported with all of its
@@ -14,38 +14,40 @@
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
-    import { getSQL } from '$lib/utils/sqljs.js';
-    import { compareVersions } from '$lib/utils/versions.js';
-    import { readDbVersion, listSaves, exportSave, importSaveInto, rebindSlot, createSave, deleteSave } from '$lib/utils/savesdb.js';
-    import { activeInstance } from '$lib/stores/instances.js';
+    import { getSQL } from '$lib/utils/sqljs';
+    import { compareVersions } from '$lib/utils/versions';
+    import { readDbVersion, listSaves, exportSave, importSaveInto, rebindSlot, createSave, deleteSave } from '$lib/utils/savesdb';
+    import { activeInstance } from '$lib/stores/instances';
+    import type { Database } from 'sql.js';
+    import type { Instance, PortableSave, SaveSummary, ToastContext } from '$lib/types';
 
-    const { TriggerError, TriggerSuccess, TriggerWarning } = getContext('toast');
+    const { TriggerError, TriggerSuccess } = getContext<ToastContext>('toast');
 
     const DB_NAME = 'Saves.db3';
 
-    let saves = $state([]);
-    let currentVersion = $state(null);
+    let saves = $state<SaveSummary[]>([]);
+    let currentVersion = $state<string | null>(null);
     let loading = $state(false);
-    let loadError = $state(null);
+    let loadError = $state<string | null>(null);
     let busy = $state(false);
-    let loadedFor = null;   // bookkeeping only, never rendered
+    let loadedFor: string | null = null;   // bookkeeping only, never rendered
     let loadToken = 0; // guards against out-of-order reloads when switching instances
 
 
-    const dbPath = (inst) => path.join(inst.path, DB_NAME);
+    const dbPath = (inst: Instance): Promise<string> => path.join(inst.path, DB_NAME);
 
     // No step of a load may hang forever: a stuck await would leave the tab spinning
     // with nothing to click, so every load is bounded and always ends in a state the
     // user can act on.
-    const withTimeout = (promise, ms, label) => Promise.race([
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => Promise.race([
         promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), ms))
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), ms))
     ]);
 
     // Loads a specific instance's DB. Captures a token so a slow reload for a previous
     // instance can never overwrite the current one's data. `silent` keeps the current
     // rows on screen while re-reading (no placeholder, no layout shift).
-    const Load = async (inst, silent = false) => {
+    const Load = async (inst: Instance | null, silent = false) => {
         if (!inst) return;
         const token = ++loadToken;
         if (!silent) {
@@ -54,7 +56,7 @@
             currentVersion = null;
         }
         loadError = null;
-        let db = null;
+        let db: Database | null = null;
         try {
             const p = await withTimeout(dbPath(inst), 15000, 'path resolution');
             if (await withTimeout(exists(p), 15000, 'file check')) {
@@ -70,19 +72,19 @@
             }
         } catch (error) {
             console.error('Failed to read the save database:', error);
-            if (token === loadToken) loadError = String(error?.message ?? error);
+            if (token === loadToken) loadError = error instanceof Error ? error.message : String(error);
         } finally {
             db?.close();
         }
         if (token === loadToken) loading = false;
     };
 
-    const stripV = (v) => (v ?? '').replace(/^v/i, '');
+    const stripV = (v: string | null | undefined): string => (v ?? '').replace(/^v/i, '');
 
-    const Export = async (entry) => {
+    const Export = async (entry: SaveSummary) => {
         if (busy || !instance) return;
         const inst = instance;
-        let db = null;
+        let db: Database | null = null;
         try {
             const p = await dbPath(inst);
             if (!(await exists(p))) {
@@ -102,22 +104,22 @@
             await writeFile(dest, new TextEncoder().encode(JSON.stringify(portable)));
             TriggerSuccess(get(_)('saves.success.export', { values: { name: entry.name } }));
         } catch (error) {
-            TriggerError(get(_)('saves.error.export', { values: { error } }));
+            TriggerError(get(_)('saves.error.export', { values: { error: String(error) } }));
         } finally {
             db?.close();
             busy = false;
         }
     };
 
-    const SlotLabel = (entry) => entry.slot === null
+    const SlotLabel = (entry: SaveSummary): string => entry.slot === null
         ? get(_)('saves.slot_reserve')
         : get(_)('saves.slot_n', { values: { n: entry.slot + 1 } });
 
     // Runs a write against the instance DB and reloads the list without a layout shift
-    const WithDb = async (action) => {
+    const WithDb = async <T,>(action: (db: Database) => T | Promise<T>): Promise<T | null> => {
         if (busy || !instance) return null;
         const inst = instance;
-        let db = null;
+        let db: Database | null = null;
         busy = true;
         try {
             const p = await dbPath(inst);
@@ -128,7 +130,9 @@
             const SQL = await getSQL();
             db = new SQL.Database(await readFile(p));
             const result = await action(db);
-            if (result?.write !== false) await writeFile(p, db.export());
+            // An action may return { write: false } to leave the file untouched
+            const skipWrite = typeof result === 'object' && result !== null && 'write' in result && result.write === false;
+            if (!skipWrite) await writeFile(p, db.export());
             await Load(inst, true);
             return result;
         } finally {
@@ -142,11 +146,11 @@
             const result = await WithDb((db) => createSave(db, get(_)('saves.new_name'), crypto.randomUUID()));
             if (result) TriggerSuccess(get(_)('saves.success.created', { values: { name: result.name } }));
         } catch (error) {
-            TriggerError(get(_)('saves.error.create', { values: { error } }));
+            TriggerError(get(_)('saves.error.create', { values: { error: String(error) } }));
         }
     };
 
-    const DeleteSave = async (entry) => {
+    const DeleteSave = async (entry: SaveSummary) => {
         // Only reserve saves can go: the game needs its 5 slots to stay filled
         if (entry.slot !== null) return;
         const confirmed = await confirmDialog(
@@ -158,17 +162,17 @@
             const result = await WithDb((db) => deleteSave(db, entry.saveId));
             if (result?.deleted) TriggerSuccess(get(_)('saves.success.deleted', { values: { name: result.name } }));
         } catch (error) {
-            TriggerError(get(_)('saves.error.delete', { values: { error } }));
+            TriggerError(get(_)('saves.error.delete', { values: { error: String(error) } }));
         }
     };
 
     // Imports an archive into one chosen save. The destination is picked by the user
     // rather than derived from the archive's unique id, so a save exported on another
     // machine can be brought into any slot. The data is merged, never regressed.
-    const Import = async (entry) => {
+    const Import = async (entry: SaveSummary) => {
         if (busy || !instance) return;
         const inst = instance;
-        let db = null;
+        let db: Database | null = null;
         try {
             const src = await openDialog({
                 multiple: false,
@@ -176,9 +180,9 @@
             });
             if (!src) return;
 
-            let portable;
+            let portable: Partial<PortableSave>;
             try {
-                portable = JSON.parse(new TextDecoder().decode(await readFile(src)));
+                portable = JSON.parse(new TextDecoder().decode(await readFile(src))) as Partial<PortableSave>;
             } catch {
                 TriggerError(get(_)('saves.error.invalid_file'));
                 return;
@@ -194,7 +198,7 @@
                     values: {
                         slot: SlotLabel(entry),
                         current: entry.name,
-                        imported: portable.save.PlayerName ?? '?'
+                        imported: String(portable.save.PlayerName ?? '?')
                     }
                 }),
                 { title: get(_)('saves.confirm_title') }
@@ -217,7 +221,7 @@
             const cmp = compareVersions(stripV(portable.dbVersion ?? dbVersion), stripV(dbVersion));
             if (cmp !== null && cmp > 0) {
                 TriggerError(get(_)('saves.error.newer', {
-                    values: { imported: portable.dbVersion, current: dbVersion }
+                    values: { imported: portable.dbVersion ?? '?', current: dbVersion }
                 }));
                 return;
             }
@@ -230,7 +234,7 @@
                 values: { name: result.name, slot: SlotLabel(entry) }
             }));
         } catch (error) {
-            TriggerError(get(_)('saves.error.import', { values: { error } }));
+            TriggerError(get(_)('saves.error.import', { values: { error: String(error) } }));
         } finally {
             db?.close();
             busy = false;
@@ -240,14 +244,15 @@
     // Rebinds a save to another slot; an occupied target slot swaps the two saves
     // (e.g. moving P5 to Slot 1 puts the previous Slot 1 save into P5's old place).
     // The rows are updated in place (no reload) so the layout never shifts.
-    const Rebind = async (entry, event) => {
-        if (busy) return;
-        const targetSlot = Number(event.target.value);
+    const Rebind = async (entry: SaveSummary, event: Event) => {
+        if (busy || !instance) return;
+        const inst = instance;
+        const targetSlot = Number((event.currentTarget as HTMLSelectElement).value);
         const fromSlot = entry.slot;
-        let db = null;
+        let db: Database | null = null;
         busy = true;
         try {
-            const p = await dbPath(instance);
+            const p = await dbPath(inst);
             if (!(await exists(p))) {
                 TriggerError(get(_)('saves.error.no_db'));
                 return;
@@ -270,10 +275,10 @@
                 }
             }
         } catch (error) {
-            TriggerError(get(_)('saves.error.rebind', { values: { error } }));
+            TriggerError(get(_)('saves.error.rebind', { values: { error: String(error) } }));
             // Resync quietly so the selectors match the real layout, without the
             // loading placeholder that would shift the layout
-            await Load(instance, true);
+            await Load(inst, true);
         } finally {
             db?.close();
             busy = false;

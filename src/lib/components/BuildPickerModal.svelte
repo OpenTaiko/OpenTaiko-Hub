@@ -1,24 +1,23 @@
-<script>
+<script lang="ts">
     // Dialog to choose which OpenTaiko build to install into an instance:
     // Stable (latest GitHub release) or one of the available experimental builds
     // (grayed out when none exist).
     import { _ } from 'svelte-i18n';
-    import { fetchLatestRelease, fetchExperimentalOptions } from '$lib/utils/builds.js';
+    import { fetchLatestRelease, fetchExperimentalOptions } from '$lib/utils/builds';
+    import type { BuildOption } from '$lib/types';
 
-    /**
-     * @typedef {Object} Props
-     * @property {boolean} [Show]
-     * @property {any} [OnClose]
-     * @property {any} [OnPick]
-     */
+    interface Props {
+        Show?: boolean;
+        OnClose?: () => void;
+        OnPick?: (build: BuildOption) => void;
+    }
 
-    /** @type {Props} */
-    let { Show = false, OnClose = () => {}, OnPick = (_build) => {} } = $props();
+    let { Show = false, OnClose = () => {}, OnPick = () => {} }: Props = $props();
 
     let loading = $state(false);
-    let latestTag = $state(null);
-    let experimentalOptions = $state([]);
-    let selected = $state('stable');   // 'stable' | index into experimentalOptions
+    let latestTag = $state<string | null>(null);
+    let experimentalOptions = $state<Exclude<BuildOption, { kind: 'stable' }>[]>([]);
+    let selected = $state<'stable' | number>('stable');   // 'stable' | index into experimentalOptions
     let loadedFor = false;             // bookkeeping only, never rendered
 
 
@@ -33,7 +32,7 @@
         } catch (error) {
             console.error('Failed to fetch the latest release:', error);
         }
-        experimentalOptions = await fetchExperimentalOptions(latestTag);
+        experimentalOptions = (await fetchExperimentalOptions(latestTag)).filter((option) => option.kind !== 'stable');
         loading = false;
     };
 

@@ -1,11 +1,12 @@
-<script>
+<script lang="ts">
     import { onMount } from 'svelte';
     import { getVersion } from '@tauri-apps/api/app';
     import { fetch } from "@tauri-apps/plugin-http";
     import { openUrl } from '@tauri-apps/plugin-opener';
 
     import { getContext } from 'svelte';
-    const { TriggerError, TriggerWarning } = getContext('toast');
+    import type { ToastContext } from '$lib/types';
+    const { TriggerError, TriggerWarning } = getContext<ToastContext>('toast');
 
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -33,7 +34,7 @@
             if (!response.ok) {
                 throw new Error(`HTTP error status: ${response.status}`);
             }
-            const data = await response.json();
+            const data = (await response.json()) as { tag_name: string };
             latestVersion = data.tag_name; // Latest tag version number
 
             if (VersionHub == latestVersion) {
@@ -45,7 +46,7 @@
             }
         } catch (err) {
             latestVersionErrorFound = true;
-            TriggerError(get(_)('hub.error.fetch', { values: { error: err } }));
+            TriggerError(get(_)('hub.error.fetch', { values: { error: String(err) } }));
         }
     }
 
@@ -55,7 +56,7 @@
         try {
             await openUrl("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest");
         } catch (err) {
-            TriggerError(get(_)('hub.error.fetch', { values: { error: err } }));
+            TriggerError(get(_)('hub.error.fetch', { values: { error: String(err) } }));
         }
     }
 
