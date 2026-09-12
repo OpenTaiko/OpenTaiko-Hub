@@ -187,7 +187,11 @@ struct WalkCtx<'a> {
 }
 
 fn maybe_emit(ctx: &mut WalkCtx, force: bool) {
-    let due = ctx.pending.len() >= 20 || ctx.last_emit.elapsed().as_millis() >= 150;
+    // Time-based batching: every event makes the frontend re-render its song list, and
+    // a fast disk produced a batch every few milliseconds when they were emitted per 20
+    // songs, which kept the UI thread saturated for the whole scan. The size cap only
+    // bounds the payload of a single event.
+    let due = ctx.last_emit.elapsed().as_millis() >= 150 || ctx.pending.len() >= 500;
     if !force && !due {
         return;
     }

@@ -3,6 +3,10 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.2.7] - 2026-09-13 (Alpha)
+
+- [Fix] The Hub froze while scanning a large song library (each progress update did a full scan of the library per listed song)
+
 ## [0.2.6] - 2026-09-09 (Alpha)
 
 - [Enhance] Difficulty chips show the "+" half step for every course and level, not only 10 and above

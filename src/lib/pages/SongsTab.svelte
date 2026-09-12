@@ -44,11 +44,14 @@
 
     // Soundtrack
     const soundtrackInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/soundtrack_info.json';
-    let soundtrackInfo = $state<SoundtrackEntry[]>([]);
+    // The big collections are $state.raw: they are always replaced as a whole (never
+    // mutated in place), so wrapping thousands of entries in deep proxies would only add
+    // a signal per key and per row read.
+    let soundtrackInfo = $state.raw<SoundtrackEntry[]>([]);
     let catalogFetchFailed = $state(false);
-    let currentSongs = $state<Record<string, LocalSong>>({});          // uniqueId → local chart
-    let allScannedSongs = $state<ScannedSong[]>([]);       // every scanned song, catalog or custom
-    let scannedGenres = $state<Record<string, ScannedGenre>>({});         // relPath → genre folder
+    let currentSongs = $state.raw<Record<string, LocalSong>>({});          // uniqueId → local chart
+    let allScannedSongs = $state.raw<ScannedSong[]>([]);       // every scanned song, catalog or custom
+    let scannedGenres = $state.raw<Record<string, ScannedGenre>>({});         // relPath → genre folder
     let scanStats = $state({ dirs: 0, found: 0 });
     let scanning = $state(false);
     let viewMode = $state<'list' | 'tree'>('list');
@@ -86,7 +89,7 @@
     const hofDiffShortMap: Partial<Record<CourseName, string>>     = { "Easy": "EZ", "Normal": "NM", "Hard": "HD", "Oni": "EX", "Edit": "EXEX" };
     let hofDb: Database | null = null;
     // uniqueId → { difficultyString → globalRank }
-    let hofMap = $state<Record<string, Partial<Record<CourseName, number>>>>({});
+    let hofMap = $state.raw<Record<string, Partial<Record<CourseName, number>>>>({});
 
     // Modal state
     let hofModalOpen = $state(false);
@@ -136,15 +139,16 @@
             );
 
             if (result.length > 0) {
+                const ranks: Record<string, Partial<Record<CourseName, number>>> = {};
                 let globalRank = 0;
                 for (const [uniqueId, difficulty] of result[0].values) {
                     globalRank++;
                     const diffStr = hofDifficultyMap[Number(difficulty)];
                     if (diffStr && typeof uniqueId === 'string') {
-                        if (!hofMap[uniqueId]) hofMap[uniqueId] = {};
-                        hofMap[uniqueId][diffStr] = globalRank;
+                        (ranks[uniqueId] ??= {})[diffStr] = globalRank;
                     }
                 }
+                hofMap = ranks;
             }
 
             // Patch soundtrackInfo with chartHoFRanks derived from the DB
@@ -246,18 +250,35 @@
         try {
             const baseDirPath = await GetGlobalSongsPath();
 
+            // Batches are merged and pushed to the UI at most once per animation frame:
+            // every update re-evaluates the status of each listed song, so applying them
+            // as they arrive would hog the UI thread for the duration of the scan.
+            let latestStats = { dirs: 0, found: 0 };
+            let dirty = false;
+            let flushFrame: number | null = null;
+            const flush = () => {
+                flushFrame = null;
+                scanStats = latestStats;
+                if (dirty) {
+                    dirty = false;
+                    // Raw state compares by reference: hand out fresh containers
+                    currentSongs = { ...liveSongs };
+                    allScannedSongs = [...liveAll];
+                }
+            };
             const channel = new Channel<ScanProgressEvent>();
             channel.onmessage = (message) => {
                 if (message.type !== 'progress') return;
-                scanStats = { dirs: message.scannedDirs, found: message.songsFound };
+                latestStats = { dirs: message.scannedDirs, found: message.songsFound };
                 if (message.batch?.length) {
                     for (const song of message.batch) registerSong(liveSongs, liveAll, song);
-                    currentSongs = liveSongs;
-                    allScannedSongs = liveAll;
+                    dirty = true;
                 }
+                flushFrame ??= requestAnimationFrame(flush);
             };
 
             const result = await invoke<ScanResult>('scan_songs', { baseDir: baseDirPath, onEvent: channel });
+            if (flushFrame !== null) cancelAnimationFrame(flushFrame);
 
             // The command result is authoritative; events were only for live display
             const finalSongs: Record<string, LocalSong> = {};
@@ -266,7 +287,7 @@
             currentSongs = finalSongs;
             allScannedSongs = finalAll;
             scannedGenres = Object.fromEntries(result.genres.map((genre) => [genre.relPath, genre]));
-            scanStats = { dirs: scanStats.dirs, found: finalAll.length };
+            scanStats = { dirs: latestStats.dirs, found: finalAll.length };
         } catch (error) {
             console.error('Song scan failed:', error);
             TriggerError(get(_)('songs.error.scan_failed', { values: { error: String(error) } }));
@@ -436,42 +457,42 @@
             default:
             case ("name"): 
             {
-                soundtrackInfo = soundtrackInfo.sort((a, b) => mult * a.chartTitle.localeCompare(b.chartTitle));
+                soundtrackInfo = [...soundtrackInfo].sort((a, b) => mult * a.chartTitle.localeCompare(b.chartTitle));
                 break;
             }
             case ("genre"): 
             {
-                soundtrackInfo = soundtrackInfo.sort((a, b) => mult * a.tjaGenreFolder.localeCompare(b.tjaGenreFolder));
+                soundtrackInfo = [...soundtrackInfo].sort((a, b) => mult * a.tjaGenreFolder.localeCompare(b.tjaGenreFolder));
                 break;
             }
             case ("size"):
             {
-                soundtrackInfo = soundtrackInfo.sort((a, b) => mult * (a.chartSize - b.chartSize));
+                soundtrackInfo = [...soundtrackInfo].sort((a, b) => mult * (a.chartSize - b.chartSize));
                 break;
             }
             case ("ez"):
             {
-                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Easy) - UndefinedToMinusOne(b.chartDifficulties.Easy))));
+                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Easy) - UndefinedToMinusOne(b.chartDifficulties.Easy))));
                 break;
             }
             case ("nm"):
             {
-                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Normal) - UndefinedToMinusOne(b.chartDifficulties.Normal))));
+                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Normal) - UndefinedToMinusOne(b.chartDifficulties.Normal))));
                 break;
             }
             case ("hd"):
             {
-                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Hard) - UndefinedToMinusOne(b.chartDifficulties.Hard))));
+                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Hard) - UndefinedToMinusOne(b.chartDifficulties.Hard))));
                 break;
             }
             case ("ex"):
             {
-                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Oni) - UndefinedToMinusOne(b.chartDifficulties.Oni))));
+                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Oni) - UndefinedToMinusOne(b.chartDifficulties.Oni))));
                 break;
             }
             case ("exex"):
             {
-                soundtrackInfo = soundtrackInfo.sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Edit) - UndefinedToMinusOne(b.chartDifficulties.Edit))));
+                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Edit) - UndefinedToMinusOne(b.chartDifficulties.Edit))));
                 break;
             }
         }
@@ -515,7 +536,7 @@
                 console.log(SInfo);
 
                 let curObj = null;
-                if (Object.keys(currentSongs).includes(SInfo.uniqueId)) curObj = currentSongs[SInfo.uniqueId];
+                if (currentSongs[SInfo.uniqueId] !== undefined) curObj = currentSongs[SInfo.uniqueId];
 
                 await DownloadSong(SInfo, curObj, songCountProgress + 1, songCount);
                 songCountProgress++;
@@ -575,9 +596,12 @@
                 await copyFile(dlPath, destPath);
                 changed = true;
                 if (remoteSha) {
-                    scannedGenres[genrePath] = {
-                        ...(scannedGenres[genrePath] ?? { relPath: genrePath, title: null, boxDefSha1: null, preimageSha1: null }),
-                        [fileName === 'box.def' ? 'boxDefSha1' : 'preimageSha1']: remoteSha
+                    scannedGenres = {
+                        ...scannedGenres,
+                        [genrePath]: {
+                            ...(scannedGenres[genrePath] ?? { relPath: genrePath, title: null, boxDefSha1: null, preimageSha1: null }),
+                            [fileName === 'box.def' ? 'boxDefSha1' : 'preimageSha1']: remoteSha
+                        }
                     };
                 }
             } catch (error) {
@@ -714,16 +738,19 @@
             TriggerSuccess(get(_)('songs.success.download_nb', { values: { nb: songNb, total: songTotal } }));
 
         //crawlSongs();
-        currentSongs[songObj.uniqueId] = {
-            chartMD5s: [songObj.tjaMD5],
-            // Keep the actual install location when the song was relocated by the user
-            chartRelativePath: (currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath
+        currentSongs = {
+            ...currentSongs,
+            [songObj.uniqueId]: {
+                chartMD5s: [songObj.tjaMD5],
+                // Keep the actual install location when the song was relocated by the user
+                chartRelativePath: (currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath
+            }
         };
     }
 
     // Artists info
     const artistsDbUrl = 'https://opentaiko.github.io/artists_info.db3';
-    let songArtistsMap = $state<Record<string, SongArtists>>({}); // songUid → artists and links
+    let songArtistsMap = $state.raw<Record<string, SongArtists>>({}); // songUid → artists and links
     let expandedSongUid = $state<string | null>(null);
 
     const updateArtistInfo = async () => {
@@ -749,11 +776,13 @@
 
             const songsResult = db.exec('SELECT songUid, artists, link FROM songs');
             if (songsResult.length > 0) {
+                const bySong: Record<string, SongArtists> = {};
                 for (const [songUid, artistsJson, songLink] of songsResult[0].values) {
                     const artistIds = JSON.parse(String(artistsJson || '[]')) as (string | number)[];
                     const artists = artistIds.map((id) => artistsById[String(id)]).filter((a): a is ArtistLinks => !!a);
-                    songArtistsMap[String(songUid)] = { artists, link: link(songLink) };
+                    bySong[String(songUid)] = { artists, link: link(songLink) };
                 }
+                songArtistsMap = bySong;
             }
         } catch (e) {
             console.error('Failed to load artist info:', e);
@@ -906,11 +935,11 @@
 				{/if}
 				<td>{songInfo.chartSize}Mb</td>
 				<!-- songDLProgress[songObj.uniqueId] -->
-				{#if scanning === true && !Object.keys(currentSongs).includes(songInfo.uniqueId)}
+				{#if scanning === true && currentSongs[songInfo.uniqueId] === undefined}
 				<td>
 					<p>{$_('songs.status.scanning')}</p>
 				</td>
-				{:else if !Object.keys(currentSongs).includes(songInfo.uniqueId)}
+				{:else if currentSongs[songInfo.uniqueId] === undefined}
 				<td>
 					<p>{$_('songs.status.not_downloaded')}</p>
 					<br />
