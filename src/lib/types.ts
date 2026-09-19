@@ -44,8 +44,13 @@ export interface SoundtrackEntry {
     tjaMD5: string;
     /** Size in megabytes. */
     chartSize: number;
+    /** Default title, usually romanized. */
     chartTitle: string;
+    /** Translated titles keyed by uppercase language code ("JA", "ZH", ...). */
+    chartTitles?: Record<string, string>;
     chartSubtitle?: string;
+    /** Translated subtitles keyed by uppercase language code. */
+    chartSubtitles?: Record<string, string>;
     chartDifficulties: Partial<Record<CourseName, number>>;
     chartMakers: Partial<Record<CourseName, string>>;
     chartAudioFilePath: string;

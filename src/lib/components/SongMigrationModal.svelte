@@ -5,8 +5,9 @@
     // side's hash and last-edited date) or in bulk.
     import { onMount, getContext } from 'svelte';
     import { invoke } from '@tauri-apps/api/core';
-    import { _ } from 'svelte-i18n';
+    import { _, locale } from 'svelte-i18n';
     import { get } from 'svelte/store';
+    import { localizedTitle } from '$lib/utils/titles';
     import type {
         MigrateSummary,
         MigrationAction,
@@ -64,7 +65,7 @@
 
     const Label = (entry: MigrationSongEntry): string => {
         const catalogEntry = entry.uniqueId ? CatalogById.get(entry.uniqueId) : null;
-        return catalogEntry?.chartTitle ?? entry.title ?? entry.relPath.split('/').pop() ?? entry.relPath;
+        return (catalogEntry ? localizedTitle(catalogEntry, $locale) : null) ?? entry.title ?? entry.relPath.split('/').pop() ?? entry.relPath;
     };
     const ShortHash = (entry: MigrationSongEntry | null): string => {
         if (!entry?.md5s || entry.md5s.length === 0) return '—';

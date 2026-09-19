@@ -30,8 +30,9 @@
 
     import { getSQL } from '$lib/utils/sqljs';
 
-    import { _ } from 'svelte-i18n';
+    import { _, locale } from 'svelte-i18n';
     import { get } from 'svelte/store';
+    import { localizedTitle, titleSearchTerms } from '$lib/utils/titles';
 
     import { GetGlobalSongsPath, GetTmpPath } from "../utils/path";
     import { instances } from "../stores/instances";
@@ -81,6 +82,9 @@
     let duplicateBusy = $state(false);
 
     let catalogById = $derived(new Map<string, SoundtrackEntry>(soundtrackInfo.map((s) => [s.uniqueId, s])));
+    // Lowercased title spellings per song, built once per catalog change rather than per
+    // row on every render (the list re-renders on each scan batch)
+    let searchTerms = $derived(new Map<string, string[]>(soundtrackInfo.map((s) => [s.uniqueId, titleSearchTerms(s)])));
 
     // Hall of Fame
     const hofDbUrl = 'https://opentaiko.github.io/hof.db3';
@@ -420,7 +424,10 @@
 
 
     let GetFilteredSInfo = $derived((SInfo: SoundtrackEntry): boolean => {
-        const bInNameFilter = SInfo.chartTitle.toLowerCase().includes(searchSong.toLowerCase()) || (SInfo.chartSubtitle?.toLowerCase().includes(searchSong.toLowerCase()) ?? false);
+        // Matches any spelling of the song (default and every translation), so a search
+        // works whatever language the title is displayed in
+        const needle = searchSong.toLowerCase();
+        const bInNameFilter = needle === '' || (searchTerms.get(SInfo.uniqueId) ?? []).some((term) => term.includes(needle));
         const bInGenreFilter = SInfo.tjaGenreFolder.toLowerCase().includes(searchGenre.toLowerCase());
 
         return bInGenreFilter && bInNameFilter;
@@ -449,6 +456,7 @@
     }
 
     const SortSongsByColumn = (column: string) => {
+        const currentLocale = get(locale);
         const wasClickedPreviously = `${column} asc` === songPreviousSort;
         const mult = (wasClickedPreviously) ? -1 : 1;
         songPreviousSort = (wasClickedPreviously) ? `${column} desc` : `${column} asc`;
@@ -457,7 +465,8 @@
             default:
             case ("name"): 
             {
-                soundtrackInfo = [...soundtrackInfo].sort((a, b) => mult * a.chartTitle.localeCompare(b.chartTitle));
+                // Sorted by what the user actually sees, in their own locale
+                soundtrackInfo = [...soundtrackInfo].sort((a, b) => mult * localizedTitle(a, currentLocale).localeCompare(localizedTitle(b, currentLocale), currentLocale ?? undefined));
                 break;
             }
             case ("genre"): 
@@ -1027,7 +1036,7 @@
     <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
     <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
         <div class="flex justify-between items-center">
-            <h2 class="h3">Hall of Fame — {hofModalSongInfo.chartTitle} ({hofDiffShortMap[hofModalDifficulty]} #{hofMap[hofModalSongInfo.uniqueId]?.[hofModalDifficulty]})</h2>
+            <h2 class="h3">Hall of Fame — {localizedTitle(hofModalSongInfo, $locale)} ({hofDiffShortMap[hofModalDifficulty]} #{hofMap[hofModalSongInfo.uniqueId]?.[hofModalDifficulty]})</h2>
             <button class="btn-icon btn-icon-sm preset-filled" onclick={() => hofModalOpen = false} aria-label={$_('hof.close')}>✕</button>
         </div>
         <div class="flex flex-col gap-1">

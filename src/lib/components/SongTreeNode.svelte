@@ -1,8 +1,9 @@
 <script lang="ts">
     // A component may import itself for recursion (replaces <svelte:self>)
     import SongTreeNode from './SongTreeNode.svelte';
-    import { _ } from 'svelte-i18n';
+    import { _, locale } from 'svelte-i18n';
     import type { ScannedSong, SongTreeFolder, SoundtrackEntry } from '$lib/types';
+    import { localizedTitle } from '$lib/utils/titles';
     import { FormatLevel } from '$lib/utils/levels';
 
     interface Props {
@@ -32,7 +33,7 @@
 
     const SongLabel = (song: ScannedSong): string => {
         const catalogEntry = song.uniqueId ? CatalogById.get(song.uniqueId) : null;
-        return catalogEntry?.chartTitle ?? song.title ?? song.relPath.split('/').pop() ?? song.relPath;
+        return (catalogEntry ? localizedTitle(catalogEntry, $locale) : null) ?? song.title ?? song.relPath.split('/').pop() ?? song.relPath;
     };
 
     const SongStatus = (song: ScannedSong): SongStatus => {

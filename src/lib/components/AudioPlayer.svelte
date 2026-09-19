@@ -1,6 +1,7 @@
 <script lang="ts">
-	import { _ } from 'svelte-i18n';
+	import { _, locale } from 'svelte-i18n';
 	import type { SoundtrackEntry } from '$lib/types';
+	import { localizedTitle, localizedSubtitle } from '$lib/utils/titles';
 
 	interface Props {
 		songInfo: SoundtrackEntry;
@@ -11,6 +12,9 @@
 	let time = $state(0);
 	let duration = $state(0);
 	let paused = $state(true);
+
+	let title = $derived(localizedTitle(songInfo, $locale));
+	let subtitle = $derived(localizedSubtitle(songInfo, $locale));
 
 	function format(time: number): string {
 		if (isNaN(time)) return '...';
@@ -42,8 +46,8 @@
 
 	<div class="info">
 		<div class="description">
-			<strong>{songInfo.chartTitle}</strong>
-			<br/><small>{songInfo.chartSubtitle}</small>
+			<strong>{title}</strong>
+			<br/><small>{subtitle}</small>
 		</div>
 
 		<div class="time">
