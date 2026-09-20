@@ -5,6 +5,7 @@
     "windows": ["main"],
     "permissions": [
       "os:default",
+      "log:default",
       "core:app:allow-set-app-theme",
       "core:app:allow-version",
       "dialog:default",

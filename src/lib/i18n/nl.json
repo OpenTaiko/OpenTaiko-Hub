@@ -122,8 +122,13 @@
     },
     "error": {
       "launch": "Fout bij het starten van de app: {error}",
+      "game_exited": "OpenTaiko is direct na het starten afgesloten ({reason}). {detail}",
+      "game_crashed": "OpenTaiko is na {mins} min onverwacht gestopt ({reason}). {detail}",
+      "game_code": "afsluitcode {code}",
+      "game_signal": "beëindigd door signaal {signal}",
       "already_downloading": "Er wordt al gedownload",
       "fetch_release": "Ophalen van de nieuwste OpenTaiko-release mislukt: {error}",
+      "build_failed": "Compileren van OpenTaiko mislukt: {error}. Zie de build-uitvoer hieronder.",
       "download_failed": "Downloaden van OpenTaiko mislukt: {error}",
       "incomplete_build": "De geïnstalleerde build is onvolledig (ontbrekende spelbestanden), installeer opnieuw."
     },
@@ -384,6 +389,8 @@
       "intro": "Als je een probleem tegenkomt of hulp zoekt bij OpenTaiko, raadpleeg dan de volgende links:",
       "discord": "Het #support-kanaal van de OpenTaiko Discord",
       "github": "GitHub issues-sectie",
+      "logs_hint": "Als de Hub zelf problemen geeft, voeg dan het bestand OpenTaiko-Hub.log uit deze map toe aan je melding.",
+      "open_logs": "Logmap openen",
       "note": "Let op: doe eerst zelf onderzoek voordat je iets vraagt, want het probleem is misschien al eerder behandeld. Bekijk ook het #often_asked_question-kanaal op Discord."
     },
     "versioning": {

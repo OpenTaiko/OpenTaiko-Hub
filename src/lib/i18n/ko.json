@@ -122,8 +122,13 @@
     },
     "error": {
       "launch": "앱 실행 중 오류가 발생했습니다: {error}",
+      "game_exited": "OpenTaiko가 시작 직후 종료되었습니다({reason}). {detail}",
+      "game_crashed": "OpenTaiko가 {mins}분 후 예기치 않게 종료되었습니다({reason}). {detail}",
+      "game_code": "종료 코드 {code}",
+      "game_signal": "시그널 {signal}에 의해 종료됨",
       "already_downloading": "이미 다운로드가 진행 중입니다",
       "fetch_release": "최신 OpenTaiko 릴리스를 가져오지 못했습니다: {error}",
+      "build_failed": "OpenTaiko 빌드에 실패했습니다: {error}. 아래 빌드 출력을 확인하세요.",
       "download_failed": "OpenTaiko 다운로드에 실패했습니다: {error}",
       "incomplete_build": "설치된 빌드가 불완전합니다(게임 파일 누락). 다시 설치해 주세요."
     },
@@ -384,6 +389,8 @@
       "intro": "OpenTaiko 사용 중 문제가 발생했거나 도움이 필요하다면 아래 링크를 참고해 주세요:",
       "discord": "OpenTaiko Discord의 #support 채널",
       "github": "GitHub 이슈 섹션",
+      "logs_hint": "Hub 자체에 문제가 있다면 이 폴더의 OpenTaiko-Hub.log 파일을 보고에 첨부해 주세요.",
+      "open_logs": "로그 폴더 열기",
       "note": "참고: 이미 다뤄진 문제일 수 있으니 질문하기 전에 직접 찾아보시고, Discord의 #often_asked_question 채널도 꼭 확인해 주세요."
     },
     "versioning": {

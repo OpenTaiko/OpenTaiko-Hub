@@ -122,8 +122,13 @@
     },
     "error": {
       "launch": "Erreur lors du lancement de l'application : {error}",
+      "game_exited": "OpenTaiko s'est fermé juste après son lancement ({reason}). {detail}",
+      "game_crashed": "OpenTaiko s'est arrêté de façon inattendue après {mins} min ({reason}). {detail}",
+      "game_code": "code de sortie {code}",
+      "game_signal": "arrêté par le signal {signal}",
       "already_downloading": "Un téléchargement est déjà en cours",
       "fetch_release": "Échec de la récupération de la dernière version d'OpenTaiko : {error}",
+      "build_failed": "Échec de la compilation d'OpenTaiko : {error}. Consultez la sortie de compilation ci-dessous.",
       "download_failed": "Échec du téléchargement d'OpenTaiko : {error}",
       "incomplete_build": "Le build installé est incomplet (fichiers du jeu manquants), veuillez le réinstaller."
     },
@@ -384,6 +389,8 @@
       "intro": "Si vous rencontrez un problème ou cherchez de l'aide à propos d'OpenTaiko, veuillez consulter les liens suivants :",
       "discord": "Le canal #support du Discord d'OpenTaiko",
       "github": "La section issues de GitHub",
+      "logs_hint": "Si le Hub lui-même dysfonctionne, joignez le fichier OpenTaiko-Hub.log de ce dossier à votre rapport.",
+      "open_logs": "Ouvrir le dossier des journaux",
       "note": "Note : Pensez à faire vos propres recherches avant de demander, le problème a peut-être déjà été traité ; pensez aussi à consulter le canal #often_asked_question du Discord."
     },
     "versioning": {

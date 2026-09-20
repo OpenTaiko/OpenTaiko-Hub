@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "OpenTaiko Hub",
   "identifier": "com.opentaiko.hub",
-  "version": "0.2.8",
+  "version": "0.2.9",
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
@@ -15,7 +15,7 @@
       "copyright": "",
       "linux": {
         "deb": {
-          "depends": []
+          "depends": ["xdg-utils"]
         },
         "appimage": {
           "bundleMediaFramework": true

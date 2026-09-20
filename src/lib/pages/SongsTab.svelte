@@ -306,10 +306,12 @@
         const candidates: MigrationCandidate[] = [];
         try {
             const globalSongs = await GetGlobalSongsPath();
-            const norm = (p: string): string => p.replace(/\//g, '\\').replace(/[\\]+$/, '').toLowerCase();
             for (const inst of get(instances)) {
                 const instSongs = await path.join(inst.path, 'Songs');
-                if (norm(instSongs) === norm(globalSongs)) continue;
+                // Asked of the backend, which resolves symlinks. A string compare
+                // cannot see that an instance's Songs folder is a link to the shared
+                // library, and would keep offering a migration the backend refuses.
+                if (await invoke<boolean>('paths_are_same_dir', { a: instSongs, b: globalSongs })) continue;
                 try {
                     const probe = new Channel<ScanProgressEvent>();
                     const result = await invoke<ScanResult>('scan_songs', { baseDir: instSongs, onEvent: probe });

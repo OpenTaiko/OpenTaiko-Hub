@@ -3,8 +3,10 @@
     import "../lite-yt-embed.css";
     import "../lite-yt-embed.js";
 
-    import { onMount, setContext, type Snippet } from 'svelte';
+    import { onMount, onDestroy, setContext, type Snippet } from 'svelte';
     import { Toast } from '@skeletonlabs/skeleton-svelte';
+    import { invoke } from '@tauri-apps/api/core';
+    import { error as logError, warn as logWarn } from '@tauri-apps/plugin-log';
     import { download } from "@tauri-apps/plugin-upload";
     import { readTextFile } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
@@ -72,7 +74,53 @@
     const toastContext: ToastContext = { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, wait };
     setContext('toast', toastContext);
 
+    // Shipped builds have devtools compiled out, so anything written to the console is
+    // invisible on a user's machine. Mirror the problem levels into the backend log file
+    // (the plugin writes to the log, never back to the console, so this cannot loop).
+    const captureFrontendProblems = () => {
+        const asText = (values: unknown[]) => values.map((v) => {
+            if (v instanceof Error) return `${v.name}: ${v.message}
+${v.stack ?? ''}`;
+            if (typeof v === 'string') return v;
+            try { return JSON.stringify(v); } catch { return String(v); }
+        }).join(' ');
+
+        const originalError = console.error;
+        const originalWarn = console.warn;
+        console.error = (...values: unknown[]) => {
+            logError(asText(values)).catch(() => {});
+            originalError.apply(console, values as []);
+        };
+        console.warn = (...values: unknown[]) => {
+            logWarn(asText(values)).catch(() => {});
+            originalWarn.apply(console, values as []);
+        };
+
+        window.addEventListener('error', (event) => {
+            logError(`Uncaught ${event.message} at ${event.filename}:${event.lineno}:${event.colno}
+${event.error?.stack ?? ''}`).catch(() => {});
+        });
+        window.addEventListener('unhandledrejection', (event) => {
+            const reason = event.reason;
+            logError(`Unhandled rejection: ${reason?.stack ?? reason?.message ?? String(reason)}`).catch(() => {});
+        });
+    };
+
+    // Tells the backend the page is still alive. When these stop while the app is
+    // running, the page process has died and the window is blank — the backend logs that
+    // so a bug report carries a cause instead of just "it crashed".
+    let heartbeat: ReturnType<typeof setInterval> | null = null;
+    const sendHeartbeat = () => { invoke('ui_heartbeat').catch(() => {}); };
+
+    onDestroy(() => {
+        if (heartbeat !== null) clearInterval(heartbeat);
+    });
+
     onMount(async () => {
+        captureFrontendProblems();
+        sendHeartbeat();
+        heartbeat = setInterval(sendHeartbeat, 5000);
+
         // Restore persisted locale
         try {
             const prefsDir = await GetPreferencesPath();

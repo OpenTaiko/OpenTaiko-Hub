@@ -3,6 +3,19 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.2.9] - 2026-09-20 (Alpha)
+
+- [Feat] The Hub now writes a log file (and records panics, startup failures and frontend errors in it) (folder can be opened from Information > Troubleshooting)
+- [Fix] The window froze for tens of seconds while an experimental build was compiling
+- [Fix] Building an experimental version showed no progress at all while downloading the source, which is indistinguishable from a freeze; it now reports bytes and speed
+- [Fix] A retried download counted the resent bytes again, sending the progress bar past 100%
+- [Fix] (Speculative Fix) Linux: raise the open-file limit at startup, which users previously had to do by hand with `ulimit -n` to avoid "Failed to create shared memory: Too many open files"
+- [Fix] Launching OpenTaiko always reported success; a game that fails to start now reports its exit code or signal, and no longer leaves a zombie process behind
+- [Fix] Migrating songs could delete the shared library when an instance's Songs folder was a link to it
+- [Fix] Archive entries are refused if they would extract outside the destination folder
+- [Fix] (Speculative Fix) Linux: the AppImage build setting (`NO_STRIP`) never actually reached the build step
+- [Chore] (Speculative Fix) The .deb now declares `xdg-utils`, which external links need, and CI installs exactly the locked dependency versions
+
 ## [0.2.8] - 2026-09-20 (Alpha)
 
 - [Feat] Song titles and subtitles are shown in the Hub language when the soundtrack provides a translation; searching still matches every spelling

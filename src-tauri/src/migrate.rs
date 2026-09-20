@@ -39,7 +39,7 @@ pub struct MigrationItem {
     pub dest: Option<SongEntry>,
 }
 
-#[derive(Serialize, Clone)]
+#[derive(Serialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct MigrationPlan {
     pub items: Vec<MigrationItem>,
@@ -130,6 +130,11 @@ fn scan_entries(base: &Path) -> Vec<SongEntry> {
 }
 
 fn build_plan(src: &Path, dest: &Path) -> MigrationPlan {
+    // Both sides being the same folder means there is nothing to move, and every song
+    // would otherwise be reported as "identical" — whose resolution deletes the source.
+    if is_same_dir(src, dest) {
+        return MigrationPlan::default();
+    }
     let src_entries = if src.is_dir() { scan_entries(src) } else { Vec::new() };
     let dest_entries = if dest.is_dir() { scan_entries(dest) } else { Vec::new() };
 
@@ -176,6 +181,15 @@ fn build_plan(src: &Path, dest: &Path) -> MigrationPlan {
     MigrationPlan { items, new_count, identical_count, conflict_count }
 }
 
+/// Lets the frontend ask the same question the guards ask, instead of comparing
+/// lowercased strings, which cannot see through a symlink.
+#[tauri::command]
+pub async fn paths_are_same_dir(a: String, b: String) -> bool {
+    tokio::task::spawn_blocking(move || is_same_dir(&PathBuf::from(&a), &PathBuf::from(&b)))
+        .await
+        .unwrap_or(false)
+}
+
 #[tauri::command]
 pub async fn plan_migration(src_songs: String, dest_songs: String) -> Result<MigrationPlan, String> {
     tokio::task::spawn_blocking(move || build_plan(&PathBuf::from(&src_songs), &PathBuf::from(&dest_songs)))
@@ -210,6 +224,15 @@ fn move_dir(src: &Path, dest: &Path) -> Result<(), String> {
 fn apply_plan(src: &Path, dest: &Path, decisions: &[MigrationDecision]) -> Result<MigrateSummary, String> {
     if !src.is_dir() {
         return Ok(MigrateSummary::default());
+    }
+    // The destructive guard. Resolving "keep_global" deletes the source copy, so if the
+    // instance's Songs folder is a link to the shared library this would delete the
+    // library itself.
+    if is_same_dir(src, dest) {
+        return Err(
+            "Refusing to migrate: the instance's Songs folder is the shared library itself"
+                .to_string(),
+        );
     }
     std::fs::create_dir_all(dest).map_err(|e| format!("Failed to create {}: {}", dest.display(), e))?;
 
@@ -286,26 +309,59 @@ fn apply_plan(src: &Path, dest: &Path, decisions: &[MigrationDecision]) -> Resul
 }
 
 /// True when the folder holds at least one .tja anywhere beneath it.
+/// True when both paths name the same folder on disk, following symlinks.
+///
+/// A raw `==` is not enough: an instance whose Songs folder is a symlink (or a bind
+/// mount) to the shared library spells a different path for the same directory, and
+/// every operation here would then treat the library as a separate copy to prune.
+pub(crate) fn is_same_dir(a: &Path, b: &Path) -> bool {
+    match (a.canonicalize(), b.canonicalize()) {
+        (Ok(ca), Ok(cb)) => ca == cb,
+        // An unreadable path cannot be proven different, so fall back to the literal
+        // comparison rather than assuming they are distinct.
+        _ => a == b,
+    }
+}
+
+/// Following symlinks can cycle forever, so the walk is bounded. Real chart trees are a
+/// handful of levels deep.
+const MAX_CHART_SCAN_DEPTH: usize = 24;
+
 pub(crate) fn contains_tja(dir: &Path) -> bool {
+    contains_tja_within(dir, MAX_CHART_SCAN_DEPTH)
+}
+
+fn contains_tja_within(dir: &Path, depth_left: usize) -> bool {
     let entries = match std::fs::read_dir(dir) {
         Ok(entries) => entries,
         Err(_) => return false,
     };
     let mut subdirs = Vec::new();
     for entry in entries.flatten() {
-        let file_type = match entry.file_type() {
-            Ok(t) => t,
+        let path = entry.path();
+        // metadata() follows symlinks where DirEntry::file_type() does not. A song
+        // folder linked in from another drive must still count as holding charts,
+        // otherwise the duplicate cleaner reads it as an empty box and deletes it.
+        let meta = match std::fs::metadata(&path) {
+            Ok(m) => m,
             Err(_) => continue,
         };
-        if file_type.is_dir() {
-            subdirs.push(entry.path());
-        } else if file_type.is_file()
+        if meta.is_dir() {
+            subdirs.push(path);
+        } else if meta.is_file()
             && entry.file_name().to_string_lossy().to_lowercase().ends_with(".tja")
         {
             return true;
         }
     }
-    subdirs.iter().any(|sub| contains_tja(sub))
+    if depth_left == 0 {
+        // Too deep to finish checking. Report "holds charts" when anything is left
+        // unexamined, so a folder is never deleted on an unproven guess.
+        return !subdirs.is_empty();
+    }
+    subdirs
+        .iter()
+        .any(|sub| contains_tja_within(sub, depth_left - 1))
 }
 
 /// True when the folder holds no file at all anywhere beneath it.
@@ -424,7 +480,7 @@ pub async fn find_duplicate_song_folders(
             return out;
         }
         // Never report anything when both paths are the same folder
-        if src == dest {
+        if is_same_dir(&src, &dest) {
             return out;
         }
         let entries = match std::fs::read_dir(&src) {
@@ -463,7 +519,7 @@ pub async fn remove_duplicate_song_folders(
     tokio::task::spawn_blocking(move || {
         let src = PathBuf::from(&instance_songs);
         let dest = PathBuf::from(&global_songs);
-        if src == dest {
+        if is_same_dir(&src, &dest) {
             return Err("Refusing to prune: both paths are the same folder".to_string());
         }
         let mut removed = 0;
@@ -507,6 +563,122 @@ pub async fn apply_migration(
 mod tests {
     use super::*;
     use std::fs;
+
+    #[test]
+    fn a_folder_is_the_same_as_itself_however_it_is_spelled() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path();
+        fs::create_dir_all(base.join("Songs")).unwrap();
+
+        assert!(is_same_dir(&base.join("Songs"), &base.join("Songs")));
+        // A detour through "." and ".." resolves to the same directory
+        assert!(is_same_dir(
+            &base.join("Songs"),
+            &base.join("Songs").join(".").join("..").join("Songs")
+        ));
+
+        fs::create_dir_all(base.join("Other")).unwrap();
+        assert!(!is_same_dir(&base.join("Songs"), &base.join("Other")));
+    }
+
+    #[test]
+    fn migrating_a_folder_onto_itself_is_refused_rather_than_deleting_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let songs = tmp.path().join("Songs");
+        write(&songs.join("01 Pop/Song/oni.tja"), "TITLE:A
+");
+
+        // The plan must be empty, so the UI never offers the migration...
+        let plan = build_plan(&songs, &songs);
+        assert!(plan.items.is_empty(), "nothing can be migrated onto itself");
+
+        // ...and applying one anyway must refuse instead of deleting the library.
+        let decisions = vec![MigrationDecision {
+            src_rel_path: "01 Pop/Song".into(),
+            action: "keep_global".into(),
+            dest_rel_path: Some("01 Pop/Song".into()),
+        }];
+        let result = apply_plan(&songs, &songs, &decisions);
+        assert!(result.is_err(), "applying onto itself must be refused");
+        assert!(
+            songs.join("01 Pop/Song/oni.tja").exists(),
+            "the chart must survive the refusal"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn charts_reachable_only_through_a_symlink_still_count_as_charts() {
+        use std::os::unix::fs::symlink;
+        let tmp = tempfile::tempdir().unwrap();
+
+        // A real chart folder somewhere else on disk...
+        let elsewhere = tmp.path().join("elsewhere/Song");
+        write(&elsewhere.join("oni.tja"), "TITLE:A\n");
+
+        // ...linked into an otherwise chart-less box, the way a user splits a library
+        // across drives. DirEntry::file_type() does not traverse the link, so this used
+        // to read as an empty box and the duplicate cleaner would delete it.
+        let box_dir = tmp.path().join("Songs/01 Pop");
+        fs::create_dir_all(&box_dir).unwrap();
+        symlink(&elsewhere, box_dir.join("Song")).unwrap();
+
+        assert!(
+            contains_tja(&box_dir),
+            "a box whose only charts arrive through a link must not read as empty"
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_songs_folder_symlinked_to_the_library_is_recognised_as_the_same_folder() {
+        use std::os::unix::fs::symlink;
+        let tmp = tempfile::tempdir().unwrap();
+
+        let library = tmp.path().join("Library/Songs");
+        write(&library.join("01 Pop/Song/oni.tja"), "TITLE:A\n");
+
+        // The instance points its Songs folder at the shared library, which is exactly
+        // the arrangement that used to make the migration delete the library.
+        let instance = tmp.path().join("Instance/Songs");
+        fs::create_dir_all(instance.parent().unwrap()).unwrap();
+        symlink(&library, &instance).unwrap();
+
+        assert!(
+            is_same_dir(&instance, &library),
+            "a symlinked Songs folder is the same folder as its target"
+        );
+        assert!(
+            build_plan(&instance, &library).items.is_empty(),
+            "nothing may be proposed for migration"
+        );
+
+        let decisions = vec![MigrationDecision {
+            src_rel_path: "01 Pop/Song".into(),
+            action: "keep_global".into(),
+            dest_rel_path: Some("01 Pop/Song".into()),
+        }];
+        assert!(apply_plan(&instance, &library, &decisions).is_err());
+        assert!(
+            library.join("01 Pop/Song/oni.tja").exists(),
+            "the library must survive"
+        );
+    }
+
+    #[test]
+    fn a_folder_whose_charts_are_only_reachable_through_a_link_is_not_empty() {
+        // contains_tja guards a delete, so it must follow links rather than report a
+        // linked-in song folder as a chart-less duplicate box.
+        let tmp = tempfile::tempdir().unwrap();
+        let real = tmp.path().join("real");
+        write(&real.join("Song/oni.tja"), "TITLE:A
+");
+        assert!(contains_tja(&real), "a plain chart tree holds charts");
+
+        let empty = tmp.path().join("empty");
+        fs::create_dir_all(empty.join("nested")).unwrap();
+        assert!(!contains_tja(&empty), "a box with no charts holds none");
+    }
 
     fn write(path: &Path, content: &str) {
         fs::create_dir_all(path.parent().unwrap()).unwrap();

@@ -6,8 +6,31 @@
     import { marked } from 'marked';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
+    import { invoke } from '@tauri-apps/api/core';
+    import { openPath } from '@tauri-apps/plugin-opener';
 
     let currentInfo = $state(0);
+
+    // Where the log file is written, offered on the troubleshooting tab so a report can
+    // carry it. Null when no writable folder was found and the Hub logs to stderr only,
+    // in which case there is no file to open and the button stays hidden.
+    let logDir = $state<string | null>(null);
+    onMount(async () => {
+        try {
+            logDir = await invoke<string | null>('log_directory');
+        } catch {
+            logDir = null;
+        }
+    });
+
+    const OpenLogFolder = async () => {
+        if (!logDir) return;
+        try {
+            await openPath(logDir);
+        } catch (error) {
+            console.error('Failed to open the log folder:', error);
+        }
+    };
 
     // Information
     const changelogUrl = 'https://raw.githubusercontent.com/0auBSQ/OpenTaiko/main/CHANGELOG.md';
@@ -161,6 +184,14 @@
         <br />
         <a href="https://github.com/0auBSQ/OpenTaiko/issues" target='_blank' class='text-blue-600 underline'>{$_('info.troubleshoot.github')}</a>
         <p>{$_('info.troubleshoot.note')}</p>
+
+        {#if logDir}
+            <p class="mt-3">{$_('info.troubleshoot.logs_hint')}</p>
+            <button type="button" class="button-blue button-main mt-2" onclick={OpenLogFolder}>
+                <i class="fa-solid fa-folder-open"></i>
+                {$_('info.troubleshoot.open_logs')}
+            </button>
+        {/if}
 
         <hr class="m-4">
 

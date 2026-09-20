@@ -6,6 +6,7 @@
     import { path } from '@tauri-apps/api';
     import { invoke, Channel } from '@tauri-apps/api/core';
     import { listen } from '@tauri-apps/api/event';
+    import { onMount } from 'svelte';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
@@ -62,11 +63,41 @@
     let downloadBusy = $state(false);
     // undefined renders an indeterminate bar
     let progress = $state<number | undefined>(0);
+    // Bytes received and the current rate, shown when the server sends no size and a
+    // percentage is therefore impossible. Without them the bar looks frozen.
+    let transferred = $state(0);
+    let transferRate = $state(0);
     let buildStage = $state<BuildStage | null>(null);
     let buildLog = $state<string[]>([]);
     let buildLogElement = $state<HTMLPreElement | null>(null);
+    // Keeps the build output on screen after a failure. Without it the panel is tied to
+    // downloadBusy and vanishes at the exact moment it becomes worth reading.
+    let buildFailed = $state(false);
+
+    // The output belongs to one build of one instance. Anything that starts another run,
+    // or switches to another instance, has to drop it: the panel is part of the shared
+    // instance card, so a kept log would otherwise render under a different instance and
+    // beneath an unrelated download, where it reads as that download's output.
+    const resetBuildOutput = () => {
+        buildLog = [];
+        buildFailed = false;
+    };
 
     type BuildStage = 'check_sdk' | 'fetch' | 'download' | 'extract' | 'build' | 'install';
+
+    /** How much compiler output is kept on screen and written to the log on a failure. */
+    const BUILD_LOG_LINES = 200;
+
+    /**
+     * Digits and a unit only, so it needs no translation. Carries a KB step because this
+     * is what tells a slow transfer apart from a stuck one, and a connection under
+     * ~50 KB/s — exactly the case worth reporting — would otherwise read "0.0 MB/s".
+     */
+    const formatBytes = (n: number): string => {
+        if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(2)} GB`;
+        if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1)} MB`;
+        return `${Math.round(n / 1024)} KB`;
+    };
 
     // Build picker
     let showBuildPicker = $state(false);
@@ -113,6 +144,10 @@
 
     const LoadInstanceState = async () => {
         if (!current) return;
+        // Switching instances, or reloading, drops a finished build's output so it cannot
+        // be read as belonging to the instance now on screen. A run still in flight keeps
+        // its log, which is the one case where the output is still the live one.
+        if (!downloadBusy) resetBuildOutput();
         versionLoading = true;
         indevLatestSha = null;
         await refreshInstanceVersion(current.id);
@@ -204,13 +239,14 @@
         const zipPath = await path.join(tmpDir, 'OpenTaiko.zip');
 
         try {
-            let totalBytes = 0;
             const success = await backoffDownload(
                 url,
                 zipPath,
                 (pr) => {
-                    totalBytes += pr.progress;
-                    progress = pr.total ? 100 * (totalBytes / pr.total) : undefined;
+                    // progressTotal rather than a running sum of chunk sizes: a retry
+                    // restarts the transfer, and a sum kept across attempts would count
+                    // the re-downloaded bytes twice and drive the bar past 100%.
+                    progress = pr.total ? 100 * (pr.progressTotal / pr.total) : undefined;
                 }
             );
             if (!success) {
@@ -262,6 +298,8 @@
 
             progress = 0;
             downloadBusy = true;
+            // A previous experimental build's output must not sit under this download.
+            resetBuildOutput();
 
             const installed = await DownloadAndInstallZip(asset.browser_download_url, instance.path);
             if (installed) {
@@ -295,6 +333,8 @@
 
             progress = 0;
             downloadBusy = true;
+            // A previous experimental build's output must not sit under this download.
+            resetBuildOutput();
 
             const installed = await DownloadAndInstallZip(asset.browser_download_url, instance.path);
             if (installed) {
@@ -325,8 +365,29 @@
         const instance = current;
 
         downloadBusy = true;
-        buildLog = [];
+        resetBuildOutput();
         let tmpDir: string | null = null;
+
+        // MSBuild emits output far faster than the UI can paint it. Rebuilding a
+        // 200-element array per line, each rebuild waking the auto-scroll effect, is
+        // enough to stall the webview for tens of seconds on a full build, so lines are
+        // collected and folded in on a timer. A timer and not an animation frame, because
+        // animation frames stop firing while the window is hidden and a build running in
+        // the background would then display nothing at all.
+        //
+        // Declared out here rather than beside the build step so the failure path can
+        // drain whatever is still buffered: the last lines are the ones that say why.
+        let pending: string[] = [];
+        let flushTimer: ReturnType<typeof setTimeout> | null = null;
+        const flushBuildLog = () => {
+            if (flushTimer !== null) {
+                clearTimeout(flushTimer);
+                flushTimer = null;
+            }
+            if (pending.length === 0) return;
+            buildLog = [...buildLog, ...pending].slice(-BUILD_LOG_LINES);
+            pending = [];
+        };
 
         try {
             // 1. The build requires the .NET SDK 8
@@ -362,16 +423,23 @@
             // 3. Download the source archive of that exact commit
             buildStage = 'download';
             progress = undefined;
+            transferred = 0;
+            transferRate = 0;
             tmpDir = await GetTmpPath(`indev-${crypto.randomUUID()}`);
             await mkdir(tmpDir, { recursive: true });
             const srcZip = await path.join(tmpDir, 'src.zip');
-            let totalBytes = 0;
             const success = await backoffDownload(
                 `https://codeload.github.com/${repoOwner}/${repoName}/zip/${sha}`,
                 srcZip,
                 (pr) => {
-                    totalBytes += pr.progress;
-                    progress = pr.total ? 100 * (totalBytes / pr.total) : undefined;
+                    // codeload builds the archive on the fly and streams it chunked, so it
+                    // sends no Content-Length and `total` is 0. A percentage is impossible;
+                    // bytes and rate are the only way to tell this stage from a hang.
+                    // progressTotal is the plugin's own running count, so it also resets
+                    // correctly when a retry restarts the transfer.
+                    transferred = pr.progressTotal;
+                    transferRate = pr.transferSpeed;
+                    progress = pr.total ? 100 * (pr.progressTotal / pr.total) : undefined;
                 },
                 3
             );
@@ -399,7 +467,12 @@
             const rid = optk_OS === 'Win' ? 'win-x64' : 'linux-x64';
             const logChannel = new Channel<string>();
             logChannel.onmessage = (line) => {
-                buildLog = [...buildLog.slice(-199), line];
+                pending.push(line);
+                // Bounded in case the flush is throttled while the window is hidden.
+                if (pending.length > BUILD_LOG_LINES * 2) {
+                    pending = pending.slice(-BUILD_LOG_LINES);
+                }
+                if (flushTimer === null) flushTimer = setTimeout(flushBuildLog, 100);
             };
             const exitCode = await invoke<number>('run_streamed', {
                 program: 'dotnet',
@@ -407,6 +480,7 @@
                 cwd: srcFolder,
                 onOutput: logChannel
             });
+            flushBuildLog();
             if (exitCode !== 0) {
                 throw new Error(`dotnet publish exited with code ${exitCode}`);
             }
@@ -437,8 +511,30 @@
 
             TriggerSuccess(get(_)('home.success.installed'));
         } catch (err) {
-            TriggerError(get(_)('home.error.download_failed', { values: { error: String(err) } }));
+            // Whatever is still buffered belongs in the report, and a failure that came
+            // from the invoke itself rather than a non-zero exit never reached the flush
+            // after the build step.
+            flushBuildLog();
+            // Getting this far can take half an hour, and the compiler output is the only
+            // record of why it failed. It lives in component state that the next run
+            // clears, so write it to the log file first: console.error is mirrored there
+            // by the root layout. Without this the user is left with an exit code.
+            if (buildLog.length > 0) {
+                buildFailed = true;
+                console.error(
+                    `Experimental build failed (${String(err)}). Last ${buildLog.length} lines of build output:\n`
+                    + buildLog.join('\n')
+                );
+            }
+            // The stage that threw decides the wording, and buildStage is not cleared
+            // until the finally below. An install that fails after a good build is not a
+            // build failure, and saying so would send the user to the wrong output.
+            const key = buildStage === 'build' ? 'home.error.build_failed' : 'home.error.download_failed';
+            TriggerError(get(_)(key, { values: { error: String(err) } }));
         } finally {
+            // No-op on the paths above that already flushed; it is here so no timer can
+            // outlive the run and write into the log of the next one.
+            flushBuildLog();
             if (tmpDir) {
                 try { await remove(tmpDir, { recursive: true }); } catch {}
             }
@@ -456,6 +552,49 @@
             TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
         }
     }
+
+    // The backend watches a launched game and reports how it ended. A game that dies
+    // immediately used to fail silently, so users blamed the Hub for its crash.
+    interface GameExit {
+        code: number | null;
+        /** Set instead of `code` when the process was killed by a signal (Unix). */
+        signal: number | null;
+        ranForSecs: number;
+        stderr: string;
+    }
+
+    /** Toast messages render as HTML, so text coming from the game must not be markup. */
+    const escapeHtml = (text: string) =>
+        text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    onMount(() => {
+        const pending = listen<GameExit>('game-exited', (event) => {
+            const { code, signal, ranForSecs, stderr } = event.payload;
+            // Exit code 0 is a successful quit no matter how briefly it ran; a game that
+            // exits immediately because it is already running says nothing is wrong.
+            // A signal death carries no exit code, and is how many games end at teardown
+            // on Linux, but only counts as a normal quit once a real session happened —
+            // otherwise a crash on startup would pass silently.
+            const playedASession = ranForSecs >= 5;
+            if (code === 0 || (playedASession && code === null)) return;
+
+            const reason = signal !== null && signal !== undefined
+                ? get(_)('home.error.game_signal', { values: { signal } })
+                : get(_)('home.error.game_code', { values: { code: code ?? '?' } });
+            const detail = stderr ? escapeHtml(stderr.split('\n').slice(-3).join(' ')) : '';
+
+            // A launch that collapses immediately and a crash mid-session are different
+            // problems, so they are reported differently.
+            if (playedASession) {
+                TriggerError(get(_)('home.error.game_crashed', {
+                    values: { mins: Math.max(1, Math.round(ranForSecs / 60)), reason, detail }
+                }));
+            } else {
+                TriggerError(get(_)('home.error.game_exited', { values: { reason, detail } }));
+            }
+        });
+        return () => { pending.then((unlisten) => unlisten()); };
+    });
 
     // Opening the instance folder lives in the instance bar (one canonical place,
     // next to the instance selector) instead of being repeated in every button row.
@@ -516,7 +655,12 @@
                     {:else if downloadBusy === true}
                         <div class="progressbar">
                             {#if buildStage}
-                                <p class="text-sm mb-1"><i class="fa-solid fa-flask"></i> {$_(`home.experimental.stage.${buildStage}`)}</p>
+                                <p class="text-sm mb-1">
+                                    <i class="fa-solid fa-flask"></i> {$_(`home.experimental.stage.${buildStage}`)}
+                                    {#if buildStage === 'download' && transferred > 0}
+                                        <span class="opacity-70">&middot; {formatBytes(transferred)}{#if transferRate > 0}&nbsp;&middot;&nbsp;{formatBytes(transferRate)}/s{/if}</span>
+                                    {/if}
+                                </p>
                             {/if}
                             <ProgressBar value={progress} max={100} />
                         </div>
@@ -592,7 +736,7 @@
                 </div>
             </div>
 
-            {#if downloadBusy && buildLog.length > 0}
+            {#if (downloadBusy || buildFailed) && buildLog.length > 0}
                 <div class="p-4">
                     <pre class="build-log" bind:this={buildLogElement}>{buildLog.join('\n')}</pre>
                 </div>

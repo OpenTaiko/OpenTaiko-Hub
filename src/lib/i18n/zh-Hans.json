@@ -122,8 +122,13 @@
     },
     "error": {
       "launch": "执行应用程序时出错：{error}",
+      "game_exited": "OpenTaiko 启动后立即退出（{reason}）。{detail}",
+      "game_crashed": "OpenTaiko 在 {mins} 分钟后意外停止（{reason}）。{detail}",
+      "game_code": "退出代码 {code}",
+      "game_signal": "被信号 {signal} 终止",
       "already_downloading": "已经在下载中",
       "fetch_release": "获取最新 OpenTaiko 版本失败：{error}",
+      "build_failed": "OpenTaiko 构建失败：{error}。请查看下方的构建输出。",
       "download_failed": "下载 OpenTaiko 失败：{error}",
       "incomplete_build": "已安装的版本不完整（缺少游戏文件），请重新安装。"
     },
@@ -384,6 +389,8 @@
       "intro": "如果您遇到问题或正在寻求关于 OpenTaiko 的支持，请参考以下链接：",
       "discord": "OpenTaiko Discord 的 #support 频道",
       "github": "GitHub issues 区",
+      "logs_hint": "如果 Hub 本身出现问题，请将此文件夹中的 OpenTaiko-Hub.log 附在报告中。",
+      "open_logs": "打开日志文件夹",
       "note": "注意：在提问前请先自行研究，问题可能已经有过解答。也请查看 Discord 的 #often_asked_question 频道。"
     },
     "versioning": {

@@ -1,6 +1,6 @@
 {
 	"name": "opentaiko-updater",
-	"version": "0.2.8",
+	"version": "0.2.9",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
@@ -36,6 +36,7 @@
 		"@tauri-apps/plugin-dialog": "~2.7.3",
 		"@tauri-apps/plugin-fs": "~2.5.2",
 		"@tauri-apps/plugin-http": "~2.6.0",
+		"@tauri-apps/plugin-log": "~2.9.2",
 		"@tauri-apps/plugin-opener": "~2.5.5",
 		"@tauri-apps/plugin-os": "~2.3.2",
 		"@tauri-apps/plugin-shell": "~2.3.6",
