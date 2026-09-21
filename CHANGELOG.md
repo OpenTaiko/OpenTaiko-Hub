@@ -3,6 +3,27 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.3.0] - 2026-09-22 (Alpha)
+
+- [Feat] The Songs tab is now a library browser: collections open in place, the songs you have and the songs you have yet to download sit together in the same folders, and picking one fills a panel beside the list
+- [Feat] A header above the library shows how much of the soundtrack you have installed, how many updates are waiting and where your Songs folder is, with one button that downloads everything missing or outdated and its total size
+- [Feat] The library can be narrowed to All, Installed or Updates, and one search box matches song titles, subtitles and folder names at once, in every spelling the soundtrack provides
+- [Feat] Every collection carries its cover art, how many of its songs you have, and a button that downloads the rest with their total size
+- [Feat] The song panel shows the jacket, a preview player, every course's level and charter, Hall of Fame ranks, the artist's links, the download size and where the chart sits on disk
+- [Feat] A folder's in-game settings can be edited from the Hub: name, genre, description lines, box and background colours, box and background type, character and scene preset, plus translated names and descriptions in the ten languages the game reads
+- [Feat] You can create your own folders and subfolders, and delete the ones you made together with the songs inside them
+- [Feat] Chart .zip files can be dropped onto one of your own folders or picked from a file dialog; an archive holding several charts installs each as its own song, and a file holding no chart is named back to you
+- [Feat] You can set the image a folder shows on its box in game, from a PNG, JPG or WebP
+- [Feat] A chart you added yourself can be deleted from its panel
+- [Feat] Any collection, or a single song's own folder, opens in your file manager straight from the tab
+- [Enhance] An installed song shows its jacket and plays its preview from your own Songs folder, so a downloaded library works offline and charts you added have both as well
+- [Enhance] Only one song preview plays at a time, and picking another song stops the one that was playing
+- [Enhance] Collection names are shown without the game's sort prefixes ("01", "S1"), with the real folder name kept underneath
+- [Enhance] A chart archive whose files are named in Japanese (Shift-JIS) installs with those names intact instead of garbled characters
+- [Enhance] A folder whose settings file was written in Japanese keeps its in-game name readable after you edit it from the Hub
+- [Fix] The Songs tab was slow to open and to scroll: it listed the whole soundtrack at once, with an audio player on every row
+- [Fix] Song names showed the game's raw colour markup, such as `<c.#d3d3d3>`
+
 ## [0.2.9] - 2026-09-20 (Alpha)
 
 - [Feat] The Hub now writes a log file (and records panics, startup failures and frontend errors in it) (folder can be opened from Information > Troubleshooting)

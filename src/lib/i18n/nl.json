@@ -208,6 +208,101 @@
     }
   },
   "songs": {
+    "box": {
+        "language": "Taal",
+        "genre_help": "Het spel gebruikt dit om inhoud vrij te spelen.",
+        "title": "Mapinstellingen",
+        "official_locked": "Map uit de OpenTaiko-soundtrack, wordt door de Hub gesynchroniseerd.",
+        "name": "Naam in het spel",
+        "genre": "Genre",
+        "description": "Beschrijving (3 regels)",
+        "line": "Regel {n}",
+        "colors": "Kleuren",
+        "box_color": "Box",
+        "back_color": "Achter",
+        "bg_color": "Achtergrond",
+        "fore_color": "Tekst",
+        "appearance": "Uiterlijk",
+        "box_type": "Boxtype",
+        "bg_type": "Achtergrondtype",
+        "box_chara": "Personage",
+        "scene": "Scènevoorinstelling",
+        "translations": "Vertaalde namen",
+        "others": "Overige instellingen ({count})",
+        "others_note": "Deze blijven bij het opslaan ongewijzigd.",
+        "clear": "Wissen",
+        "jacket": "Mapafbeelding",
+        "jacket_hint": "Wordt in het spel op de box getoond. PNG, JPG of WebP.",
+        "jacket_pick": "Afbeelding kiezen...",
+        "jacket_saved": "Opgeslagen als {name}",
+        "jacket_failed": "Kon de afbeelding niet instellen: {error}"
+    },
+    "folder": {
+        "loading": "De nummers worden geladen.",
+        "name_taken": "\"{name}\" bestaat hier al.",
+        "not_downloaded": "Deze map is nog niet gedownload.",
+        "new_folder": "Nieuwe map",
+        "new_subfolder": "Nieuwe submap",
+        "new_prompt": "Naam van de nieuwe map",
+        "new_placeholder": "Bijvoorbeeld: Mijn charts",
+        "create": "Aanmaken",
+        "created": "\"{name}\" aangemaakt",
+        "create_failed": "Kon de map niet aanmaken: {error}",
+        "delete": "Verwijderen",
+        "delete_confirm": "\"{name}\" en de {count} nummers erin verwijderen? Dit kan niet ongedaan worden gemaakt.",
+        "delete_song_confirm": "\"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt.",
+        "deleted": "\"{name}\" verwijderd",
+        "delete_failed": "Kon niet verwijderen: {error}",
+        "box_missing": "nog geen box.def",
+        "box_loading": "Laden...",
+        "save_box": "Opslaan",
+        "unsaved": "niet-opgeslagen wijzigingen",
+        "box_saved": "box.def opgeslagen",
+        "box_save_failed": "Kon box.def niet opslaan: {error}",
+        "drop_hint": "Sleep chart-.zip-bestanden hierheen om ze aan deze map toe te voegen",
+        "browse_zip": "Bestanden kiezen...",
+        "importing": "Charts toevoegen...",
+        "imported": "{count} nummers toegevoegd",
+        "import_rejected": "Geen chart-archief: {names}",
+        "import_failed": "Kon de charts niet toevoegen: {error}",
+        "drop_needs_folder": "Selecteer eerst een eigen map en zet de bestanden daar neer."
+    },
+    "start": {
+        "title": "Je bibliotheek is leeg",
+        "body": "Download de OpenTaiko-nummers om te beginnen, of zet je eigen charts in de songmap."
+    },
+    "detail": {
+        "help_title": "Kies een nummer om details te zien",
+        "help_installed": "Geïnstalleerd en actueel",
+        "help_available": "Beschikbaar om te downloaden",
+        "help_outdated": "Er is een nieuwere versie",
+        "help_custom": "Je eigen chart",
+        "help_hint": "Open een map om te bladeren, of gebruik Ophalen om alles wat ontbreekt te downloaden.",
+        "get_size": "Downloaden ({size})",
+        "open_song_folder": "Map openen",
+        "set_jacket": "Omslag instellen"
+    },
+    "course": {
+        "easy": "Makkelijk",
+        "normal": "Normaal",
+        "hard": "Moeilijk",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "Toren",
+        "dan": "Dan"
+    },
+    "scope": {
+        "all": "Alle",
+        "installed": "Geïnstalleerd",
+        "updates": "Updates"
+    },
+    "library": {
+        "title": "Muziekbibliotheek",
+        "summary": "{installed} van {total} nummers geïnstalleerd",
+        "get_everything": "Alle {count} ophalen",
+        "updates_waiting": "{count} bij te werken",
+        "search": "Zoek nummers en mappen..."
+    },
     "col": {
       "name": "Titel",
       "folder": "Map",
@@ -221,6 +316,7 @@
       "folder": "Map zoeken..."
     },
     "status": {
+      "installed_short": "Geïnstalleerd",
       "scanning": "Scannen...",
       "not_downloaded": "Niet gedownload",
       "up_to_date": "Up-to-date",
@@ -242,6 +338,16 @@
       "done": "{count} nummers in de bibliotheek"
     },
     "tree": {
+      "show_more": "Nog {count} tonen",
+      "get_n": "{count} ophalen",
+      "nothing_here": "Niets hier komt overeen met het huidige filter.",
+      "installed_of": "{installed} / {total} geïnstalleerd",
+      "library_total": "{installed} van {total} nummers geïnstalleerd",
+      "legend_available": "Vervaagd = beschikbaar om te downloaden",
+      "show_available": "Downloadbare nummers tonen",
+      "no_match": "Geen nummers komen overeen met deze zoekopdracht.",
+      "open_folder_tip": "Deze map openen",
+      "download_folder_tip": "De {count} ontbrekende nummers in deze map downloaden",
       "soundtrack": "OpenTaiko-soundtrack",
       "custom": "Aangepast",
       "songs_count": "{count} nummers",
@@ -272,8 +378,8 @@
     "metadata": {
       "updated": "{count} genremap(pen) bijgewerkt (box.def / preimages)"
     },
-    "experimental_note": "De geselecteerde instantie is een experimentele build: deze bevat eigen nummers en gebruikt de gedeelde muziekbibliotheek niet.",
     "error": {
+      "open_folder": "Kon de map niet openen: {error}",
       "scanning": "Kan geen nummers downloaden terwijl lokale mappen worden gescand",
       "scan_failed": "Scannen van de muziekbibliotheek mislukt: {error}"
     },

@@ -208,6 +208,101 @@
     }
   },
   "songs": {
+    "box": {
+        "language": "Sprache",
+        "genre_help": "Das Spiel schaltet damit Inhalte frei.",
+        "title": "Ordnereinstellungen",
+        "official_locked": "Ordner des OpenTaiko-Soundtracks, wird vom Hub synchron gehalten.",
+        "name": "Im Spiel angezeigter Name",
+        "genre": "Genre",
+        "description": "Beschreibung (3 Zeilen)",
+        "line": "Zeile {n}",
+        "colors": "Farben",
+        "box_color": "Box",
+        "back_color": "Rückseite",
+        "bg_color": "Hintergrund",
+        "fore_color": "Text",
+        "appearance": "Aussehen",
+        "box_type": "Boxtyp",
+        "bg_type": "Hintergrundtyp",
+        "box_chara": "Charakter",
+        "scene": "Szenen-Voreinstellung",
+        "translations": "Übersetzte Namen",
+        "others": "Weitere Einstellungen ({count})",
+        "others_note": "Diese bleiben beim Speichern unverändert erhalten.",
+        "clear": "Löschen",
+        "jacket": "Ordnerbild",
+        "jacket_hint": "Wird im Spiel auf der Box angezeigt. PNG, JPG oder WebP.",
+        "jacket_pick": "Bild auswählen...",
+        "jacket_saved": "Als {name} gespeichert",
+        "jacket_failed": "Bild konnte nicht gesetzt werden: {error}"
+    },
+    "folder": {
+        "loading": "Die Lieder werden gerade geladen.",
+        "name_taken": "„{name}“ existiert hier bereits.",
+        "not_downloaded": "Dieser Ordner ist noch nicht heruntergeladen.",
+        "new_folder": "Neuer Ordner",
+        "new_subfolder": "Neuer Unterordner",
+        "new_prompt": "Name des neuen Ordners",
+        "new_placeholder": "Zum Beispiel: Meine Charts",
+        "create": "Erstellen",
+        "created": "„{name}“ erstellt",
+        "create_failed": "Ordner konnte nicht erstellt werden: {error}",
+        "delete": "Löschen",
+        "delete_confirm": "„{name}“ und die {count} enthaltenen Lieder löschen? Das lässt sich nicht rückgängig machen.",
+        "delete_song_confirm": "„{name}“ löschen? Das lässt sich nicht rückgängig machen.",
+        "deleted": "„{name}“ gelöscht",
+        "delete_failed": "Löschen fehlgeschlagen: {error}",
+        "box_missing": "noch keine box.def",
+        "box_loading": "Wird geladen...",
+        "save_box": "Speichern",
+        "unsaved": "ungespeicherte Änderungen",
+        "box_saved": "box.def gespeichert",
+        "box_save_failed": "box.def konnte nicht gespeichert werden: {error}",
+        "drop_hint": "Lege Chart-.zip-Dateien hier ab, um sie diesem Ordner hinzuzufügen",
+        "browse_zip": "Dateien auswählen...",
+        "importing": "Charts werden hinzugefügt...",
+        "imported": "{count} Lieder hinzugefügt",
+        "import_rejected": "Kein Chart-Archiv: {names}",
+        "import_failed": "Charts konnten nicht hinzugefügt werden: {error}",
+        "drop_needs_folder": "Wähle zuerst einen eigenen Ordner und lege die Dateien dann dort ab."
+    },
+    "start": {
+        "title": "Deine Bibliothek ist leer",
+        "body": "Lade die OpenTaiko-Lieder herunter, um zu beginnen, oder lege eigene Charts in den Songordner."
+    },
+    "detail": {
+        "help_title": "Wähle ein Lied, um Details zu sehen",
+        "help_installed": "Installiert und aktuell",
+        "help_available": "Zum Download verfügbar",
+        "help_outdated": "Eine neuere Version existiert",
+        "help_custom": "Dein eigenes Chart",
+        "help_hint": "Öffne einen Ordner zum Durchsehen, oder lade mit „Laden“ alles Fehlende herunter.",
+        "get_size": "Herunterladen ({size})",
+        "open_song_folder": "Ordner öffnen",
+        "set_jacket": "Cover festlegen"
+    },
+    "course": {
+        "easy": "Einfach",
+        "normal": "Normal",
+        "hard": "Schwer",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "Turm",
+        "dan": "Dan"
+    },
+    "scope": {
+        "all": "Alle",
+        "installed": "Installiert",
+        "updates": "Updates"
+    },
+    "library": {
+        "title": "Songbibliothek",
+        "summary": "{installed} von {total} Liedern installiert",
+        "get_everything": "Alle {count} laden",
+        "updates_waiting": "{count} zu aktualisieren",
+        "search": "Lieder und Ordner suchen..."
+    },
     "col": {
       "name": "Songname",
       "folder": "Ordner",
@@ -221,6 +316,7 @@
       "folder": "Ordnersuche..."
     },
     "status": {
+      "installed_short": "Installiert",
       "scanning": "Wird gescannt...",
       "not_downloaded": "Nicht heruntergeladen",
       "up_to_date": "Aktuell",
@@ -242,6 +338,16 @@
       "done": "{count} Songs in der Bibliothek"
     },
     "tree": {
+      "show_more": "{count} weitere anzeigen",
+      "get_n": "{count} laden",
+      "nothing_here": "Hier entspricht nichts dem aktuellen Filter.",
+      "installed_of": "{installed} / {total} installiert",
+      "library_total": "{installed} von {total} Liedern installiert",
+      "legend_available": "Blass = zum Download verfügbar",
+      "show_available": "Herunterladbare Lieder anzeigen",
+      "no_match": "Keine Lieder entsprechen dieser Suche.",
+      "open_folder_tip": "Diesen Ordner öffnen",
+      "download_folder_tip": "Die {count} fehlenden Lieder in diesem Ordner herunterladen",
       "soundtrack": "OpenTaiko-Soundtrack",
       "custom": "Benutzerdefiniert",
       "songs_count": "{count} Songs",
@@ -272,8 +378,8 @@
     "metadata": {
       "updated": "{count} Genre-Ordner aktualisiert (box.def / preimages)"
     },
-    "experimental_note": "Die ausgewählte Instanz ist ein experimenteller Build: Sie enthält ihre eigenen Songs und nutzt nicht die gemeinsame Song-Bibliothek.",
     "error": {
+      "open_folder": "Ordner konnte nicht geöffnet werden: {error}",
       "scanning": "Songs können nicht heruntergeladen werden, während lokale Ordner gescannt werden",
       "scan_failed": "Die Song-Bibliothek konnte nicht gescannt werden: {error}"
     },

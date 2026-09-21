@@ -208,6 +208,101 @@
     }
   },
   "songs": {
+    "box": {
+        "language": "Langue",
+        "genre_help": "Le jeu s'en sert pour débloquer du contenu.",
+        "title": "Réglages du dossier",
+        "official_locked": "Dossier de la bande-son OpenTaiko, synchronisé par le Hub.",
+        "name": "Nom affiché en jeu",
+        "genre": "Genre",
+        "description": "Description (3 lignes)",
+        "line": "Ligne {n}",
+        "colors": "Couleurs",
+        "box_color": "Boîte",
+        "back_color": "Arrière",
+        "bg_color": "Fond",
+        "fore_color": "Texte",
+        "appearance": "Apparence",
+        "box_type": "Type de boîte",
+        "bg_type": "Type de fond",
+        "box_chara": "Personnage",
+        "scene": "Préréglage de scène",
+        "translations": "Noms traduits",
+        "others": "Autres réglages ({count})",
+        "others_note": "Ces réglages sont conservés tels quels à l'enregistrement.",
+        "clear": "Effacer",
+        "jacket": "Image du dossier",
+        "jacket_hint": "Affichée sur la boîte en jeu. PNG, JPG ou WebP.",
+        "jacket_pick": "Choisir une image...",
+        "jacket_saved": "Enregistrée sous {name}",
+        "jacket_failed": "Impossible de définir l'image : {error}"
+    },
+    "folder": {
+        "loading": "Les chansons sont en cours de chargement.",
+        "name_taken": "« {name} » existe déjà ici.",
+        "not_downloaded": "Ce dossier n'est pas encore téléchargé.",
+        "new_folder": "Nouveau dossier",
+        "new_subfolder": "Nouveau sous-dossier",
+        "new_prompt": "Nom du nouveau dossier",
+        "new_placeholder": "Par exemple : Mes cartes",
+        "create": "Créer",
+        "created": "« {name} » créé",
+        "create_failed": "Impossible de créer le dossier : {error}",
+        "delete": "Supprimer",
+        "delete_confirm": "Supprimer « {name} » et les {count} chansons qu'il contient ? Action irréversible.",
+        "delete_song_confirm": "Supprimer « {name} » ? Action irréversible.",
+        "deleted": "« {name} » supprimé",
+        "delete_failed": "Suppression impossible : {error}",
+        "box_missing": "pas encore de box.def",
+        "box_loading": "Chargement...",
+        "save_box": "Enregistrer",
+        "unsaved": "modifications non enregistrées",
+        "box_saved": "box.def enregistré",
+        "box_save_failed": "Impossible d'enregistrer box.def : {error}",
+        "drop_hint": "Déposez des .zip de fichiers ici pour les ajouter à ce dossier",
+        "browse_zip": "Choisir des fichiers...",
+        "importing": "Ajout des fichiers...",
+        "imported": "{count} chansons ajoutées",
+        "import_rejected": "Pas une archive de fichiers : {names}",
+        "import_failed": "Impossible d'ajouter les fichiers : {error}",
+        "drop_needs_folder": "Sélectionnez d'abord un de vos dossiers, puis déposez-y les fichiers."
+    },
+    "start": {
+        "title": "Votre bibliothèque est vide",
+        "body": "Téléchargez les chansons OpenTaiko pour commencer, ou déposez vos propres fichiers dans le dossier des chansons."
+    },
+    "detail": {
+        "help_title": "Choisissez une chanson pour voir ses détails",
+        "help_installed": "Installée et à jour",
+        "help_available": "Disponible au téléchargement",
+        "help_outdated": "Une version plus récente existe",
+        "help_custom": "Votre propre fichier",
+        "help_hint": "Ouvrez un dossier pour le parcourir, ou utilisez Télécharger pour récupérer ce qui manque.",
+        "get_size": "Télécharger ({size})",
+        "open_song_folder": "Ouvrir le dossier",
+        "set_jacket": "Définir la jaquette"
+    },
+    "course": {
+        "easy": "Facile",
+        "normal": "Normal",
+        "hard": "Difficile",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "Tour",
+        "dan": "Dan"
+    },
+    "scope": {
+        "all": "Tout",
+        "installed": "Installées",
+        "updates": "Mises à jour"
+    },
+    "library": {
+        "title": "Bibliothèque de chansons",
+        "summary": "{installed} chansons installées sur {total}",
+        "get_everything": "Tout télécharger ({count})",
+        "updates_waiting": "{count} à mettre à jour",
+        "search": "Rechercher chansons et dossiers..."
+    },
     "col": {
       "name": "Nom de la chanson",
       "folder": "Dossier",
@@ -221,6 +316,7 @@
       "folder": "Rechercher un dossier..."
     },
     "status": {
+      "installed_short": "Installée",
       "scanning": "Analyse...",
       "not_downloaded": "Non téléchargée",
       "up_to_date": "À jour",
@@ -242,6 +338,16 @@
       "done": "{count} chansons dans la bibliothèque"
     },
     "tree": {
+      "show_more": "Afficher {count} de plus",
+      "get_n": "Télécharger {count}",
+      "nothing_here": "Rien ici ne correspond au filtre actuel.",
+      "installed_of": "{installed} / {total} installés",
+      "library_total": "{installed} chansons installées sur {total}",
+      "legend_available": "Estompé = disponible au téléchargement",
+      "show_available": "Afficher les chansons téléchargeables",
+      "no_match": "Aucune chanson ne correspond à cette recherche.",
+      "open_folder_tip": "Ouvrir ce dossier",
+      "download_folder_tip": "Télécharger les {count} chansons manquantes de ce dossier",
       "soundtrack": "Bande-son OpenTaiko",
       "custom": "Personnalisé",
       "songs_count": "{count} chansons",
@@ -272,8 +378,8 @@
     "metadata": {
       "updated": "{count} dossier(s) de genre mis à jour (box.def / preimages)"
     },
-    "experimental_note": "L'instance sélectionnée est un build expérimental : elle inclut ses propres chansons et n'utilise pas la bibliothèque de chansons partagée.",
     "error": {
+      "open_folder": "Impossible d'ouvrir le dossier : {error}",
       "scanning": "Impossible de télécharger des chansons pendant l'analyse des dossiers locaux",
       "scan_failed": "Échec de l'analyse de la bibliothèque de chansons : {error}"
     },

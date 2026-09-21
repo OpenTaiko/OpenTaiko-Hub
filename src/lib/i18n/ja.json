@@ -208,6 +208,101 @@
     }
   },
   "songs": {
+    "box": {
+        "language": "言語",
+        "genre_help": "ゲーム内の解放条件に使われます。",
+        "title": "フォルダー設定",
+        "official_locked": "OpenTaiko サウンドトラックのフォルダーです。Hub が同期します。",
+        "name": "ゲーム内の表示名",
+        "genre": "ジャンル",
+        "description": "説明（3行）",
+        "line": "{n} 行目",
+        "colors": "色",
+        "box_color": "ボックス",
+        "back_color": "背面",
+        "bg_color": "背景",
+        "fore_color": "文字",
+        "appearance": "外観",
+        "box_type": "ボックス種別",
+        "bg_type": "背景種別",
+        "box_chara": "キャラクター",
+        "scene": "シーンプリセット",
+        "translations": "翻訳された名前",
+        "others": "その他の設定（{count}）",
+        "others_note": "保存してもこれらはそのまま保持されます。",
+        "clear": "クリア",
+        "jacket": "フォルダー画像",
+        "jacket_hint": "ゲーム内のボックスに表示されます。PNG・JPG・WebP に対応。",
+        "jacket_pick": "画像を選択...",
+        "jacket_saved": "{name} として保存しました",
+        "jacket_failed": "画像を設定できませんでした: {error}"
+    },
+    "folder": {
+        "loading": "楽曲を読み込んでいます。",
+        "name_taken": "「{name}」はすでに存在します。",
+        "not_downloaded": "このフォルダーはまだダウンロードされていません。",
+        "new_folder": "新しいフォルダー",
+        "new_subfolder": "サブフォルダーを作成",
+        "new_prompt": "新しいフォルダーの名前",
+        "new_placeholder": "例: マイチャート",
+        "create": "作成",
+        "created": "「{name}」を作成しました",
+        "create_failed": "フォルダーを作成できませんでした: {error}",
+        "delete": "削除",
+        "delete_confirm": "「{name}」と、その中の {count} 曲を削除しますか？元に戻せません。",
+        "delete_song_confirm": "「{name}」を削除しますか？元に戻せません。",
+        "deleted": "「{name}」を削除しました",
+        "delete_failed": "削除できませんでした: {error}",
+        "box_missing": "box.def はまだありません",
+        "box_loading": "読み込み中...",
+        "save_box": "保存",
+        "unsaved": "未保存の変更",
+        "box_saved": "box.def を保存しました",
+        "box_save_failed": "box.def を保存できませんでした: {error}",
+        "drop_hint": "譜面の .zip をここにドロップするとこのフォルダーに追加されます",
+        "browse_zip": "ファイルを選択...",
+        "importing": "譜面を追加中...",
+        "imported": "{count} 曲を追加しました",
+        "import_rejected": "譜面のアーカイブではありません: {names}",
+        "import_failed": "譜面を追加できませんでした: {error}",
+        "drop_needs_folder": "先に自分のフォルダーを選択してから、ファイルをドロップしてください。"
+    },
+    "start": {
+        "title": "ライブラリは空です",
+        "body": "OpenTaiko の楽曲をダウンロードして始めましょう。自作譜面は楽曲フォルダーに入れてください。"
+    },
+    "detail": {
+        "help_title": "曲を選ぶと詳細が表示されます",
+        "help_installed": "所持・最新",
+        "help_available": "ダウンロード可能",
+        "help_outdated": "新しいバージョンがあります",
+        "help_custom": "自作譜面",
+        "help_hint": "フォルダーを開いて閲覧するか、「取得」で不足分をまとめてダウンロードできます。",
+        "get_size": "ダウンロード（{size}）",
+        "open_song_folder": "フォルダーを開く",
+        "set_jacket": "ジャケットを設定"
+    },
+    "course": {
+        "easy": "かんたん",
+        "normal": "ふつう",
+        "hard": "むずかしい",
+        "oni": "おに（表）",
+        "edit": "おに（裏）",
+        "tower": "タワー",
+        "dan": "段位"
+    },
+    "scope": {
+        "all": "すべて",
+        "installed": "所持",
+        "updates": "更新"
+    },
+    "library": {
+        "title": "楽曲ライブラリ",
+        "summary": "{total} 曲中 {installed} 曲インストール済み",
+        "get_everything": "{count} 曲すべて取得",
+        "updates_waiting": "{count} 曲に更新あり",
+        "search": "曲・フォルダーを検索..."
+    },
     "col": {
       "name": "曲名",
       "folder": "フォルダ",
@@ -221,6 +316,7 @@
       "folder": "フォルダを検索..."
     },
     "status": {
+      "installed_short": "所持",
       "scanning": "スキャン中...",
       "not_downloaded": "未ダウンロード",
       "up_to_date": "最新",
@@ -242,6 +338,16 @@
       "done": "ライブラリに{count}曲あります"
     },
     "tree": {
+      "show_more": "さらに {count} 件を表示",
+      "get_n": "{count} 曲取得",
+      "nothing_here": "現在の絞り込みに一致するものはありません。",
+      "installed_of": "{total} 曲中 {installed} 曲",
+      "library_total": "ライブラリ: {total} 曲中 {installed} 曲インストール済み",
+      "legend_available": "薄い表示 = ダウンロード可能",
+      "show_available": "ダウンロード可能な曲を表示",
+      "no_match": "検索に一致する曲がありません。",
+      "open_folder_tip": "このフォルダーを開く",
+      "download_folder_tip": "このフォルダーの未所持 {count} 曲をダウンロード",
       "soundtrack": "OpenTaiko サウンドトラック",
       "custom": "カスタム",
       "songs_count": "{count}曲",
@@ -272,8 +378,8 @@
     "metadata": {
       "updated": "{count}個のジャンルフォルダを更新しました（box.def / preimages）"
     },
-    "experimental_note": "選択中のインスタンスは実験版ビルドです。専用の曲が同梱されており、共有曲ライブラリは使用しません。",
     "error": {
+      "open_folder": "フォルダーを開けませんでした: {error}",
       "scanning": "ローカルフォルダーのスキャン中は曲をダウンロードできません",
       "scan_failed": "曲ライブラリのスキャンに失敗しました：{error}"
     },

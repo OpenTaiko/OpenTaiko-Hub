@@ -208,6 +208,101 @@
     }
   },
   "songs": {
+    "box": {
+        "language": "언어",
+        "genre_help": "게임의 해금 조건으로 사용됩니다.",
+        "title": "폴더 설정",
+        "official_locked": "OpenTaiko 사운드트랙 폴더입니다. Hub가 동기화합니다.",
+        "name": "게임에 표시되는 이름",
+        "genre": "장르",
+        "description": "설명 (3줄)",
+        "line": "{n}번째 줄",
+        "colors": "색상",
+        "box_color": "상자",
+        "back_color": "뒷면",
+        "bg_color": "배경",
+        "fore_color": "글자",
+        "appearance": "모양",
+        "box_type": "상자 유형",
+        "bg_type": "배경 유형",
+        "box_chara": "캐릭터",
+        "scene": "장면 프리셋",
+        "translations": "번역된 이름",
+        "others": "기타 설정 ({count})",
+        "others_note": "저장해도 이 값들은 그대로 유지됩니다.",
+        "clear": "지우기",
+        "jacket": "폴더 이미지",
+        "jacket_hint": "게임에서 상자에 표시됩니다. PNG, JPG 또는 WebP.",
+        "jacket_pick": "이미지 선택...",
+        "jacket_saved": "{name}(으)로 저장했습니다",
+        "jacket_failed": "이미지를 설정할 수 없습니다: {error}"
+    },
+    "folder": {
+        "loading": "곡을 불러오는 중입니다.",
+        "name_taken": "'{name}'은(는) 이미 있습니다.",
+        "not_downloaded": "이 폴더는 아직 다운로드되지 않았습니다.",
+        "new_folder": "새 폴더",
+        "new_subfolder": "새 하위 폴더",
+        "new_prompt": "새 폴더 이름",
+        "new_placeholder": "예: 내 채보",
+        "create": "만들기",
+        "created": "'{name}'을(를) 만들었습니다",
+        "create_failed": "폴더를 만들 수 없습니다: {error}",
+        "delete": "삭제",
+        "delete_confirm": "'{name}'과(와) 그 안의 {count}곡을 삭제할까요? 되돌릴 수 없습니다.",
+        "delete_song_confirm": "'{name}'을(를) 삭제할까요? 되돌릴 수 없습니다.",
+        "deleted": "'{name}'을(를) 삭제했습니다",
+        "delete_failed": "삭제할 수 없습니다: {error}",
+        "box_missing": "box.def 없음",
+        "box_loading": "불러오는 중...",
+        "save_box": "저장",
+        "unsaved": "저장하지 않은 변경",
+        "box_saved": "box.def 저장됨",
+        "box_save_failed": "box.def를 저장할 수 없습니다: {error}",
+        "drop_hint": "보면 .zip 파일을 여기에 놓으면 이 폴더에 추가됩니다",
+        "browse_zip": "파일 선택...",
+        "importing": "보면 추가 중...",
+        "imported": "{count}곡을 추가했습니다",
+        "import_rejected": "보면 압축 파일이 아닙니다: {names}",
+        "import_failed": "보면을 추가할 수 없습니다: {error}",
+        "drop_needs_folder": "먼저 직접 만든 폴더를 선택한 다음 파일을 놓으세요."
+    },
+    "start": {
+        "title": "라이브러리가 비어 있습니다",
+        "body": "OpenTaiko 곡을 내려받아 시작하거나, 직접 만든 보면을 곡 폴더에 넣으세요."
+    },
+    "detail": {
+        "help_title": "곡을 선택하면 상세 정보가 표시됩니다",
+        "help_installed": "설치됨 · 최신",
+        "help_available": "다운로드 가능",
+        "help_outdated": "더 새로운 버전이 있습니다",
+        "help_custom": "직접 만든 보면",
+        "help_hint": "폴더를 열어 둘러보거나, ‘받기’로 빠진 곡을 한 번에 내려받으세요.",
+        "get_size": "다운로드 ({size})",
+        "open_song_folder": "폴더 열기",
+        "set_jacket": "재킷 설정"
+    },
+    "course": {
+        "easy": "쉬움",
+        "normal": "보통",
+        "hard": "어려움",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "타워",
+        "dan": "단위"
+    },
+    "scope": {
+        "all": "전체",
+        "installed": "설치됨",
+        "updates": "업데이트"
+    },
+    "library": {
+        "title": "곡 라이브러리",
+        "summary": "전체 {total}곡 중 {installed}곡 설치됨",
+        "get_everything": "{count}곡 모두 받기",
+        "updates_waiting": "{count}곡 업데이트 가능",
+        "search": "곡과 폴더 검색..."
+    },
     "col": {
       "name": "곡 이름",
       "folder": "폴더",
@@ -221,6 +316,7 @@
       "folder": "폴더 검색..."
     },
     "status": {
+      "installed_short": "설치됨",
       "scanning": "스캔 중...",
       "not_downloaded": "미다운로드",
       "up_to_date": "최신",
@@ -242,6 +338,16 @@
       "done": "라이브러리에 있는 곡: {count}개"
     },
     "tree": {
+      "show_more": "{count}개 더 보기",
+      "get_n": "{count}곡 받기",
+      "nothing_here": "현재 필터와 일치하는 항목이 없습니다.",
+      "installed_of": "{total}곡 중 {installed}곡 설치됨",
+      "library_total": "전체 {total}곡 중 {installed}곡 설치됨",
+      "legend_available": "흐린 항목 = 다운로드 가능",
+      "show_available": "다운로드 가능한 곡 표시",
+      "no_match": "검색과 일치하는 곡이 없습니다.",
+      "open_folder_tip": "이 폴더 열기",
+      "download_folder_tip": "이 폴더에서 빠진 {count}곡 다운로드",
       "soundtrack": "OpenTaiko 사운드트랙",
       "custom": "커스텀",
       "songs_count": "곡 {count}개",
@@ -272,8 +378,8 @@
     "metadata": {
       "updated": "장르 폴더 {count}개를 업데이트했습니다 (box.def / preimages)"
     },
-    "experimental_note": "선택한 인스턴스는 실험판 빌드입니다. 자체 곡이 포함되어 있으며 공유 곡 라이브러리를 사용하지 않습니다.",
     "error": {
+      "open_folder": "폴더를 열 수 없습니다: {error}",
       "scanning": "로컬 폴더 스캔 중에는 곡을 다운로드할 수 없습니다",
       "scan_failed": "곡 라이브러리 스캔에 실패했습니다: {error}"
     },

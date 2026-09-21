@@ -5,13 +5,32 @@
 
 	interface Props {
 		songInfo: SoundtrackEntry;
+		/** Local audio for an installed chart. Falls back to the soundtrack repo only
+		 *  when the chart is not on disk, so a downloaded library plays offline and
+		 *  does not hammer the repository. */
+		Src?: string | null;
 	}
 
-	let { songInfo }: Props = $props();
+	let { songInfo, Src = null }: Props = $props();
+
+	let source = $derived(
+		Src
+		?? `https://github.com/OpenTaiko/OpenTaiko-Soundtrack/raw/refs/heads/main/${songInfo.chartAudioFilePath}`
+	);
 
 	let time = $state(0);
 	let duration = $state(0);
 	let paused = $state(true);
+
+	// Changing the src on a live <audio> keeps `paused` false, so picking another song
+	// while one played left the button showing Pause for a track that was not playing.
+	let loadedId = $state<string | null>(null);
+	$effect(() => {
+		if (source === loadedId) return;
+		loadedId = source;
+		paused = true;
+		time = 0;
+	});
 
 	let title = $derived(localizedTitle(songInfo, $locale));
 	let subtitle = $derived(localizedSubtitle(songInfo, $locale));
@@ -28,7 +47,7 @@
 
 <div class="player" class:paused>
 	<audio
-		src="https://github.com/OpenTaiko/OpenTaiko-Soundtrack/raw/refs/heads/main/{songInfo.chartAudioFilePath}"
+		src={source}
 		bind:currentTime={time}
 		bind:duration
 		bind:paused

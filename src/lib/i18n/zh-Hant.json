@@ -208,6 +208,101 @@
     }
   },
   "songs": {
+    "box": {
+        "language": "語言",
+        "genre_help": "遊戲用它來解鎖內容。",
+        "title": "資料夾設定",
+        "official_locked": "OpenTaiko 原聲帶資料夾，由 Hub 保持同步。",
+        "name": "遊戲中顯示的名稱",
+        "genre": "流派",
+        "description": "說明（3 行）",
+        "line": "第 {n} 行",
+        "colors": "顏色",
+        "box_color": "盒子",
+        "back_color": "背面",
+        "bg_color": "背景",
+        "fore_color": "文字",
+        "appearance": "外觀",
+        "box_type": "盒子類型",
+        "bg_type": "背景類型",
+        "box_chara": "角色",
+        "scene": "場景預設",
+        "translations": "翻譯名稱",
+        "others": "其他設定（{count}）",
+        "others_note": "儲存時會原樣保留這些設定。",
+        "clear": "清除",
+        "jacket": "資料夾圖片",
+        "jacket_hint": "在遊戲中顯示於盒子上。支援 PNG、JPG 或 WebP。",
+        "jacket_pick": "選擇圖片...",
+        "jacket_saved": "已儲存為 {name}",
+        "jacket_failed": "無法設定圖片：{error}"
+    },
+    "folder": {
+        "loading": "正在載入歌曲。",
+        "name_taken": "「{name}」已存在。",
+        "not_downloaded": "此資料夾尚未下載。",
+        "new_folder": "新增資料夾",
+        "new_subfolder": "新增子資料夾",
+        "new_prompt": "新資料夾的名稱",
+        "new_placeholder": "例如：我的譜面",
+        "create": "建立",
+        "created": "已建立「{name}」",
+        "create_failed": "無法建立資料夾：{error}",
+        "delete": "刪除",
+        "delete_confirm": "要刪除「{name}」及其中的 {count} 首歌曲嗎？此操作無法復原。",
+        "delete_song_confirm": "要刪除「{name}」嗎？此操作無法復原。",
+        "deleted": "已刪除「{name}」",
+        "delete_failed": "無法刪除：{error}",
+        "box_missing": "尚無 box.def",
+        "box_loading": "載入中...",
+        "save_box": "儲存",
+        "unsaved": "未儲存的變更",
+        "box_saved": "已儲存 box.def",
+        "box_save_failed": "無法儲存 box.def：{error}",
+        "drop_hint": "將譜面 .zip 拖放到此處即可加入該資料夾",
+        "browse_zip": "選擇檔案...",
+        "importing": "正在加入譜面...",
+        "imported": "已加入 {count} 首歌曲",
+        "import_rejected": "不是譜面壓縮檔：{names}",
+        "import_failed": "無法加入譜面：{error}",
+        "drop_needs_folder": "請先選擇你自己的資料夾，然後再拖放檔案。"
+    },
+    "start": {
+        "title": "曲庫為空",
+        "body": "下載 OpenTaiko 歌曲即可開始，或將自製譜面放入歌曲資料夾。"
+    },
+    "detail": {
+        "help_title": "選擇一首歌曲查看詳情",
+        "help_installed": "已安裝且為最新",
+        "help_available": "可下載",
+        "help_outdated": "有更新的版本",
+        "help_custom": "自製譜面",
+        "help_hint": "展開資料夾進行瀏覽，或使用「取得」下載其中缺少的內容。",
+        "get_size": "下載（{size}）",
+        "open_song_folder": "開啟資料夾",
+        "set_jacket": "設定封面"
+    },
+    "course": {
+        "easy": "簡單",
+        "normal": "普通",
+        "hard": "困難",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "塔",
+        "dan": "段位"
+    },
+    "scope": {
+        "all": "全部",
+        "installed": "已安裝",
+        "updates": "更新"
+    },
+    "library": {
+        "title": "曲庫",
+        "summary": "已安裝 {installed} / {total} 首",
+        "get_everything": "取得全部 {count} 首",
+        "updates_waiting": "{count} 首可更新",
+        "search": "搜尋歌曲和資料夾..."
+    },
     "col": {
       "name": "歌曲名稱",
       "folder": "分類資料夾",
@@ -221,6 +316,7 @@
       "folder": "搜尋資料夾……"
     },
     "status": {
+      "installed_short": "已安裝",
       "scanning": "掃描中……",
       "not_downloaded": "未下載",
       "up_to_date": "最新",
@@ -242,6 +338,16 @@
       "done": "曲庫中共有 {count} 首歌曲"
     },
     "tree": {
+      "show_more": "再顯示 {count} 首",
+      "get_n": "取得 {count} 首",
+      "nothing_here": "沒有符合目前篩選條件的內容。",
+      "installed_of": "已安裝 {installed} / {total}",
+      "library_total": "曲庫：已安裝 {installed} / {total} 首",
+      "legend_available": "半透明 = 可下載",
+      "show_available": "顯示可下載的歌曲",
+      "no_match": "沒有符合搜尋條件的歌曲。",
+      "open_folder_tip": "開啟此資料夾",
+      "download_folder_tip": "下載此資料夾中缺少的 {count} 首歌曲",
       "soundtrack": "OpenTaiko 音軌",
       "custom": "自訂",
       "songs_count": "{count} 首歌曲",
@@ -272,8 +378,8 @@
     "metadata": {
       "updated": "已更新 {count} 個曲風資料夾（box.def／預覽圖）"
     },
-    "experimental_note": "所選實例為實驗版：它內含自己的歌曲，不會使用共享曲庫。",
     "error": {
+      "open_folder": "無法開啟資料夾：{error}",
       "scanning": "仍在掃描本機資料夾，因此無法下載歌曲",
       "scan_failed": "掃描曲庫失敗：{error}"
     },

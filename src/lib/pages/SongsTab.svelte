@@ -1,9 +1,11 @@
 <script lang="ts">
     // Dependencies
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
+    import { mkdir, exists, copyFile, remove, readFile } from '@tauri-apps/plugin-fs';
     import { openPath } from '@tauri-apps/plugin-opener';
+    import { open, confirm } from '@tauri-apps/plugin-dialog';
+    import { getCurrentWebview } from '@tauri-apps/api/webview';
     import { fetch } from "@tauri-apps/plugin-http";
     import { download } from "@tauri-apps/plugin-upload";
     import { path } from '@tauri-apps/api';
@@ -38,10 +40,17 @@
     import { instances } from "../stores/instances";
 
     // Song management
-    import AudioPlayer from '$lib/components/AudioPlayer.svelte';
-    import SongDifficultyChip from '$lib/components/SongDifficultyChip.svelte';
-    import SongTree from '$lib/components/SongTree.svelte';
     import SongMigrationModal from '$lib/components/SongMigrationModal.svelte';
+    import NamePromptModal from '$lib/components/songs/NamePromptModal.svelte';
+
+    // The song library browser
+    import LibraryHeader from '$lib/components/songs/LibraryHeader.svelte';
+    import CollectionBar from '$lib/components/songs/CollectionBar.svelte';
+    import SongRow from '$lib/components/songs/SongRow.svelte';
+    import SongDetail from '$lib/components/songs/SongDetail.svelte';
+    import FolderDetail from '$lib/components/songs/FolderDetail.svelte';
+    import { buildLibraryTree, viewOf, pendingUnder, formatSize } from '$lib/utils/library';
+    import type { LibraryEntry, LibraryFolder, Scope } from '$lib/utils/library';
 
     // Soundtrack
     const soundtrackInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/soundtrack_info.json';
@@ -55,7 +64,24 @@
     let scannedGenres = $state.raw<Record<string, ScannedGenre>>({});         // relPath → genre folder
     let scanStats = $state({ dirs: 0, found: 0 });
     let scanning = $state(false);
-    let viewMode = $state<'list' | 'tree'>('list');
+    // Library browser state
+    let scope = $state<Scope>('all');
+    let librarySearch = $state('');
+    /** Only one top-level collection is open at a time, which is what stops the tab
+     *  rendering hundreds of rows the moment it opens. */
+    let openCollection = $state<string | null>(null);
+    let selectedKey = $state<string | null>(null);
+    /** A collection is selected instead of a song: the panel shows its box.def. */
+    let selectedFolder = $state<string | null>(null);
+    let boxText = $state<string | null>(null);
+    let boxFileExists = $state(false);
+    let savingBox = $state(false);
+    let importing = $state(false);
+    let dropActive = $state(false);
+    /** Object URL for the selected folder's default.* image, revoked when it changes. */
+    let folderJacket = $state<string | null>(null);
+    const dropListeners: (() => void)[] = [];
+    let globalSongsPath = $state<string | null>(null);
     let searchSong = $state("");
     let searchGenre = $state("");
     let songPreviousSort = "none";
@@ -85,6 +111,360 @@
     // Lowercased title spellings per song, built once per catalog change rather than per
     // row on every render (the list re-renders on each scan batch)
     let searchTerms = $derived(new Map<string, string[]>(soundtrackInfo.map((s) => [s.uniqueId, titleSearchTerms(s)])));
+
+    // One tree of installed + downloadable charts. Counts come from here and never move
+    // with the scope or the search, so "12 of 47" always means the same thing.
+    let library = $derived(buildLibraryTree({
+        scanned: allScannedSongs,
+        genres: scannedGenres,
+        catalog: soundtrackInfo,
+        catalogById,
+        installed: currentSongs,
+        labelFor: (entry, fallback) => (entry ? localizedTitle(entry, $locale) : null) ?? fallback,
+        subtitleFor: (entry) => entry.chartSubtitle ?? null
+    }));
+
+    let view = $derived(viewOf(library, scope, librarySearch,
+        (entry: LibraryEntry) => (entry.catalog ? searchTerms.get(entry.catalog.uniqueId) ?? [] : [])));
+
+    let topCollections = $derived(view ? [...view.children.values()].sort((a, b) => a.name.localeCompare(b.name)) : []);
+    let libraryEmpty = $derived(!scanning && library.installedCount === 0 && library.totalCount > 0);
+
+    let selectedEntry = $derived.by((): LibraryEntry | null => {
+        if (!selectedKey) return null;
+        const find = (node: LibraryFolder): LibraryEntry | null => {
+            for (const entry of node.entries) if (entry.key === selectedKey) return entry;
+            for (const child of node.children.values()) {
+                const hit = find(child);
+                if (hit) return hit;
+            }
+            return null;
+        };
+        return find(library);
+    });
+
+    const SOUNDTRACK_RAW = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main';
+
+    // Genre art comes from the soundtrack repo, so a collection looks the same whether or
+    // not it is installed. This is the same file EnsureGenreMetadata already downloads.
+    const GenreArtUrl = (relPath: string): string | null =>
+        relPath ? `${SOUNDTRACK_RAW}/${relPath.split('/').map(encodeURIComponent).join('/')}/default.png` : null;
+
+    const JacketUrl = (entry: SoundtrackEntry): string | null =>
+        entry.chartJacketFilePath ? `${SOUNDTRACK_RAW}/${entry.chartJacketFilePath}` : null;
+
+    const OpenHoF = (entry: SoundtrackEntry, course: CourseName) => openHoFModal(entry, course);
+
+    // An installed chart's jacket and preview come off the disk. Streaming them from the
+    // soundtrack repository instead would put every browse of the library on the network
+    // and on GitHub's bandwidth, and would leave a custom chart — which the repository
+    // has never heard of — with no art and no audio at all.
+    let songJacket = $state<string | null>(null);
+    let songAudio = $state<string | null>(null);
+    let mediaFor = $state<string | null>(null);
+
+    const ReleaseSongMedia = () => {
+        if (songJacket) URL.revokeObjectURL(songJacket);
+        if (songAudio) URL.revokeObjectURL(songAudio);
+        songJacket = null;
+        songAudio = null;
+    };
+
+    const blobFor = async (base: string, relPath: string, name: string): Promise<string | null> => {
+        const full = await path.join(base, relPath, ...name.split('/'));
+        if (!(await exists(full))) return null;
+        const bytes = await readFile(full);
+        return URL.createObjectURL(new Blob([bytes as BlobPart]));
+    };
+
+    const LoadSongMedia = async (entry: LibraryEntry) => {
+        const forPath = entry.relPath;
+        ReleaseSongMedia();
+        mediaFor = forPath;
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const media = await invoke<{ preimage: string | null; audio: string | null }>(
+                'read_song_media', { base, relPath: forPath }
+            );
+            const [jacket, audio] = await Promise.all([
+                media.preimage ? blobFor(base, forPath, media.preimage) : null,
+                media.audio ? blobFor(base, forPath, media.audio) : null
+            ]);
+            // The selection may have moved on while this was in flight.
+            if (mediaFor !== forPath) {
+                if (jacket) URL.revokeObjectURL(jacket);
+                if (audio) URL.revokeObjectURL(audio);
+                return;
+            }
+            songJacket = jacket;
+            songAudio = audio;
+        } catch (error) {
+            console.error('Could not read the chart media:', error);
+        }
+    };
+
+    $effect(() => {
+        const entry = selectedEntry;
+        if (!entry?.installed) {
+            if (mediaFor !== null) {
+                ReleaseSongMedia();
+                mediaFor = null;
+            }
+            return;
+        }
+        if (entry.relPath === mediaFor) return;
+        LoadSongMedia(entry);
+    });
+
+    const PickSongPreimage = async (entry: LibraryEntry) => {
+        const picked = await open({
+            multiple: false,
+            filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+        });
+        if (!picked || Array.isArray(picked)) return;
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const name = await invoke<string>('set_song_preimage', {
+                base, relPath: entry.relPath, source: picked
+            });
+            TriggerSuccess(get(_)('songs.box.jacket_saved', { values: { name } }));
+            mediaFor = null;   // force the effect to reload it
+            await LoadSongMedia(entry);
+        } catch (error) {
+            TriggerError(get(_)('songs.box.jacket_failed', { values: { error: String(error) } }));
+        }
+    };
+
+    let selectedFolderNode = $derived.by((): LibraryFolder | null => {
+        if (selectedFolder === null) return null;
+        const find = (node: LibraryFolder): LibraryFolder | null => {
+            if (node.relPath === selectedFolder) return node;
+            for (const child of node.children.values()) {
+                const hit = find(child);
+                if (hit) return hit;
+            }
+            return null;
+        };
+        return find(library);
+    });
+
+    let selectedIsOfficial = $derived(selectedFolderNode?.official ?? false);
+
+    onDestroy(() => {
+        for (const stop of dropListeners) stop();
+        if (folderJacket) URL.revokeObjectURL(folderJacket);
+        ReleaseSongMedia();
+    });
+
+    const SelectFolder = async (folder: LibraryFolder) => {
+        selectedFolder = folder.relPath;
+        selectedKey = null;
+        boxText = null;
+        boxFileExists = false;
+        LoadFolderJacket(folder.relPath);
+        if (!folder.onDisk) return;
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const info = await invoke<{ folderExists: boolean; fileExists: boolean; text: string }>(
+                'read_box_def', { base, relPath: folder.relPath }
+            );
+            // The selection may have moved on while this was in flight.
+            if (selectedFolder !== folder.relPath) return;
+            boxFileExists = info.fileExists;
+            boxText = info.text;
+        } catch (error) {
+            console.error('Could not read box.def:', error);
+            boxText = '';
+        }
+    };
+
+    const JACKET_NAMES = ['default.png', 'default.jpg', 'default.webp'];
+
+    // The image is read through the fs plugin and shown as a blob: the asset protocol is
+    // not enabled for this app, so a local file cannot be src'd directly.
+    const LoadFolderJacket = async (relPath: string) => {
+        if (folderJacket) {
+            URL.revokeObjectURL(folderJacket);
+            folderJacket = null;
+        }
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            for (const name of JACKET_NAMES) {
+                const full = await path.join(base, relPath, name);
+                if (!(await exists(full))) continue;
+                const bytes = await readFile(full);
+                // The selection may have moved on while this was in flight.
+                if (selectedFolder !== relPath) return;
+                folderJacket = URL.createObjectURL(new Blob([bytes as BlobPart]));
+                return;
+            }
+        } catch (error) {
+            console.error('Could not read the folder image:', error);
+        }
+    };
+
+    const PickJacket = async (relPath: string) => {
+        const picked = await open({
+            multiple: false,
+            filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+        });
+        if (!picked || Array.isArray(picked)) return;
+        try {
+            const base = await GetGlobalSongsPath();
+            const name = await invoke<string>('set_folder_jacket', { base, relPath, source: picked });
+            TriggerSuccess(get(_)('songs.box.jacket_saved', { values: { name } }));
+            // The panel reloads the image itself; no chart changed, so no rescan.
+            await LoadFolderJacket(relPath);
+        } catch (error) {
+            TriggerError(get(_)('songs.box.jacket_failed', { values: { error: String(error) } }));
+        }
+    };
+
+    const SaveBoxDef = async (text: string) => {
+        if (!selectedFolderNode) return;
+        savingBox = true;
+        try {
+            const base = await GetGlobalSongsPath();
+            await invoke('write_box_def', { base, relPath: selectedFolderNode.relPath, text });
+            boxText = text;
+            boxFileExists = true;
+            TriggerSuccess(get(_)('songs.folder.box_saved'));
+            // Only the folder's own title can have moved, so it is updated in place
+            // rather than re-scanning every chart in the library.
+            const title = /^#TITLE:(.*)$/m.exec(text)?.[1]?.trim() || null;
+            const known = scannedGenres[selectedFolderNode.relPath];
+            if (known) {
+                scannedGenres = {
+                    ...scannedGenres,
+                    [selectedFolderNode.relPath]: { ...known, title }
+                };
+            }
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.box_save_failed', { values: { error: String(error) } }));
+        } finally {
+            savingBox = false;
+        }
+    };
+
+    /** Names already used at this level, plus every name the soundtrack owns. */
+    const takenUnder = (parentRel: string): Set<string> => {
+        const find = (node: LibraryFolder): LibraryFolder | null => {
+            if (node.relPath === parentRel) return node;
+            for (const child of node.children.values()) {
+                const hit = find(child);
+                if (hit) return hit;
+            }
+            return null;
+        };
+        const parent = parentRel ? find(library) : library;
+        const names = new Set<string>();
+        for (const child of parent?.children.values() ?? []) {
+            names.add(child.rawName.toLowerCase());
+            names.add(child.label.toLowerCase());
+        }
+        return names;
+    };
+
+    /** Which folder the new-folder prompt would create into; null while it is closed. */
+    let newFolderParent = $state<string | null>(null);
+
+    const NewFolder = (parentRel: string) => { newFolderParent = parentRel; };
+
+    const CreateFolder = async (parentRel: string, wanted: string) => {
+        newFolderParent = null;
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const created = await invoke<string>('create_genre_folder', { base, parentRel, name: wanted });
+            TriggerSuccess(get(_)('songs.folder.created', { values: { name: wanted } }));
+            // A new empty folder adds no charts, so the scan has nothing to re-find:
+            // registering it directly avoids emptying and rebuilding the whole library.
+            scannedGenres = {
+                ...scannedGenres,
+                [created]: { relPath: created, title: wanted, boxDefSha1: null, preimageSha1: null }
+            };
+            // The tree has not rebuilt yet, so the node is named rather than looked up.
+            SelectFolder({ relPath: created, onDisk: true } as LibraryFolder);
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.create_failed', { values: { error: String(error) } }));
+        }
+    };
+
+    const DeleteFolder = async (folder: LibraryFolder) => {
+        const ok = await confirm(
+            get(_)('songs.folder.delete_confirm', { values: { name: folder.label, count: folder.installedCount } })
+        );
+        if (!ok) return;
+        try {
+            const base = await GetGlobalSongsPath();
+            await invoke('delete_library_entry', { base, relPath: folder.relPath });
+            TriggerSuccess(get(_)('songs.folder.deleted', { values: { name: folder.label } }));
+            selectedFolder = null;
+            DropUnder(folder.relPath);
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.delete_failed', { values: { error: String(error) } }));
+        }
+    };
+
+    const DeleteSong = async (entry: LibraryEntry) => {
+        const ok = await confirm(get(_)('songs.folder.delete_song_confirm', { values: { name: entry.label } }));
+        if (!ok) return;
+        try {
+            const base = await GetGlobalSongsPath();
+            await invoke('delete_library_entry', { base, relPath: entry.relPath });
+            TriggerSuccess(get(_)('songs.folder.deleted', { values: { name: entry.label } }));
+            selectedKey = null;
+            DropUnder(entry.relPath);
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.delete_failed', { values: { error: String(error) } }));
+        }
+    };
+
+    /**
+     * Forgets everything that lived under a path that was just deleted. Exact, and
+     * instant, where a rescan would re-walk the whole library to learn the same thing.
+     */
+    const DropUnder = (relPath: string) => {
+        const under = (p: string) => p === relPath || p.startsWith(relPath + '/');
+        allScannedSongs = allScannedSongs.filter((song) => !under(song.relPath));
+        currentSongs = Object.fromEntries(
+            Object.entries(currentSongs).filter(([, song]) => !under(song.chartRelativePath))
+        );
+        scannedGenres = Object.fromEntries(
+            Object.entries(scannedGenres).filter(([path]) => !under(path))
+        );
+    };
+
+    /** Extracts dropped or picked archives into `relPath`. */
+    const ImportArchives = async (relPath: string, archives: string[]) => {
+        if (archives.length === 0 || importing) return;
+        importing = true;
+        try {
+            const base = await GetGlobalSongsPath();
+            const report = await invoke<{ charts: { title: string | null }[]; rejected: string[] }>(
+                'import_chart_archives', { base, relPath, archives }
+            );
+            if (report.charts.length > 0) {
+                TriggerSuccess(get(_)('songs.folder.imported', { values: { count: report.charts.length } }));
+                crawlSongs();
+            }
+            if (report.rejected.length > 0) {
+                TriggerError(get(_)('songs.folder.import_rejected', { values: { names: report.rejected.join(', ') } }));
+            }
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.import_failed', { values: { error: String(error) } }));
+        } finally {
+            importing = false;
+        }
+    };
+
+    const PickArchives = async (relPath: string) => {
+        const picked = await open({
+            multiple: true,
+            filters: [{ name: 'Chart archives', extensions: ['zip'] }]
+        });
+        if (!picked) return;
+        await ImportArchives(relPath, Array.isArray(picked) ? picked : [picked]);
+    };
 
     // Hall of Fame
     const hofDbUrl = 'https://opentaiko.github.io/hof.db3';
@@ -238,8 +618,10 @@
         scanStats = { dirs: 0, found: 0 };
         let liveSongs: Record<string, LocalSong> = {};
         let liveAll: ScannedSong[] = [];
-        currentSongs = {};
-        allScannedSongs = [];
+        // A rescan of a library that is already on screen keeps showing it until the
+        // final result replaces it: clearing first empties every bar and refills it row
+        // by row, which reads as the whole library reloading after any small change.
+        const showLive = allScannedSongs.length === 0;
 
         const registerSong = (map: Record<string, LocalSong>, list: ScannedSong[], song: ScannedSong) => {
             list.push(song);
@@ -263,7 +645,7 @@
             const flush = () => {
                 flushFrame = null;
                 scanStats = latestStats;
-                if (dirty) {
+                if (dirty && showLive) {
                     dirty = false;
                     // Raw state compares by reference: hand out fresh containers
                     currentSongs = { ...liveSongs };
@@ -384,6 +766,44 @@
         migrationCandidate = null;
         crawlSongs();
     }
+
+    /** Opens one collection, or one song's folder, inside the shared library. */
+    const OpenGenreFolder = async (relPath: string) => {
+        try {
+            const songsDir = await GetGlobalSongsPath();
+            await openPath(relPath ? await path.join(songsDir, relPath) : songsDir);
+        } catch (error) {
+            TriggerError(get(_)('songs.error.open_folder', { values: { error: String(error) } }));
+        }
+    };
+
+    /** Downloads everything a folder is still missing, updates included. */
+    const DownloadFolder = async (folder: LibraryFolder) => {
+        if (scanning) {
+            TriggerError(get(_)('songs.error.scanning'));
+            return;
+        }
+        if (bulkBusy || songBusy) return;
+
+        const pending = pendingUnder(folder);
+        if (pending.length === 0) return;
+
+        bulkBusy = true;
+        try {
+            await EnsureRemoteShaMap();
+            songCountProgress = 0;
+            for (const SInfo of pending) {
+                songCountProgressBar = 100 * (songCountProgress / pending.length);
+                await DownloadSong(SInfo, currentSongs[SInfo.uniqueId] ?? null, songCountProgress + 1, pending.length);
+                songCountProgress++;
+            }
+            const updated = await RefreshAllGenreMetadata();
+            if (updated > 0) TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
+        } finally {
+            songCountProgressBar = null;
+            bulkBusy = false;
+        }
+    };
 
     const OpenSongsFolder = async () => {
         try {
@@ -807,6 +1227,27 @@
     };
 
     onMount(async () => {
+        GetGlobalSongsPath().then((dir) => globalSongsPath = dir).catch(() => {});
+
+        const stopDrop = await getCurrentWebview().onDragDropEvent(async (event) => {
+            // Archives land in the collection that is currently selected, which is the
+            // only unambiguous target: the panel showing the drop zone is its panel.
+            const target = selectedFolderNode;
+            const usable = target !== null && target.onDisk && target.canAddCharts;
+            if (event.payload.type === 'over') {
+                dropActive = usable;
+            } else if (event.payload.type === 'drop') {
+                dropActive = false;
+                if (!usable || !target) {
+                    TriggerError(get(_)('songs.folder.drop_needs_folder'));
+                    return;
+                }
+                await ImportArchives(target.relPath, event.payload.paths);
+            } else {
+                dropActive = false;
+            }
+        });
+        dropListeners.push(stopDrop);
         crawlSongs();         // native scan: no longer depends on the catalog fetch
         await updateSoundtrackInfo();
         updateHoFInfo();      // fire-and-forget: patches soundtrackInfo when DB is ready
@@ -855,181 +1296,135 @@
 </aside>
 {/each}
 
-<div class="card bg-surface-100-800 p-3 mb-2 flex items-center gap-3 flex-wrap">
-	{#if scanning}
-		<div class="flex-1 flex items-center gap-3 min-w-[16rem]">
-			<ProgressBar />
-			<span class="whitespace-nowrap text-sm">{$_('songs.scan.progress', { values: { count: scanStats.found } })}</span>
-		</div>
+<LibraryHeader
+	LibraryPath={globalSongsPath}
+	Installed={library.installedCount}
+	Total={library.totalCount}
+	PendingMb={library.pendingMb}
+	Outdated={library.outdatedCount}
+	Scanning={scanning}
+	Found={scanStats.found}
+	Busy={bulkBusy || songBusy}
+	CurrentScope={scope}
+	Search={librarySearch}
+	OnScope={(s) => scope = s}
+	OnSearch={(v) => librarySearch = v}
+	OnReload={crawlSongs}
+	OnOpenLibrary={OpenSongsFolder}
+	OnGetAll={() => DownloadFolder(library)}
+/>
+
+<div class="library-body">
+	<div class="collections">
+		{#if libraryEmpty}
+			<!-- First run: one sentence and one action, not a wall of ghosts. -->
+			<div class="card start">
+				<h3>{$_('songs.start.title')}</h3>
+				<p>{$_('songs.start.body')}</p>
+				<div class="start-actions">
+					<button type="button" class="button-green button-main" disabled={bulkBusy || scanning} onclick={() => DownloadFolder(library)}>
+						<i class="fa-solid fa-download"></i>
+						{$_('songs.library.get_everything', { values: { count: library.totalCount } })}
+						<span class="dim">{formatSize(library.pendingMb)}</span>
+					</button>
+					<button type="button" class="button-blue button-main" onclick={OpenSongsFolder}>
+						<i class="fa-solid fa-folder-open"></i> {$_('songs.button.open_folder')}
+					</button>
+					<button type="button" class="button-blue button-main" onclick={() => NewFolder('')}>
+						<i class="fa-solid fa-folder-plus"></i> {$_('songs.folder.new_folder')}
+					</button>
+				</div>
+			</div>
+		{:else if view === null}
+			<p class="nomatch">{$_('songs.tree.no_match')}</p>
+		{:else}
+			{#each topCollections as node (node.relPath)}
+				<CollectionBar
+					Node={node}
+					Depth={0}
+					Open={openCollection === node.relPath}
+					SelectedKey={selectedKey}
+					SelectedFolder={selectedFolder}
+					Downloading={songDLProgress}
+					Disabled={bulkBusy || scanning}
+					BulkDisabled={bulkBusy || songBusy || scanning}
+					ArtUrl={GenreArtUrl}
+					OnToggle={(p) => openCollection = openCollection === p ? null : p}
+					OnSelect={(entry) => { selectedKey = entry.key; selectedFolder = null; }}
+					OnSelectFolder={SelectFolder}
+					OnGet={(entry) => DownloadSong(entry, currentSongs[entry.uniqueId] ?? null)}
+					OnGetFolder={DownloadFolder}
+					OnOpenFolder={OpenGenreFolder}
+				/>
+			{/each}
+
+			<button type="button" class="addfolder" onclick={() => NewFolder('')}>
+				<i class="fa-solid fa-plus"></i> {$_('songs.folder.new_folder')}
+			</button>
+
+			{#each view.entries as entry (entry.key)}
+				<SongRow
+					Entry={entry}
+					Selected={selectedKey === entry.key}
+					Progress={entry.catalog ? songDLProgress[entry.catalog.uniqueId] : undefined}
+					Disabled={bulkBusy || scanning}
+					OnSelect={(e) => { selectedKey = e.key; selectedFolder = null; }}
+					OnGet={(e) => DownloadSong(e, currentSongs[e.uniqueId] ?? null)}
+				/>
+			{/each}
+		{/if}
+	</div>
+
+	{#if selectedFolderNode}
+		<FolderDetail
+			Node={selectedFolderNode}
+			BoxText={boxText}
+			BoxFileExists={boxFileExists}
+			Saving={savingBox}
+			Busy={bulkBusy || scanning}
+			DropActive={dropActive}
+			Importing={importing}
+			Official={selectedIsOfficial}
+			Scanning={scanning}
+			OnSaveBox={SaveBoxDef}
+			OnOpenFolder={OpenGenreFolder}
+			OnGetFolder={DownloadFolder}
+			OnNewFolder={NewFolder}
+			OnDelete={DeleteFolder}
+			OnPickArchives={PickArchives}
+			OnPickJacket={PickJacket}
+			JacketUrl={folderJacket}
+		/>
 	{:else}
-		<span class="text-sm">{$_('songs.scan.done', { values: { count: allScannedSongs.length } })}</span>
-		<button type="button" class="button-blue button-main" onclick={crawlSongs}><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
-		<button type="button" class="button-blue button-main" onclick={OpenSongsFolder}><i class="fa-solid fa-folder-open"></i> {$_('songs.button.open_folder')}</button>
-		<span class="flex-1"></span>
+	<SongDetail
+		Entry={selectedEntry}
+		Artists={selectedEntry?.catalog ? songArtistsMap[selectedEntry.catalog.uniqueId] ?? null : null}
+		HoFRanks={selectedEntry?.catalog ? hofMap[selectedEntry.catalog.uniqueId] ?? {} : {}}
+		Progress={selectedEntry?.catalog ? songDLProgress[selectedEntry.catalog.uniqueId] : undefined}
+		Disabled={bulkBusy || scanning}
+		JacketUrl={JacketUrl}
+		LocalJacket={songJacket}
+		LocalAudio={songAudio}
+		OnPickPreimage={PickSongPreimage}
+		OnGet={(entry) => DownloadSong(entry, currentSongs[entry.uniqueId] ?? null)}
+		OnOpenFolder={OpenGenreFolder}
+		OnHoF={OpenHoF}
+		OnDelete={DeleteSong}
+	/>
 	{/if}
-	<button type="button" class="button-{viewMode === 'list' ? 'gray' : 'blue'} button-main" onclick={() => viewMode = 'list'}>
-		<i class="fa-solid fa-list"></i> {$_('songs.view.list')}
-	</button>
-	<button type="button" class="button-{viewMode === 'tree' ? 'gray' : 'blue'} button-main" onclick={() => viewMode = 'tree'}>
-		<i class="fa-solid fa-folder-tree"></i> {$_('songs.view.tree')}
-	</button>
 </div>
 
-{#if viewMode === 'tree'}
-<SongTree Songs={allScannedSongs} Genres={scannedGenres} CatalogById={catalogById} />
-{:else}
-<div class="table-wrap">
-	<table class="table table-hover">
-		<thead>
-			<tr>
-				<th><button onclick={() => SortSongsByColumn("name")}>{$_('songs.col.name')}</button></th>
-				<th><button onclick={() => SortSongsByColumn("genre")}>{$_('songs.col.folder')}</button></th>
-				<th colspan="5" class="w-1/5">{$_('songs.col.difficulties')}</th>
-				<th><button onclick={() => SortSongsByColumn("size")}>{$_('songs.col.size')}</button></th>
-				<th class="w-1/6">{$_('songs.col.status')}</th>
-			</tr>
-			<tr>
-				<th><input class="w-full rounded-md px-3 py-2 bg-white text-blue-950" placeholder={$_('songs.filter.song')} bind:value={searchSong}></th>
-				<th><input class="w-full rounded-md px-3 py-2 bg-white text-blue-950" placeholder={$_('songs.filter.folder')} bind:value={searchGenre}></th>
-				<th><button onclick={() => SortSongsByColumn("ez")}>EZ</button></th>
-				<th><button onclick={() => SortSongsByColumn("nm")}>NM</button></th>
-				<th><button onclick={() => SortSongsByColumn("hd")}>HD</button></th>
-				<th><button onclick={() => SortSongsByColumn("ex")}>EX</button></th>
-				<th><button onclick={() => SortSongsByColumn("exex")}>EXEX</button></th>
-				<th></th>
-				<th>
-					{#if songCountProgressBar !== null}
-					<ProgressBar value={songCountProgressBar} max={100} />
-					{:else}
-					<button type="button" disabled={bulkBusy || songBusy} onclick={DownloadDisplayedSongs} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.bulk_download')}</button>
-					{/if}
-				</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each soundtrackInfo as songInfo}
-			{#if GetFilteredSInfo(songInfo)}
-			<tr class:row-expanded={expandedSongUid === songInfo.uniqueId}>
-				<td>
-					<div class="flex items-center gap-2">
-						<button class="expand-btn" onclick={() => toggleExpand(songInfo.uniqueId)} aria-label="expand">
-							<i class="fa-solid fa-chevron-{expandedSongUid === songInfo.uniqueId ? 'down' : 'right'}"></i>
-						</button>
-						<div class="flex-1"><AudioPlayer {songInfo} /></div>
-					</div>
-				</td>
-				<td>{songInfo.tjaGenreFolder}</td>
-				{#if songInfo.chartDifficulties.Dan !== undefined}
-				<td colspan="5">
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Dan"/>
-				</td>
-				{:else if songInfo.chartDifficulties.Tower !== undefined}
-				<td colspan="5">
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Tower"/>
-				</td>
-				{:else}
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Easy" OnCrownClick={openHoFModal}/>
-				</td>
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Normal" OnCrownClick={openHoFModal}/>
-				</td>
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Hard" OnCrownClick={openHoFModal}/>
-				</td>
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Oni" OnCrownClick={openHoFModal}/>
-				</td>
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Edit" OnCrownClick={openHoFModal}/>
-				</td>
-				{/if}
-				<td>{songInfo.chartSize}Mb</td>
-				<!-- songDLProgress[songObj.uniqueId] -->
-				{#if scanning === true && currentSongs[songInfo.uniqueId] === undefined}
-				<td>
-					<p>{$_('songs.status.scanning')}</p>
-				</td>
-				{:else if currentSongs[songInfo.uniqueId] === undefined}
-				<td>
-					<p>{$_('songs.status.not_downloaded')}</p>
-					<br />
-					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy} onclick={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
-					{:else}
-					<ProgressBar value={songDLProgress[songInfo.uniqueId]} max={100} />
-					{/if}
-				</td>
-				{:else if IsSongUpToDate(songInfo)}
-				<td>
-					<p>{$_('songs.status.up_to_date')}</p>
-                    <br />
-                    {#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy} onclick={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
-					{:else}
-					<ProgressBar value={songDLProgress[songInfo.uniqueId]} max={100} />
-					{/if}
-				</td>
-				{:else}
-				<td>
-					<p>{$_('songs.status.outdated')}</p>
-					<br />
-					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy} onclick={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
-					{:else}
-					<ProgressBar value={songDLProgress[songInfo.uniqueId]} max={100} />
-					{/if}
-				</td>
-				{/if}
-			</tr>
-			{#if expandedSongUid === songInfo.uniqueId}
-				{@const artistData = songArtistsMap[songInfo.uniqueId]}
-			<tr class="expanded-detail-row">
-				<td colspan="9">
-					<div class="song-detail-box">
-						<!-- Jacket -->
-						<div class="song-jacket">
-							{#if songInfo.chartJacketFilePath}
-								<img
-									src="https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/{songInfo.chartJacketFilePath}"
-									alt="jacket"
-								/>
-							{:else}
-								<div class="no-jacket"><span>No jacket</span></div>
-							{/if}
-						</div>
-						<!-- Artist info -->
-						<div class="song-artist-info">
-							{#if artistData && artistData.artists.length > 0}
-								{#each artistData.artists as artist}
-									<div class="artist-entry">
-										<span class="artist-name">{artist.artist}</span>
-										<div class="artist-links">
-											{#if artist.youtube}   <a href={artist.youtube}   target="_blank" class="artist-link link-youtube">  <i class="fa-brands fa-youtube"></i>    YouTube</a>   {/if}
-											{#if artist.soundcloud}<a href={artist.soundcloud} target="_blank" class="artist-link link-soundcloud"><i class="fa-brands fa-soundcloud"></i> SoundCloud</a>{/if}
-											{#if artist.spotify}   <a href={artist.spotify}   target="_blank" class="artist-link link-spotify">  <i class="fa-brands fa-spotify"></i>    Spotify</a>   {/if}
-											{#if artist.bandcamp}  <a href={artist.bandcamp}  target="_blank" class="artist-link link-bandcamp"> <i class="fa-brands fa-bandcamp"></i>   Bandcamp</a>  {/if}
-											{#if artist.bilibili}  <a href={artist.bilibili}  target="_blank" class="artist-link link-bilibili"> <i class="fa-solid fa-tv"></i>          Bilibili</a>  {/if}
-											{#if artist.other}     <a href={artist.other}     target="_blank" class="artist-link link-other">    <i class="fa-solid fa-link"></i>        Website</a>   {/if}
-										</div>
-									</div>
-								{/each}
-								{#if artistData.link}
-									<a href={artistData.link} target="_blank" class="artist-link link-other mt-1"><i class="fa-solid fa-music"></i> Song link</a>
-								{/if}
-							{:else}
-								<span class="opacity-50 italic">No artist information available.</span>
-							{/if}
-						</div>
-					</div>
-				</td>
-			</tr>
-			{/if}
-			{/if}
-			{/each}
-		</tbody>
-	</table>
-</div>
+{#if newFolderParent !== null}
+    {@const parent = newFolderParent}
+    <NamePromptModal
+        Title={$_('songs.folder.new_folder')}
+        Label={$_('songs.folder.new_prompt')}
+        Placeholder={$_('songs.folder.new_placeholder')}
+        Confirm={$_('songs.folder.create')}
+        Taken={takenUnder(parent)}
+        OnConfirm={(name) => CreateFolder(parent, name)}
+        OnCancel={() => newFolderParent = null}
+    />
 {/if}
 
 {#if hofModalOpen && hofModalSongInfo && hofModalDifficulty}
@@ -1107,6 +1502,58 @@
 {/if}
 
 <style>
+    /* Collections scroll; the detail panel stays put beside them. */
+    .library-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 20rem;
+        gap: 0.6rem;
+        align-items: start;
+        margin-top: 0.5rem;
+    }
+    .collections {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+        padding: 0.5rem;
+        border-radius: var(--radius-container);
+        background-color: light-dark(var(--color-surface-100), var(--color-surface-800));
+        box-shadow: inset 0 0 0 1px light-dark(rgb(23 23 23 / 0.05), rgb(250 250 250 / 0.05));
+    }
+
+    .start {padding: 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start;}
+    .start-actions {display: flex; gap: 0.5rem; flex-wrap: wrap;}
+    .dim {opacity: 0.85; font-weight: 400;}
+    .nomatch {opacity: 0.7; padding: 1rem 0.5rem;}
+
+    .addfolder {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.45rem;
+        width: 100%;
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 700;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: 2px dashed color-mix(in oklab, var(--color-surface-500) 40%, transparent);
+        background: none;
+        color: inherit;
+        opacity: 0.8;
+        cursor: pointer;
+    }
+    .addfolder:hover {
+        opacity: 1;
+        border-color: var(--color-primary-500);
+        background-color: color-mix(in oklab, var(--color-primary-500) 10%, transparent);
+    }
+
+    /* Below ~1000px the panel would squeeze the list, so it moves under it. */
+    @media (max-width: 1000px) {
+        .library-body {grid-template-columns: minmax(0, 1fr);}
+    }
+
     .modal-backdrop {
         position: fixed;
         inset: 0;
@@ -1182,91 +1629,11 @@
     }
 
     /* Expand button */
-    .expand-btn {
-        flex-shrink: 0;
-        width: 1.6rem;
-        height: 1.6rem;
-        border-radius: 0.3rem;
-        opacity: 0.6;
-        transition: opacity 0.15s;
-    }
-    .expand-btn:hover { opacity: 1; }
 
     /* Expanded detail row */
-    .expanded-detail-row td { padding: 0 !important; }
 
-    .song-detail-box {
-        display: flex;
-        flex-direction: row;
-        gap: 1rem;
-        padding: 0.75rem 1rem;
-        border-top: 1px solid rgba(128,128,128,0.2);
-    }
 
     /* Jacket */
-    .song-jacket {
-        flex-shrink: 0;
-        width: 96px;
-        height: 96px;
-        border-radius: 0.4rem;
-        overflow: hidden;
-        border: 1px solid rgba(128,128,128,0.3);
-    }
-    .song-jacket img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    .no-jacket {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(128,128,128,0.15);
-        font-size: 0.7rem;
-        opacity: 0.5;
-        font-style: italic;
-    }
 
     /* Artist info */
-    .song-artist-info {
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-        justify-content: center;
-    }
-    .artist-entry {
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-    }
-    .artist-name {
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-    .artist-links {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.3rem;
-    }
-    .artist-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        padding: 0.15rem 0.5rem;
-        border-radius: 0.3rem;
-        font-size: 0.78rem;
-        font-weight: 500;
-        color: #fff;
-        text-decoration: none;
-        transition: opacity 0.15s;
-    }
-    .artist-link:hover { opacity: 0.8; }
-    .link-youtube   { background: #ff0000; }
-    .link-soundcloud{ background: #ff5500; }
-    .link-spotify   { background: #1db954; }
-    .link-bandcamp  { background: #1da0c3; }
-    .link-bilibili  { background: #00a1d6; }
-    .link-other     { background: #555; }
 </style>

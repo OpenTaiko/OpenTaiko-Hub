@@ -208,6 +208,101 @@
     }
   },
   "songs": {
+    "box": {
+        "language": "Idioma",
+        "genre_help": "El juego lo usa para desbloquear contenido.",
+        "title": "Ajustes de la carpeta",
+        "official_locked": "Carpeta de la banda sonora de OpenTaiko, sincronizada por el Hub.",
+        "name": "Nombre mostrado en el juego",
+        "genre": "Género",
+        "description": "Descripción (3 líneas)",
+        "line": "Línea {n}",
+        "colors": "Colores",
+        "box_color": "Caja",
+        "back_color": "Fondo",
+        "bg_color": "Fondo",
+        "fore_color": "Texto",
+        "appearance": "Apariencia",
+        "box_type": "Tipo de caja",
+        "bg_type": "Tipo de fondo",
+        "box_chara": "Personaje",
+        "scene": "Preajuste de escena",
+        "translations": "Nombres traducidos",
+        "others": "Otros ajustes ({count})",
+        "others_note": "Estos ajustes se conservan tal cual al guardar.",
+        "clear": "Borrar",
+        "jacket": "Imagen de la carpeta",
+        "jacket_hint": "Se muestra en la caja dentro del juego. PNG, JPG o WebP.",
+        "jacket_pick": "Elegir imagen...",
+        "jacket_saved": "Guardada como {name}",
+        "jacket_failed": "No se pudo establecer la imagen: {error}"
+    },
+    "folder": {
+        "loading": "Las canciones se están cargando.",
+        "name_taken": "«{name}» ya existe aquí.",
+        "not_downloaded": "Esta carpeta aún no se ha descargado.",
+        "new_folder": "Nueva carpeta",
+        "new_subfolder": "Nueva subcarpeta",
+        "new_prompt": "Nombre de la nueva carpeta",
+        "new_placeholder": "Por ejemplo: Mis mapas",
+        "create": "Crear",
+        "created": "Se creó «{name}»",
+        "create_failed": "No se pudo crear la carpeta: {error}",
+        "delete": "Eliminar",
+        "delete_confirm": "¿Eliminar «{name}» y las {count} canciones que contiene? No se puede deshacer.",
+        "delete_song_confirm": "¿Eliminar «{name}»? No se puede deshacer.",
+        "deleted": "Se eliminó «{name}»",
+        "delete_failed": "No se pudo eliminar: {error}",
+        "box_missing": "aún sin box.def",
+        "box_loading": "Cargando...",
+        "save_box": "Guardar",
+        "unsaved": "cambios sin guardar",
+        "box_saved": "box.def guardado",
+        "box_save_failed": "No se pudo guardar box.def: {error}",
+        "drop_hint": "Suelta archivos .zip de partituras aquí para añadirlos a esta carpeta",
+        "browse_zip": "Elegir archivos...",
+        "importing": "Añadiendo partituras...",
+        "imported": "Se añadieron {count} canciones",
+        "import_rejected": "No es un archivo de partituras: {names}",
+        "import_failed": "No se pudieron añadir las partituras: {error}",
+        "drop_needs_folder": "Selecciona primero una de tus carpetas y suelta los archivos en ella."
+    },
+    "start": {
+        "title": "Tu biblioteca está vacía",
+        "body": "Descarga las canciones de OpenTaiko para empezar, o coloca tus propias partituras en la carpeta de canciones."
+    },
+    "detail": {
+        "help_title": "Elige una canción para ver sus detalles",
+        "help_installed": "Instalada y actualizada",
+        "help_available": "Disponible para descargar",
+        "help_outdated": "Existe una versión más reciente",
+        "help_custom": "Tu propia partitura",
+        "help_hint": "Abre una carpeta para explorarla, o usa Descargar para obtener lo que falta.",
+        "get_size": "Descargar ({size})",
+        "open_song_folder": "Abrir carpeta",
+        "set_jacket": "Establecer la portada"
+    },
+    "course": {
+        "easy": "Fácil",
+        "normal": "Normal",
+        "hard": "Difícil",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "Torre",
+        "dan": "Dan"
+    },
+    "scope": {
+        "all": "Todas",
+        "installed": "Instaladas",
+        "updates": "Actualizaciones"
+    },
+    "library": {
+        "title": "Biblioteca de canciones",
+        "summary": "{installed} de {total} canciones instaladas",
+        "get_everything": "Descargar las {count}",
+        "updates_waiting": "{count} por actualizar",
+        "search": "Buscar canciones y carpetas..."
+    },
     "col": {
       "name": "Nombre de la canción",
       "folder": "Carpeta",
@@ -221,6 +316,7 @@
       "folder": "Buscar carpeta..."
     },
     "status": {
+      "installed_short": "Instalada",
       "scanning": "Escaneando...",
       "not_downloaded": "No descargada",
       "up_to_date": "Actualizada",
@@ -242,6 +338,16 @@
       "done": "{count} canciones en la biblioteca"
     },
     "tree": {
+      "show_more": "Mostrar {count} más",
+      "get_n": "Descargar {count}",
+      "nothing_here": "Nada aquí coincide con el filtro actual.",
+      "installed_of": "{installed} / {total} instaladas",
+      "library_total": "{installed} de {total} canciones instaladas",
+      "legend_available": "Atenuado = disponible para descargar",
+      "show_available": "Mostrar canciones disponibles para descargar",
+      "no_match": "Ninguna canción coincide con esta búsqueda.",
+      "open_folder_tip": "Abrir esta carpeta",
+      "download_folder_tip": "Descargar las {count} canciones que faltan en esta carpeta",
       "soundtrack": "Banda sonora de OpenTaiko",
       "custom": "Personalizado",
       "songs_count": "{count} canciones",
@@ -272,8 +378,8 @@
     "metadata": {
       "updated": "Se actualizaron {count} carpeta(s) de género (box.def / preimages)"
     },
-    "experimental_note": "La instancia seleccionada es una build experimental: incluye sus propias canciones y no usa la biblioteca de canciones compartida.",
     "error": {
+      "open_folder": "No se pudo abrir la carpeta: {error}",
       "scanning": "No se pueden descargar canciones mientras se escanean las carpetas locales",
       "scan_failed": "No se pudo escanear la biblioteca de canciones: {error}"
     },

@@ -208,6 +208,101 @@
     }
   },
   "songs": {
+    "box": {
+        "language": "语言",
+        "genre_help": "游戏用它来解锁内容。",
+        "title": "文件夹设置",
+        "official_locked": "OpenTaiko 原声带文件夹，由 Hub 保持同步。",
+        "name": "游戏中显示的名称",
+        "genre": "流派",
+        "description": "说明（3 行）",
+        "line": "第 {n} 行",
+        "colors": "颜色",
+        "box_color": "盒子",
+        "back_color": "背面",
+        "bg_color": "背景",
+        "fore_color": "文字",
+        "appearance": "外观",
+        "box_type": "盒子类型",
+        "bg_type": "背景类型",
+        "box_chara": "角色",
+        "scene": "场景预设",
+        "translations": "翻译名称",
+        "others": "其他设置（{count}）",
+        "others_note": "保存时会原样保留这些设置。",
+        "clear": "清除",
+        "jacket": "文件夹图片",
+        "jacket_hint": "在游戏中显示于盒子上。支持 PNG、JPG 或 WebP。",
+        "jacket_pick": "选择图片...",
+        "jacket_saved": "已保存为 {name}",
+        "jacket_failed": "无法设置图片：{error}"
+    },
+    "folder": {
+        "loading": "正在加载歌曲。",
+        "name_taken": "“{name}”已存在。",
+        "not_downloaded": "此文件夹尚未下载。",
+        "new_folder": "新建文件夹",
+        "new_subfolder": "新建子文件夹",
+        "new_prompt": "新文件夹的名称",
+        "new_placeholder": "例如：我的谱面",
+        "create": "创建",
+        "created": "已创建“{name}”",
+        "create_failed": "无法创建文件夹：{error}",
+        "delete": "删除",
+        "delete_confirm": "要删除“{name}”及其中的 {count} 首歌曲吗？此操作无法撤销。",
+        "delete_song_confirm": "要删除“{name}”吗？此操作无法撤销。",
+        "deleted": "已删除“{name}”",
+        "delete_failed": "无法删除：{error}",
+        "box_missing": "尚无 box.def",
+        "box_loading": "加载中...",
+        "save_box": "保存",
+        "unsaved": "未保存的更改",
+        "box_saved": "已保存 box.def",
+        "box_save_failed": "无法保存 box.def：{error}",
+        "drop_hint": "将谱面 .zip 拖放到此处即可添加到该文件夹",
+        "browse_zip": "选择文件...",
+        "importing": "正在添加谱面...",
+        "imported": "已添加 {count} 首歌曲",
+        "import_rejected": "不是谱面压缩包：{names}",
+        "import_failed": "无法添加谱面：{error}",
+        "drop_needs_folder": "请先选择你自己的文件夹，然后再拖放文件。"
+    },
+    "start": {
+        "title": "曲库为空",
+        "body": "下载 OpenTaiko 歌曲即可开始，或将自制谱面放入歌曲文件夹。"
+    },
+    "detail": {
+        "help_title": "选择一首歌曲查看详情",
+        "help_installed": "已安装且为最新",
+        "help_available": "可下载",
+        "help_outdated": "有更新的版本",
+        "help_custom": "自制谱面",
+        "help_hint": "展开文件夹进行浏览，或使用“获取”下载其中缺少的内容。",
+        "get_size": "下载（{size}）",
+        "open_song_folder": "打开文件夹",
+        "set_jacket": "设置封面"
+    },
+    "course": {
+        "easy": "简单",
+        "normal": "普通",
+        "hard": "困难",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "塔",
+        "dan": "段位"
+    },
+    "scope": {
+        "all": "全部",
+        "installed": "已安装",
+        "updates": "更新"
+    },
+    "library": {
+        "title": "曲库",
+        "summary": "已安装 {installed} / {total} 首",
+        "get_everything": "获取全部 {count} 首",
+        "updates_waiting": "{count} 首可更新",
+        "search": "搜索歌曲和文件夹..."
+    },
     "col": {
       "name": "歌曲名称",
       "folder": "分区",
@@ -221,6 +316,7 @@
       "folder": "搜索分区..."
     },
     "status": {
+      "installed_short": "已安装",
       "scanning": "正在扫描...",
       "not_downloaded": "未下载",
       "up_to_date": "最新",
@@ -242,6 +338,16 @@
       "done": "曲库中共有 {count} 首歌曲"
     },
     "tree": {
+      "show_more": "再显示 {count} 首",
+      "get_n": "获取 {count} 首",
+      "nothing_here": "没有符合当前筛选条件的内容。",
+      "installed_of": "已安装 {installed} / {total}",
+      "library_total": "曲库：已安装 {installed} / {total} 首",
+      "legend_available": "半透明 = 可下载",
+      "show_available": "显示可下载的歌曲",
+      "no_match": "没有符合搜索条件的歌曲。",
+      "open_folder_tip": "打开此文件夹",
+      "download_folder_tip": "下载此文件夹中缺少的 {count} 首歌曲",
       "soundtrack": "OpenTaiko 音轨",
       "custom": "自定义",
       "songs_count": "{count} 首歌曲",
@@ -272,8 +378,8 @@
     "metadata": {
       "updated": "已更新 {count} 个曲风文件夹（box.def / preimages）"
     },
-    "experimental_note": "所选实例为实验版构建：它自带歌曲，不使用共享曲库。",
     "error": {
+      "open_folder": "无法打开文件夹：{error}",
       "scanning": "正在扫描本地文件夹，无法下载歌曲",
       "scan_failed": "扫描曲库失败：{error}"
     },

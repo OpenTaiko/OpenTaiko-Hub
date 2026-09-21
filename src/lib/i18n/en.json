@@ -208,6 +208,101 @@
     }
   },
   "songs": {
+    "box": {
+        "language": "Language",
+        "genre_help": "The game uses this to unlock content.",
+        "title": "Folder settings",
+        "official_locked": "OpenTaiko soundtrack folder, kept in sync by the Hub.",
+        "name": "Name shown in game",
+        "genre": "Genre",
+        "description": "Description (3 lines)",
+        "line": "Line {n}",
+        "colors": "Colours",
+        "box_color": "Box",
+        "back_color": "Back",
+        "bg_color": "Background",
+        "fore_color": "Text",
+        "appearance": "Appearance",
+        "box_type": "Box type",
+        "bg_type": "Background type",
+        "box_chara": "Character",
+        "scene": "Scene preset",
+        "translations": "Translated names",
+        "others": "Other settings ({count})",
+        "others_note": "These are kept exactly as they are when you save.",
+        "clear": "Clear",
+        "jacket": "Folder image",
+        "jacket_hint": "Shown on the box in game. PNG, JPG or WebP.",
+        "jacket_pick": "Choose image...",
+        "jacket_saved": "Saved as {name}",
+        "jacket_failed": "Could not set the image: {error}"
+    },
+    "folder": {
+        "loading": "The songs are currently loading.",
+        "name_taken": "\"{name}\" already exists here.",
+        "not_downloaded": "This folder is not downloaded yet.",
+        "new_folder": "New folder",
+        "new_subfolder": "New subfolder",
+        "new_prompt": "Name of the new folder",
+        "new_placeholder": "For example: My charts",
+        "create": "Create",
+        "created": "Created \"{name}\"",
+        "create_failed": "Could not create the folder: {error}",
+        "delete": "Delete",
+        "delete_confirm": "Delete \"{name}\" and the {count} songs in it? This cannot be undone.",
+        "delete_song_confirm": "Delete \"{name}\"? This cannot be undone.",
+        "deleted": "Deleted \"{name}\"",
+        "delete_failed": "Could not delete: {error}",
+        "box_missing": "no box.def yet",
+        "box_loading": "Loading...",
+        "save_box": "Save",
+        "unsaved": "unsaved changes",
+        "box_saved": "box.def saved",
+        "box_save_failed": "Could not save box.def: {error}",
+        "drop_hint": "Drop chart .zip files here to add them to this folder",
+        "browse_zip": "Choose files...",
+        "importing": "Adding charts...",
+        "imported": "Added {count} songs",
+        "import_rejected": "Not a chart archive: {names}",
+        "import_failed": "Could not add the charts: {error}",
+        "drop_needs_folder": "Select one of your own folders first, then drop the files into it."
+    },
+    "start": {
+        "title": "Your library is empty",
+        "body": "Download the OpenTaiko songs to get started, or drop your own charts into the songs folder."
+    },
+    "detail": {
+        "help_title": "Pick a song to see its details",
+        "help_installed": "Installed and up to date",
+        "help_available": "Available to download",
+        "help_outdated": "A newer version exists",
+        "help_custom": "Your own chart",
+        "help_hint": "Open a folder to browse it, or use Get to download everything it is missing.",
+        "get_size": "Download ({size})",
+        "open_song_folder": "Open folder",
+        "set_jacket": "Set jacket"
+    },
+    "course": {
+        "easy": "Easy",
+        "normal": "Normal",
+        "hard": "Hard",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "Tower",
+        "dan": "Dan"
+    },
+    "scope": {
+        "all": "All",
+        "installed": "Installed",
+        "updates": "Updates"
+    },
+    "library": {
+        "title": "Song library",
+        "summary": "{installed} of {total} songs installed",
+        "get_everything": "Get all {count}",
+        "updates_waiting": "{count} to update",
+        "search": "Search songs and folders..."
+    },
     "col": {
       "name": "Song name",
       "folder": "Folder",
@@ -221,6 +316,7 @@
       "folder": "Folder search..."
     },
     "status": {
+      "installed_short": "Installed",
       "scanning": "Scanning...",
       "not_downloaded": "Not downloaded",
       "up_to_date": "Up-to-date",
@@ -242,6 +338,16 @@
       "done": "{count} songs in the library"
     },
     "tree": {
+      "show_more": "Show {count} more",
+      "get_n": "Get {count}",
+      "nothing_here": "Nothing here matches the current filter.",
+      "installed_of": "{installed} / {total} installed",
+      "library_total": "{installed} of {total} songs installed",
+      "legend_available": "Faded = available to download",
+      "show_available": "Show songs available to download",
+      "no_match": "No song matches this search.",
+      "open_folder_tip": "Open this folder",
+      "download_folder_tip": "Download the {count} missing songs in this folder",
       "soundtrack": "OpenTaiko Soundtrack",
       "custom": "Custom",
       "songs_count": "{count} songs",
@@ -272,8 +378,8 @@
     "metadata": {
       "updated": "Updated {count} genre folder(s) (box.def / preimages)"
     },
-    "experimental_note": "The selected instance is an experimental build: it ships with its own songs and does not use the shared Songs library.",
     "error": {
+      "open_folder": "Could not open the folder: {error}",
       "scanning": "Cannot download songs while local folders are being scanned",
       "scan_failed": "Failed to scan the songs library: {error}"
     },

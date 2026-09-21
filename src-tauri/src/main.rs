@@ -1,6 +1,7 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod library;
 mod assetscan;
 mod binver;
 mod configini;
@@ -488,6 +489,14 @@ fn main() {
             migrate::strip_song_content,
             migrate::remove_duplicate_song_folders,
             configini::ensure_config_tjapath,
+            library::read_box_def,
+            library::write_box_def,
+            library::create_genre_folder,
+            library::delete_library_entry,
+            library::import_chart_archives,
+            library::set_folder_jacket,
+            library::read_song_media,
+            library::set_song_preimage,
             health::ui_heartbeat,
             log_directory
         ])
