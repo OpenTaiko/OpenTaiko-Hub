@@ -24,6 +24,10 @@ You can update either through the OpenTaiko Hub, or directly from the releases t
 - [Fix] The Songs tab was slow to open and to scroll: it listed the whole soundtrack at once, with an audio player on every row
 - [Fix] Song names showed the game's raw colour markup, such as `<c.#d3d3d3>`
 
+## [0.2.10] - 2026-10-11 (Alpha)
+
+- [Fix] Windows: building an experimental version no longer requires long paths to be enabled
+
 ## [0.2.9] - 2026-09-20 (Alpha)
 
 - [Feat] The Hub now writes a log file (and records panics, startup failures and frontend errors in it) (folder can be opened from Information > Troubleshooting)
