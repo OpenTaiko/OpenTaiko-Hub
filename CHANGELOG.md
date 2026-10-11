@@ -3,6 +3,10 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.2.10] - 2026-10-11 (Alpha)
+
+- [Fix] Windows: building an experimental version no longer requires long paths to be enabled
+
 ## [0.2.9] - 2026-09-20 (Alpha)
 
 - [Feat] The Hub now writes a log file (and records panics, startup failures and frontend errors in it) (folder can be opened from Information > Troubleshooting)

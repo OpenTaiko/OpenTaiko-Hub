@@ -13,7 +13,7 @@
     import type { BuildOption, GitHubRelease, HubOS, IndevBuildInfo, Instance, ToastContext } from '$lib/types';
     const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
-    import { GetOS, GetTmpPath } from "$lib/utils/path";
+    import { GetOS, GetTmpPath, GetBuildPath } from "$lib/utils/path";
     import { isVersionAtLeast } from "$lib/utils/versions";
     import {
         repoOwner,
@@ -425,7 +425,7 @@
             progress = undefined;
             transferred = 0;
             transferRate = 0;
-            tmpDir = await GetTmpPath(`indev-${crypto.randomUUID()}`);
+            tmpDir = await GetBuildPath();
             await mkdir(tmpDir, { recursive: true });
             const srcZip = await path.join(tmpDir, 'src.zip');
             const success = await backoffDownload(
@@ -453,13 +453,18 @@
             const unlisten = await listen<number>('extract-progress', (event) => {
                 progress = event.payload;
             });
-            let srcFolder: string;
+            let extracted: string;
             try {
-                srcFolder = await invoke<string>('unzip_and_get_first_folder', { zipPath: srcZip });
+                extracted = await invoke<string>('unzip_and_get_first_folder', { zipPath: srcZip });
             } finally {
                 unlisten();
             }
             await remove(srcZip);
+            // The archive unpacks into `OpenTaiko-<40 character commit>`. Every character
+            // of that name counts against the Windows path limit for the whole build, so
+            // it is moved to a one-letter folder before the compiler sees it.
+            const srcFolder = await path.join(tmpDir, 's');
+            await invoke('merge_move_dir', { src: extracted, dest: srcFolder });
 
             // 5. Build (same command as the game's build scripts)
             buildStage = 'build';
@@ -474,9 +479,16 @@
                 }
                 if (flushTimer === null) flushTimer = setTimeout(flushBuildLog, 100);
             };
+            // Same command as the game's build scripts, except for where the output goes.
+            // By default the game's files are copied to
+            // OpenTaiko\bin\Release\net8.0\<rid>\publish, 45 characters deeper than the
+            // source they came from, which alone pushes the skin folders past the Windows
+            // path limit. Both output folders sit directly in the build folder instead.
+            const publishDir = await path.join(tmpDir, 'p');
+            const outDir = await path.join(tmpDir, 'b') + path.sep();
             const exitCode = await invoke<number>('run_streamed', {
                 program: 'dotnet',
-                args: ['publish', 'OpenTaiko/OpenTaiko.csproj', '--configuration', 'Release', '--self-contained', '-p:PublishSingleFile=true', '--runtime', rid],
+                args: ['publish', 'OpenTaiko/OpenTaiko.csproj', '--configuration', 'Release', '--self-contained', '-p:PublishSingleFile=true', '--runtime', rid, '--output', publishDir, `-p:OutDir=${outDir}`],
                 cwd: srcFolder,
                 onOutput: logChannel
             });
@@ -487,7 +499,6 @@
 
             // 6. Install the publish output (and local docs when the branch ships them)
             buildStage = 'install';
-            const publishDir = await path.join(srcFolder, 'OpenTaiko', 'bin', 'Release', 'net8.0', rid, 'publish');
             // A local publish carries the repository's whole Songs tree; drop those
             // charts so the instance uses only the shared library
             await invoke('strip_song_content', { songsDir: await path.join(publishDir, 'Songs') });
