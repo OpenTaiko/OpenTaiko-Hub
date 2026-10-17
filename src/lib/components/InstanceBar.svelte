@@ -1,6 +1,6 @@
 <script lang="ts">
     import { _ } from 'svelte-i18n';
-    import { openPath } from '@tauri-apps/plugin-opener';
+    import { OpenFolder } from '$lib/utils/path';
     import { instances, activeInstanceId, activeInstance, setActiveInstance, instanceVersions } from '$lib/stores/instances';
     import type { Instance } from '$lib/types';
 
@@ -14,7 +14,7 @@
         const inst = $activeInstance;
         if (!inst) return;
         try {
-            await openPath(inst.path);
+            await OpenFolder(inst.path);
         } catch (error) {
             console.error('Failed to open the instance folder:', error);
         }

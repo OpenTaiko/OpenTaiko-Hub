@@ -5,7 +5,7 @@ import { writable, derived, get } from 'svelte/store';
 import { readTextFile, writeTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
 import { join, basename } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/core';
-import { GetPreferencesPath, GetRootPath, GetGlobalSongsPath, GetLegacyInstancePath } from '../utils/path';
+import { GetPreferencesPath, GetGlobalSongsPath, GetLegacyInstancePath } from '../utils/path';
 import { isVersionInSeries } from '../utils/versions';
 import type { Instance, InstanceRegistry } from '$lib/types';
 
@@ -156,10 +156,10 @@ export const updateInstance = async (id: string, patch: Partial<Instance>): Prom
 };
 
 export const createInstance = async (name: string | null | undefined): Promise<Instance> => {
-    const root = await GetRootPath();
     const folderName = `OpenTaiko-${crypto.randomUUID()}`;
-    const path = await join(root, folderName);
-    await mkdir(path, { recursive: true });
+    // Created by the backend, which also gives the Hub access to it: the Hub root itself
+    // is not open to the page
+    const path = await invoke<string>('create_instance_dir', { folderName });
     const instance: Instance = {
         id: crypto.randomUUID(),
         name: name?.trim() || folderName,

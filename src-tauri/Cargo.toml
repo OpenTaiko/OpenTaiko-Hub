@@ -22,11 +22,9 @@ tauri-plugin-fs = "~2.5.2"
 tauri-plugin-http = "~2.6.0"
 tauri-plugin-opener = "~2.5.5"
 tauri-plugin-os = "~2.3.2"
-tauri-plugin-shell = "~2.3.6"
-tauri-plugin-store = "~2.4.4"
-tauri-plugin-upload = "~2.4.1"
 zip = "4.2.0"
-tokio = "1.51.1"
+# fs and io-util: download.rs streams to disk
+tokio = { version = "1.51.1", features = ["fs", "io-util"] }
 tauri-plugin-dialog = "~2.7.3"
 pelite = "0.10"
 md-5 = "0.10"

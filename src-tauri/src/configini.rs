@@ -23,6 +23,16 @@ fn normalize_for_compare(path: &str) -> String {
 /// Returns the resulting TJAPath value.
 #[tauri::command]
 pub fn ensure_config_tjapath(
+    app: tauri::AppHandle,
+    instance_dir: String,
+    global_songs_path: String,
+    include_local: bool,
+) -> Result<String, String> {
+    crate::guard::checked(&app, &instance_dir)?;
+    write_tjapath(instance_dir, global_songs_path, include_local)
+}
+
+fn write_tjapath(
     instance_dir: String,
     global_songs_path: String,
     include_local: bool,
@@ -136,7 +146,7 @@ mod tests {
         let dir = tmp.path().to_str().unwrap().to_string();
         let sep = std::path::MAIN_SEPARATOR;
 
-        let value = ensure_config_tjapath(dir.clone(), "D:/Global/Songs".into(), true).unwrap();
+        let value = write_tjapath(dir.clone(), "D:/Global/Songs".into(), true).unwrap();
         assert_eq!(value, format!("Songs{sep};D:/Global/Songs{sep}"));
 
         let bytes = std::fs::read(tmp.path().join("Config.ini")).unwrap();
@@ -155,8 +165,8 @@ mod tests {
         let (encoded, _, _) = SHIFT_JIS.encode(original);
         std::fs::write(tmp.path().join("Config.ini"), &encoded).unwrap();
 
-        let first = ensure_config_tjapath(dir.clone(), "D:/Global/Songs".into(), true).unwrap();
-        let second = ensure_config_tjapath(dir.clone(), "D:/Global/Songs".into(), true).unwrap();
+        let first = write_tjapath(dir.clone(), "D:/Global/Songs".into(), true).unwrap();
+        let second = write_tjapath(dir.clone(), "D:/Global/Songs".into(), true).unwrap();
         assert_eq!(first, second, "second call must not change the value");
         assert_eq!(first.matches("D:/Global/Songs").count(), 1, "no duplicate entries");
 
@@ -172,7 +182,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let dir = tmp.path().to_str().unwrap().to_string();
         // é is not representable in Shift_JIS
-        assert!(ensure_config_tjapath(dir, "D:/Généreux/Songs".into(), true).is_err());
+        assert!(write_tjapath(dir, "D:/Généreux/Songs".into(), true).is_err());
     }
 
     #[test]
@@ -182,7 +192,7 @@ mod tests {
         let sep = std::path::MAIN_SEPARATOR;
 
         // Fresh file: only the global path
-        let value = ensure_config_tjapath(dir.clone(), "D:/Global/Songs".into(), false).unwrap();
+        let value = write_tjapath(dir.clone(), "D:/Global/Songs".into(), false).unwrap();
         assert_eq!(value, format!("D:/Global/Songs{sep}"));
 
         // Existing file with the bundled Songs entry and a custom path
@@ -190,13 +200,13 @@ mod tests {
         let (encoded, _, _) = SHIFT_JIS.encode(original);
         std::fs::write(tmp.path().join("Config.ini"), &encoded).unwrap();
 
-        let value = ensure_config_tjapath(dir.clone(), "D:/Global/Songs".into(), false).unwrap();
+        let value = write_tjapath(dir.clone(), "D:/Global/Songs".into(), false).unwrap();
         assert!(!value.split(';').any(|e| e == "Songs\\" || e == "Songs/"), "local Songs must be removed");
         assert!(value.contains("E:\\custom\\"), "custom paths must be kept");
         assert!(value.contains("D:/Global/Songs"), "global path must be present");
 
         // Idempotent
-        let again = ensure_config_tjapath(dir, "D:/Global/Songs".into(), false).unwrap();
+        let again = write_tjapath(dir, "D:/Global/Songs".into(), false).unwrap();
         assert_eq!(value, again);
     }
 }

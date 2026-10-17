@@ -7,7 +7,7 @@
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
     import { invoke } from '@tauri-apps/api/core';
-    import { openPath } from '@tauri-apps/plugin-opener';
+    import { OpenFolder } from '$lib/utils/path';
     import { SafeHtml } from '$lib/utils/sanitize';
 
     let currentInfo = $state(0);
@@ -27,7 +27,7 @@
     const OpenLogFolder = async () => {
         if (!logDir) return;
         try {
-            await openPath(logDir);
+            await OpenFolder(logDir);
         } catch (error) {
             console.error('Failed to open the log folder:', error);
         }

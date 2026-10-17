@@ -3,11 +3,11 @@
     import { onMount, onDestroy } from 'svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
     import { mkdir, exists, copyFile, remove, readFile } from '@tauri-apps/plugin-fs';
-    import { openPath } from '@tauri-apps/plugin-opener';
+    import { OpenFolder, IsPlainRelPath } from '$lib/utils/path';
     import { open, confirm } from '@tauri-apps/plugin-dialog';
     import { getCurrentWebview } from '@tauri-apps/api/webview';
     import { fetch } from "@tauri-apps/plugin-http";
-    import { download } from "@tauri-apps/plugin-upload";
+    import { download } from '$lib/utils/download';
     import { path } from '@tauri-apps/api';
     import { invoke, Channel } from '@tauri-apps/api/core';
     import { getContext } from 'svelte';
@@ -771,7 +771,7 @@
     const OpenGenreFolder = async (relPath: string) => {
         try {
             const songsDir = await GetGlobalSongsPath();
-            await openPath(relPath ? await path.join(songsDir, relPath) : songsDir);
+            await OpenFolder(relPath ? await path.join(songsDir, relPath) : songsDir);
         } catch (error) {
             TriggerError(get(_)('songs.error.open_folder', { values: { error: String(error) } }));
         }
@@ -809,7 +809,7 @@
         try {
             const songsDir = await GetGlobalSongsPath();
             await mkdir(songsDir, { recursive: true });
-            await openPath(songsDir);
+            await OpenFolder(songsDir);
         } catch (error) {
             TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
         }
@@ -1085,6 +1085,14 @@
 
     const RunDownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, songNb?: number, songTotal?: number) => {
         await EnsureRemoteShaMap();
+
+        // Catalog paths decide where files are written, so a malformed one is refused
+        // before anything is downloaded
+        if (![songObj.tjaFolderPath, ...songObj.tjaFilesPath].every(IsPlainRelPath)) {
+            console.error(`Refusing catalog paths of ${songObj.uniqueId}:`, songObj.tjaFolderPath, songObj.tjaFilesPath);
+            TriggerError(get(_)('dl.error.failed_abort'));
+            return;
+        }
 
         const baseDirPath = await GetGlobalSongsPath();
         const localRelPath = ((currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath).replace(/\\/g, '/');

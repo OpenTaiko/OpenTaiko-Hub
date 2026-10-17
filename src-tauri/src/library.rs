@@ -132,7 +132,8 @@ pub async fn read_box_def(base: String, rel_path: String) -> Result<BoxDef, Stri
 }
 
 #[tauri::command]
-pub async fn write_box_def(base: String, rel_path: String, text: String) -> Result<(), String> {
+pub async fn write_box_def(app: tauri::AppHandle, base: String, rel_path: String, text: String) -> Result<(), String> {
+    crate::guard::checked(&app, &base)?;
     let dir = resolve_inside(Path::new(&base), &rel_path)?;
     if !dir.is_dir() {
         return Err("That folder is not on disk yet".into());
@@ -156,7 +157,8 @@ pub async fn write_box_def(base: String, rel_path: String, text: String) -> Resu
 // ── Folders ─────────────────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub async fn create_genre_folder(base: String, parent_rel: String, name: String) -> Result<String, String> {
+pub async fn create_genre_folder(app: tauri::AppHandle, base: String, parent_rel: String, name: String) -> Result<String, String> {
+    crate::guard::checked(&app, &base)?;
     let parent = resolve_inside(Path::new(&base), &parent_rel)?;
     fs::create_dir_all(&parent).map_err(|e| format!("Could not reach that folder: {}", e))?;
 
@@ -187,7 +189,8 @@ pub async fn create_genre_folder(base: String, parent_rel: String, name: String)
 
 /// Deletes one folder inside the library, with everything under it.
 #[tauri::command]
-pub async fn delete_library_entry(base: String, rel_path: String) -> Result<(), String> {
+pub async fn delete_library_entry(app: tauri::AppHandle, base: String, rel_path: String) -> Result<(), String> {
+    crate::guard::checked(&app, &base)?;
     if rel_path.trim().is_empty() {
         return Err("Refusing to delete the whole songs folder".into());
     }
@@ -208,7 +211,8 @@ const JACKET_EXTS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
 /// format it actually is, and removes any previous one so two `default.*` files cannot
 /// disagree about which the game should use. Returns the new file name.
 #[tauri::command]
-pub async fn set_folder_jacket(base: String, rel_path: String, source: String) -> Result<String, String> {
+pub async fn set_folder_jacket(app: tauri::AppHandle, base: String, rel_path: String, source: String) -> Result<String, String> {
+    crate::guard::checked(&app, &base)?;
     let dir = resolve_inside(Path::new(&base), &rel_path)?;
     if !dir.is_dir() {
         return Err("That folder is not on disk yet".into());
@@ -356,7 +360,8 @@ fn with_preimage(text: &str, name: &str) -> String {
 /// Copies a chosen image into a chart folder as its jacket and points every .tja there
 /// at it. Returns the file name written.
 #[tauri::command]
-pub async fn set_song_preimage(base: String, rel_path: String, source: String) -> Result<String, String> {
+pub async fn set_song_preimage(app: tauri::AppHandle, base: String, rel_path: String, source: String) -> Result<String, String> {
+    crate::guard::checked(&app, &base)?;
     let dir = resolve_inside(Path::new(&base), &rel_path)?;
     if !dir.is_dir() {
         return Err("That chart is not on disk".into());
@@ -577,10 +582,12 @@ fn import_one(
 
 #[tauri::command]
 pub async fn import_chart_archives(
+    app: tauri::AppHandle,
     base: String,
     rel_path: String,
     archives: Vec<String>,
 ) -> Result<ImportReport, String> {
+    crate::guard::checked(&app, &base)?;
     let dest_parent = resolve_inside(Path::new(&base), &rel_path)?;
     if !dest_parent.is_dir() {
         return Err("That folder is not on disk yet".into());

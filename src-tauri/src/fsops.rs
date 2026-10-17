@@ -57,7 +57,10 @@ fn merge_move(src: &Path, dest: &Path) -> Result<(), String> {
 /// Moves the CONTENT of `src` into `dest` (merging into existing folders, replacing
 /// existing files), then removes the emptied `src`.
 #[tauri::command]
-pub async fn merge_move_dir(src: String, dest: String) -> Result<(), String> {
+pub async fn merge_move_dir(app: tauri::AppHandle, src: String, dest: String) -> Result<(), String> {
+    // Both ends are written to: the source is emptied and removed
+    crate::guard::checked(&app, &src)?;
+    crate::guard::checked(&app, &dest)?;
     tokio::task::spawn_blocking(move || merge_move_dir_sync(&src, &dest))
         .await
         .map_err(|e| format!("Task failed: {e}"))?

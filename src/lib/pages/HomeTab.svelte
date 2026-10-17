@@ -398,8 +398,7 @@
             sdkChannel.onmessage = (line) => sdkLines.push(line);
             let sdkExitCode = -1;
             try {
-                sdkExitCode = await invoke<number>('run_streamed', {
-                    program: 'dotnet',
+                sdkExitCode = await invoke<number>('run_dotnet', {
                     args: ['--list-sdks'],
                     cwd: null,
                     onOutput: sdkChannel
@@ -486,8 +485,7 @@
             // path limit. Both output folders sit directly in the build folder instead.
             const publishDir = await path.join(tmpDir, 'p');
             const outDir = await path.join(tmpDir, 'b') + path.sep();
-            const exitCode = await invoke<number>('run_streamed', {
-                program: 'dotnet',
+            const exitCode = await invoke<number>('run_dotnet', {
                 args: ['publish', 'OpenTaiko/OpenTaiko.csproj', '--configuration', 'Release', '--self-contained', '-p:PublishSingleFile=true', '--runtime', rid, '--output', publishDir, `-p:OutDir=${outDir}`],
                 cwd: srcFolder,
                 onOutput: logChannel
@@ -558,7 +556,7 @@
         if (!current) return;
         try {
             const appPath = await path.join(current.path, "OpenTaiko");
-            await invoke('execute_external_app', { os: optk_OS, path: appPath });
+            await invoke('execute_external_app', { path: appPath });
         } catch (error) {
             TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
         }

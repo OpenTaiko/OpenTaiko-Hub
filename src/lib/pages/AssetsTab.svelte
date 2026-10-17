@@ -36,7 +36,7 @@
     import { getContext } from 'svelte';
     const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
-    import { GetTmpPath } from "$lib/utils/path";
+    import { GetTmpPath, IsPlainRelPath } from "$lib/utils/path";
     import { activeInstance, instanceVersions } from "$lib/stores/instances";
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -210,6 +210,15 @@
         const assetRelpath = Field(assetObj, assetPrefix, 'Folder');
         const assetSize = SizeMb(assetObj, assetPrefix);
         const assetVersion = Field(assetObj, assetPrefix, 'Version');
+
+        // Catalog paths decide where files are written, so a malformed one is refused
+        // before anything is downloaded
+        const catalogPaths = assetType === 'Skins' ? [assetRelpath] : [assetRelpath, ...(assetObj as CharaInfo).charaFilesPath];
+        if (!catalogPaths.every(IsPlainRelPath)) {
+            console.error(`Refusing catalog paths of ${assetRelpath}:`, catalogPaths);
+            TriggerError(get(_)('dl.error.failed_abort'));
+            return;
+        }
 
         assetDLProgress[assetType][assetRelpath] = 0;
 

@@ -7,7 +7,7 @@
     import { Toast } from '@skeletonlabs/skeleton-svelte';
     import { invoke } from '@tauri-apps/api/core';
     import { error as logError, warn as logWarn } from '@tauri-apps/plugin-log';
-    import { download } from "@tauri-apps/plugin-upload";
+    import { download } from '$lib/utils/download';
     import { readTextFile } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
 

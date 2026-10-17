@@ -1,45 +1,20 @@
 {
-    "identifier": "migrated3",
-    "description": "permissions that were migrated from v1",
+    "identifier": "fs",
+    "description": "File access with no path granted here: guard.rs adds the Hub's folders and the registered instances at startup, and the dialog plugin adds what the user picks. Rust commands check paths against the same scope.",
     "local": true,
     "windows": ["main"],
     "permissions": [
-      {
-        "identifier": "fs:default",
-        "allow": [
-          { "path": "**/*" },
-          { "path": "**/.*" },
-          { "path": "**/.*/**" }
-        ]
-      },
-      {
-        "identifier": "fs:allow-copy-file",
-        "allow": [
-          { "path": "**/*" },
-          { "path": "**/.*" },
-          { "path": "**/.*/**" }
-        ]
-      },
-      {
-        "identifier": "fs:allow-stat",
-        "allow": [
-          { "path": "**/*" },
-          { "path": "**/.*" },
-          { "path": "**/.*/**" }
-        ]
-      },
-      {
-        "identifier": "fs:write-all",
-        "allow": [
-          { "path": "**/*" },
-          { "path": "**/.*" },
-          { "path": "**/.*/**" }
-        ]
-      },
       "fs:default",
+      "fs:allow-exists",
+      "fs:allow-read-dir",
+      "fs:allow-read-file",
+      "fs:allow-read-text-file",
+      "fs:allow-mkdir",
+      "fs:allow-write-file",
+      "fs:allow-write-text-file",
       "fs:allow-copy-file",
-      "fs:allow-stat",
-      "fs:write-all",
+      "fs:allow-remove",
+      "fs:allow-rename",
       "core:path:default",
       "core:event:allow-listen",
       "core:event:allow-unlisten"

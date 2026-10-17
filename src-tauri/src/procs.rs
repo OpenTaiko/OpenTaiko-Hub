@@ -35,13 +35,35 @@ fn augmented_tool_path(base_path: &str, home: Option<&str>) -> String {
     dirs.join(":")
 }
 
+/// The only commands the page may run: listing the installed SDKs, and publishing the
+/// game from source.
+fn allowed_dotnet_args(args: &[String]) -> bool {
+    matches!(args.first().map(String::as_str), Some("--list-sdks") if args.len() == 1)
+        || args.first().map(String::as_str) == Some("publish")
+}
+
+/// Runs `dotnet` and streams its output. The program is fixed: this used to accept any
+/// program and arguments, which made it a way to start anything from the page.
 #[tauri::command]
-pub async fn run_streamed(
-    program: String,
+pub async fn run_dotnet(
+    app: tauri::AppHandle,
     args: Vec<String>,
     cwd: Option<String>,
     on_output: Channel<String>,
 ) -> Result<i32, String> {
+    if !allowed_dotnet_args(&args) {
+        return Err(format!("Refusing to run dotnet {}", args.join(" ")));
+    }
+    // A publish builds whatever project sits in its folder, so it must be one the Hub
+    // downloaded into its own build folder
+    match &cwd {
+        Some(dir) => {
+            crate::guard::checked(&app, dir)?;
+        }
+        None if args[0] == "publish" => return Err("A build needs its source folder".into()),
+        None => {}
+    }
+    let program = "dotnet".to_string();
     tokio::task::spawn_blocking(move || {
         let mut cmd = Command::new(&program);
         cmd.args(&args)
@@ -98,6 +120,25 @@ pub async fn run_streamed(
     })
     .await
     .map_err(|e| format!("Task failed: {e}"))?
+}
+
+#[cfg(test)]
+mod arg_tests {
+    use super::allowed_dotnet_args;
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| s.to_string()).collect()
+    }
+
+    #[test]
+    fn only_the_sdk_listing_and_a_publish_are_allowed() {
+        assert!(allowed_dotnet_args(&args(&["--list-sdks"])));
+        assert!(allowed_dotnet_args(&args(&["publish", "OpenTaiko/OpenTaiko.csproj"])));
+        assert!(!allowed_dotnet_args(&args(&["--list-sdks", "extra"])));
+        assert!(!allowed_dotnet_args(&args(&["run"])));
+        assert!(!allowed_dotnet_args(&args(&["exec", "payload.dll"])));
+        assert!(!allowed_dotnet_args(&[]));
+    }
 }
 
 #[cfg(all(test, unix))]

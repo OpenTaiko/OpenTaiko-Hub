@@ -3,7 +3,7 @@
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
     import { open } from '@tauri-apps/plugin-dialog';
-    import { openPath } from '@tauri-apps/plugin-opener';
+    import { OpenFolder as OpenFolderPath } from '$lib/utils/path';
 
     import {
         instances,
@@ -41,7 +41,9 @@
 
     const DoAttach = async () => {
         try {
-            const dir = await open({ directory: true, multiple: false, title: get(_)('instances.attach') });
+            // recursive: the dialog grants the Hub access to the picked folder, and an
+            // instance is worked on all the way down
+            const dir = await open({ directory: true, recursive: true, multiple: false, title: get(_)('instances.attach') });
             if (!dir) return;
             const instance = await attachInstance(dir);
             await refreshInstanceVersion(instance.id);
@@ -76,7 +78,7 @@
 
     const OpenFolder = async (inst: Instance) => {
         try {
-            await openPath(inst.path);
+            await OpenFolderPath(inst.path);
         } catch (error) {
             TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
         }

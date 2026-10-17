@@ -5,7 +5,9 @@ mod library;
 mod assetscan;
 mod binver;
 mod configini;
+mod download;
 mod fsops;
+mod guard;
 mod health;
 mod migrate;
 mod procs;
@@ -17,6 +19,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
+use tauri_plugin_opener::OpenerExt;
 use tokio::task;
 use zip::ZipArchive;
 
@@ -37,12 +40,22 @@ struct GameExit {
     stderr: String,
 }
 
+/// The game binary's name without extension. Launching is limited to it, inside a folder
+/// the Hub manages, so this command cannot be used to start anything else.
+const GAME_BINARY: &str = "OpenTaiko";
+
+/// Launches the game of an instance. `path` is `<instance>/OpenTaiko`; the extension is
+/// added here on Windows.
 #[tauri::command]
-fn execute_external_app(os: String, path: String, app_handle: AppHandle) -> Result<(), String> {
-    let full_path = if os == "Win" {
-        format!("{}.exe", path)
+fn execute_external_app(path: String, app_handle: AppHandle) -> Result<(), String> {
+    let path = guard::checked(&app_handle, &path)?;
+    if path.file_name().and_then(|n| n.to_str()) != Some(GAME_BINARY) {
+        return Err(format!("Refusing to launch {}", path.display()));
+    }
+    let full_path = if cfg!(windows) {
+        path.with_extension("exe").to_string_lossy().into_owned()
     } else {
-        path
+        path.to_string_lossy().into_owned()
     };
 
     // Extract the directory from the full path
@@ -143,6 +156,8 @@ async fn unzip_and_get_first_folder(
     zip_path: String,
     app_handle: AppHandle,
 ) -> Result<String, String> {
+    // The archive is extracted next to itself
+    guard::checked(&app_handle, &zip_path)?;
     let zip_path_clone = zip_path.clone();
 
     task::spawn_blocking(move || {
@@ -325,6 +340,28 @@ fn log_directory(dir: tauri::State<'_, LogDirectory>) -> Option<String> {
     dir.0.as_ref().map(|d| d.display().to_string())
 }
 
+/// Opens a folder in the system file manager. Only folders are accepted: handing a file
+/// to the system opener runs it when it is a program. The page has no opener permission
+/// for paths, so this is the only way it can open one.
+#[tauri::command]
+fn open_folder(
+    path: String,
+    app_handle: AppHandle,
+    logs: tauri::State<'_, LogDirectory>,
+) -> Result<(), String> {
+    let is_log_dir = logs.0.as_deref().is_some_and(|d| migrate::is_same_dir(d, Path::new(&path)));
+    if !is_log_dir {
+        guard::checked(&app_handle, &path)?;
+    }
+    if !Path::new(&path).is_dir() {
+        return Err(format!("{} is not a folder", path));
+    }
+    app_handle
+        .opener()
+        .open_path(path, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
 /// Outcome of the descriptor-limit change, reported once the logger exists.
 #[cfg(target_os = "linux")]
 fn raise_open_file_limit() -> Option<String> {
@@ -466,21 +503,22 @@ fn main() {
                 .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(2))
                 .build(),
         )
-        .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_upload::init())
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             unzip_and_get_first_folder,
             execute_external_app,
+            open_folder,
             binver::get_game_version,
             scan::scan_songs,
             assetscan::scan_asset_versions,
-            procs::run_streamed,
+            procs::run_dotnet,
+            download::download_file,
+            guard::allow_build_dir,
+            guard::create_instance_dir,
             fsops::merge_move_dir,
             migrate::plan_migration,
             migrate::paths_are_same_dir,
@@ -518,6 +556,8 @@ fn main() {
                 log::info!("{}", outcome);
             }
             health::spawn_watcher(ui_health.clone());
+            guard::init(app.handle());
+            std::thread::spawn(guard::sweep_stale_tmp);
             Ok(())
         })
         .build(tauri::generate_context!());
