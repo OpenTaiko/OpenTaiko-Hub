@@ -1,6 +1,6 @@
 import { resourceDir, documentDir, homeDir, appConfigDir, tempDir, join } from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
-import { invoke } from '@tauri-apps/api/core';
+import { ipc } from '$lib/ipc';
 import type { HubOS } from '$lib/types';
 
 // These folders cannot change while the Hub runs, and each lookup is a call to the
@@ -86,7 +86,7 @@ export const GetBuildPath = async (): Promise<string> => {
         const fallback = await join(await tempDir(), `otk-${id}`);
         if (fallback.length < preferred.length) {
             // The Hub has no access to the temp folder until this one is allowed
-            await invoke('allow_build_dir', { path: fallback });
+            await ipc.allowBuildDir(fallback);
             return fallback;
         }
     } catch (error) {
@@ -105,7 +105,7 @@ export const IsPlainRelPath = (p: string): boolean =>
 // Opens a folder in the system file manager. Folders only: the page has no permission to
 // open paths itself, since opening a program's path runs it.
 export const OpenFolder = async (path: string): Promise<void> => {
-    await invoke('open_folder', { path });
+    await ipc.openFolder(path);
 }
 
 // Pre-0.2 single-instance game folder, adopted as the first instance on upgrade

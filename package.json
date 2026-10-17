@@ -7,10 +7,10 @@
 		"build": "vite build",
 		"preview": "vite preview",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --diagnostic-sources js,svelte",
-		"tauri": "tauri"
+		"tauri": "tauri",
+		"test": "vitest run"
 	},
 	"devDependencies": {
-		"@sveltejs/adapter-auto": "^3.3.1",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.70.3",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
@@ -21,7 +21,8 @@
 		"svelte-check": "^4.7.6",
 		"tailwindcss": "^4.3.3",
 		"typescript": "^5.9.3",
-		"vite": "^8.2.2"
+		"vite": "^8.2.2",
+		"vitest": "^5.0.2"
 	},
 	"type": "module",
 	"dependencies": {
@@ -39,21 +40,9 @@
 		"@tauri-apps/plugin-log": "~2.9.2",
 		"@tauri-apps/plugin-opener": "~2.5.5",
 		"@tauri-apps/plugin-os": "~2.3.2",
-		"axios": "^1.15.0",
-		"axios-tauri-http-adapter": "^1.1.2",
 		"dompurify": "^3.4.16",
-		"js-file-downloader": "^1.1.25",
-		"js-md5": "^0.8.3",
-		"jszip": "^3.10.1",
-		"lite-youtube-embed": "^0.3.4",
 		"marked": "^14.1.4",
-		"node-fetch": "^3.3.2",
-		"node-fetch-progress": "^1.0.2",
-		"rollup": "^4.60.1",
 		"sql.js": "^1.14.1",
-		"svelte-i18n": "^4.0.1",
-		"tauri": "^0.15.0",
-		"tauri-xhr": "^0.1.2",
-		"wget-improved": "^3.4.0"
+		"svelte-i18n": "^4.0.1"
 	}
 }

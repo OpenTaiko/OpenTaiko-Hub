@@ -5,7 +5,7 @@
 
     import { onMount, onDestroy, setContext, type Snippet } from 'svelte';
     import { Toast } from '@skeletonlabs/skeleton-svelte';
-    import { invoke } from '@tauri-apps/api/core';
+    import { ipc } from '$lib/ipc';
     import { error as logError, warn as logWarn } from '@tauri-apps/plugin-log';
     import { download } from '$lib/utils/download';
     import { readTextFile } from '@tauri-apps/plugin-fs';
@@ -142,7 +142,7 @@ ${event.error?.stack ?? ''}`).catch(() => {});
     // running, the page process has died and the window is blank — the backend logs that
     // so a bug report carries a cause instead of just "it crashed".
     let heartbeat: ReturnType<typeof setInterval> | null = null;
-    const sendHeartbeat = () => { invoke('ui_heartbeat').catch(() => {}); };
+    const sendHeartbeat = () => { ipc.uiHeartbeat().catch(() => {}); };
 
     onDestroy(() => {
         if (heartbeat !== null) clearInterval(heartbeat);

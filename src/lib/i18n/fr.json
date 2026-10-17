@@ -8,16 +8,11 @@
   "dl": {
     "error": {
       "failed_abort": "Échec du téléchargement, abandon"
-    },
-    "warn": {
-      "failed_retry": "Échec du téléchargement, nouvelle tentative... ({attempt}/{max})"
     }
   },
   "nav": {
     "home": "Accueil",
     "songlist": "Chansons",
-    "skins": "Skins",
-    "docs": "Docs",
     "tools": "Outils",
     "secrets": "Secrets",
     "information": "Informations",
@@ -26,8 +21,6 @@
     "tooltip": {
       "home": "Gérez OpenTaiko et l'OpenTaiko Hub.",
       "songlist": "Mettez à jour vos chansons OpenTaiko et téléchargez les plus récentes.",
-      "skins": "Obtenez les derniers skins OpenTaiko et les ressources associées.",
-      "docs": "Parcourez la documentation incluse dans le build OpenTaiko sélectionné.",
       "tools": "Des outils pour améliorer votre expérience OpenTaiko.",
       "secrets": "???",
       "information": "Pour consulter les changelogs, la documentation, ou en cas de problème.",
@@ -88,11 +81,7 @@
     },
     "button": {
       "reload": "Recharger",
-      "download": "Télécharger OpenTaiko",
-      "download_stable": "Télécharger le build Stable",
-      "download_experimental": "Télécharger le build Expérimental",
       "launch": "Lancer OpenTaiko",
-      "explorer": "Ouvrir dans l'explorateur",
       "update": "Mettre à jour OpenTaiko",
       "redownload": "Retélécharger OpenTaiko",
       "rebuild": "Recompiler",
@@ -303,57 +292,27 @@
         "updates_waiting": "{count} à mettre à jour",
         "search": "Rechercher chansons et dossiers..."
     },
-    "col": {
-      "name": "Nom de la chanson",
-      "folder": "Dossier",
-      "difficulties": "Difficultés",
-      "charter": "Charteur : ",
-      "size": "Taille",
-      "status": "Statut"
-    },
-    "filter": {
-      "song": "Rechercher une chanson...",
-      "folder": "Rechercher un dossier..."
-    },
     "status": {
       "installed_short": "Installée",
-      "scanning": "Analyse...",
       "not_downloaded": "Non téléchargée",
       "up_to_date": "À jour",
       "outdated": "Obsolète"
     },
     "button": {
-      "bulk_download": "Tout télécharger",
-      "download": "Télécharger",
-      "redownload": "Retélécharger",
       "update": "Mettre à jour",
       "open_folder": "Ouvrir le dossier des chansons"
     },
-    "view": {
-      "list": "Liste",
-      "tree": "Arborescence"
-    },
     "scan": {
-      "progress": "Analyse des chansons... ({count} trouvées)",
-      "done": "{count} chansons dans la bibliothèque"
+      "progress": "Analyse des chansons... ({count} trouvées)"
     },
     "tree": {
       "show_more": "Afficher {count} de plus",
       "get_n": "Télécharger {count}",
       "nothing_here": "Rien ici ne correspond au filtre actuel.",
       "installed_of": "{installed} / {total} installés",
-      "library_total": "{installed} chansons installées sur {total}",
-      "legend_available": "Estompé = disponible au téléchargement",
-      "show_available": "Afficher les chansons téléchargeables",
       "no_match": "Aucune chanson ne correspond à cette recherche.",
       "open_folder_tip": "Ouvrir ce dossier",
-      "download_folder_tip": "Télécharger les {count} chansons manquantes de ce dossier",
-      "soundtrack": "Bande-son OpenTaiko",
-      "custom": "Personnalisé",
-      "songs_count": "{count} chansons",
-      "empty": "Aucune chanson trouvée dans la bibliothèque pour le moment.",
-      "spicy": "Épicé",
-      "sweet": "Doux"
+      "custom": "Personnalisé"
     },
     "migrate": {
       "banner": "{count} dossier(s) de chansons trouvé(s) dans « {instance} ». Les transférer vers la bibliothèque de chansons partagée ?",
@@ -384,9 +343,7 @@
       "scan_failed": "Échec de l'analyse de la bibliothèque de chansons : {error}"
     },
     "success": {
-      "all_up_to_date": "Toutes les chansons sont déjà à jour",
-      "download_complete": "Téléchargement terminé",
-      "download_nb": "Chanson {nb} sur {total} téléchargée"
+      "download_complete": "Téléchargement terminé"
     },
     "duplicates": {
       "banner": "{count} dossier(s) vides en double dans « {instance} ». Les supprimer ?",
@@ -427,8 +384,7 @@
     },
     "success": {
       "all_up_to_date": "Tous les {type} sont déjà à jour",
-      "download_complete": "Téléchargement terminé",
-      "download_nb": "{type} : {nb} sur {total} téléchargé(s)"
+      "download_complete": "Téléchargement terminé"
     }
   },
   "asset_cell": {
@@ -476,7 +432,6 @@
     "tab": {
       "changelog_game": "Changelogs (Jeu)",
       "changelog_hub": "Changelogs (Hub)",
-      "documentation": "Documentation",
       "troubleshooting": "Dépannage",
       "credits": "Crédits"
     },
@@ -630,10 +585,6 @@
     },
     "debug": {
       "disable_btn": "Désactiver le mode debug"
-    },
-    "error": {
-      "theme_json": "Le fichier theme.json (ou le dossier settings) n'existe pas ou est corrompu !<br>Veuillez réinstaller l'OpenTaiko Hub pour corriger cela.",
-      "thememode_json": "Le fichier thememode.json (ou le dossier settings) n'existe pas ou est corrompu !<br>Veuillez réinstaller l'OpenTaiko Hub pour corriger cela."
     },
     "warn": {
       "same_theme": "Le thème sélectionné est identique au thème actuel.",

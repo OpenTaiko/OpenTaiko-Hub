@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { ipc } from '$lib/ipc';
     // Dependencies
     import { onMount } from 'svelte';
     import { Tabs, Accordion } from '@skeletonlabs/skeleton-svelte';
@@ -6,7 +7,6 @@
     import { marked } from 'marked';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
-    import { invoke } from '@tauri-apps/api/core';
     import { OpenFolder } from '$lib/utils/path';
     import { SafeHtml } from '$lib/utils/sanitize';
 
@@ -18,7 +18,7 @@
     let logDir = $state<string | null>(null);
     onMount(async () => {
         try {
-            logDir = await invoke<string | null>('log_directory');
+            logDir = await ipc.logDirectory();
         } catch {
             logDir = null;
         }

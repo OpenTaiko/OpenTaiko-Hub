@@ -8,16 +8,11 @@
   "dl": {
     "error": {
       "failed_abort": "Download mislukt, wordt afgebroken"
-    },
-    "warn": {
-      "failed_retry": "Download mislukt, opnieuw proberen... ({attempt}/{max})"
     }
   },
   "nav": {
     "home": "Home",
     "songlist": "Songlijst",
-    "skins": "Skins",
-    "docs": "Docs",
     "tools": "Tools",
     "secrets": "Geheimen",
     "information": "Informatie",
@@ -26,8 +21,6 @@
     "tooltip": {
       "home": "Beheer OpenTaiko en de OpenTaiko Hub.",
       "songlist": "Werk je OpenTaiko-nummers bij en download de nieuwste.",
-      "skins": "Download de nieuwste OpenTaiko-skins en bijbehorende assets.",
-      "docs": "Blader door de documentatie van de geselecteerde OpenTaiko-build.",
       "tools": "Tools die je OpenTaiko-ervaring kunnen verbeteren.",
       "secrets": "???",
       "information": "Voor changelogs, documentatie of probleemoplossing.",
@@ -88,11 +81,7 @@
     },
     "button": {
       "reload": "Herladen",
-      "download": "OpenTaiko downloaden",
-      "download_stable": "Stabiel downloaden",
-      "download_experimental": "Experimenteel downloaden",
       "launch": "OpenTaiko starten",
-      "explorer": "Openen in Verkenner",
       "update": "OpenTaiko bijwerken",
       "redownload": "OpenTaiko opnieuw downloaden",
       "rebuild": "Opnieuw bouwen",
@@ -303,57 +292,27 @@
         "updates_waiting": "{count} bij te werken",
         "search": "Zoek nummers en mappen..."
     },
-    "col": {
-      "name": "Titel",
-      "folder": "Map",
-      "difficulties": "Moeilijkheidsgraden",
-      "charter": "Charter: ",
-      "size": "Grootte",
-      "status": "Status"
-    },
-    "filter": {
-      "song": "Nummer zoeken...",
-      "folder": "Map zoeken..."
-    },
     "status": {
       "installed_short": "Geïnstalleerd",
-      "scanning": "Scannen...",
       "not_downloaded": "Niet gedownload",
       "up_to_date": "Up-to-date",
       "outdated": "Verouderd"
     },
     "button": {
-      "bulk_download": "Bulkdownload",
-      "download": "Downloaden",
-      "redownload": "Opnieuw downloaden",
       "update": "Bijwerken",
       "open_folder": "Muziekmap openen"
     },
-    "view": {
-      "list": "Lijst",
-      "tree": "Boomstructuur"
-    },
     "scan": {
-      "progress": "Nummers scannen... ({count} gevonden)",
-      "done": "{count} nummers in de bibliotheek"
+      "progress": "Nummers scannen... ({count} gevonden)"
     },
     "tree": {
       "show_more": "Nog {count} tonen",
       "get_n": "{count} ophalen",
       "nothing_here": "Niets hier komt overeen met het huidige filter.",
       "installed_of": "{installed} / {total} geïnstalleerd",
-      "library_total": "{installed} van {total} nummers geïnstalleerd",
-      "legend_available": "Vervaagd = beschikbaar om te downloaden",
-      "show_available": "Downloadbare nummers tonen",
       "no_match": "Geen nummers komen overeen met deze zoekopdracht.",
       "open_folder_tip": "Deze map openen",
-      "download_folder_tip": "De {count} ontbrekende nummers in deze map downloaden",
-      "soundtrack": "OpenTaiko-soundtrack",
-      "custom": "Aangepast",
-      "songs_count": "{count} nummers",
-      "empty": "Nog geen nummers gevonden in de bibliotheek.",
-      "spicy": "Pittig",
-      "sweet": "Zoet"
+      "custom": "Aangepast"
     },
     "migrate": {
       "banner": "{count} muziekmap(pen) gevonden in \"{instance}\". Overzetten naar de gedeelde muziekbibliotheek?",
@@ -384,9 +343,7 @@
       "scan_failed": "Scannen van de muziekbibliotheek mislukt: {error}"
     },
     "success": {
-      "all_up_to_date": "Alle nummers zijn al up-to-date",
-      "download_complete": "Download voltooid",
-      "download_nb": "Nummer {nb} van {total} gedownload"
+      "download_complete": "Download voltooid"
     },
     "duplicates": {
       "banner": "{count} lege dubbele map(pen) in \"{instance}\". Verwijderen?",
@@ -427,8 +384,7 @@
     },
     "success": {
       "all_up_to_date": "Alle {type} zijn al up-to-date",
-      "download_complete": "Download voltooid",
-      "download_nb": "{nb} van {total} {type} gedownload"
+      "download_complete": "Download voltooid"
     }
   },
   "asset_cell": {
@@ -476,7 +432,6 @@
     "tab": {
       "changelog_game": "Changelogs (Spel)",
       "changelog_hub": "Changelogs (Hub)",
-      "documentation": "Documentatie",
       "troubleshooting": "Probleemoplossing",
       "credits": "Credits"
     },
@@ -630,10 +585,6 @@
     },
     "debug": {
       "disable_btn": "Debugmodus uitschakelen"
-    },
-    "error": {
-      "theme_json": "Het bestand theme.json (of de instellingenmap) bestaat niet of is beschadigd!<br>Installeer de OpenTaiko Hub opnieuw om dit op te lossen.",
-      "thememode_json": "Het bestand thememode.json (of de instellingenmap) bestaat niet of is beschadigd!<br>Installeer de OpenTaiko Hub opnieuw om dit op te lossen."
     },
     "warn": {
       "same_theme": "Het geselecteerde thema is hetzelfde als het huidige thema.",

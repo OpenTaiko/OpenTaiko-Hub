@@ -15,6 +15,16 @@ use zip::ZipArchive;
 
 use crate::scan::{decode_text, parse_unique_id};
 
+/// Runs file work on tokio's blocking pool. Deleting a genre folder or reading a whole
+/// archive on an async worker stalled the downloads sharing those workers.
+pub(crate) async fn blocking<T: Send + 'static>(
+    work: impl FnOnce() -> Result<T, String> + Send + 'static,
+) -> Result<T, String> {
+    tokio::task::spawn_blocking(work)
+        .await
+        .map_err(|e| format!("Task failed: {e}"))?
+}
+
 /// Joins `rel` onto `base` and refuses anything that leaves it.
 ///
 /// `canonicalize` is not used for the result because the target may not exist yet; the
@@ -116,92 +126,104 @@ fn directive(text: &str, key: &str) -> Option<String> {
 
 #[tauri::command]
 pub async fn read_box_def(base: String, rel_path: String) -> Result<BoxDef, String> {
-    let dir = resolve_inside(Path::new(&base), &rel_path)?;
-    if !dir.is_dir() {
-        return Ok(BoxDef { folder_exists: false, file_exists: false, text: String::new(), title: None });
-    }
-    let file = dir.join("box.def");
-    match fs::read(&file) {
-        Ok(bytes) => {
-            let text = decode_text(&bytes);
-            let title = directive(&text, "#TITLE:");
-            Ok(BoxDef { folder_exists: true, file_exists: true, text, title })
+    blocking(move || {
+        let dir = resolve_inside(Path::new(&base), &rel_path)?;
+        if !dir.is_dir() {
+            return Ok(BoxDef { folder_exists: false, file_exists: false, text: String::new(), title: None });
         }
-        Err(_) => Ok(BoxDef { folder_exists: true, file_exists: false, text: String::new(), title: None }),
-    }
+        let file = dir.join("box.def");
+        match fs::read(&file) {
+            Ok(bytes) => {
+                let text = decode_text(&bytes);
+                let title = directive(&text, "#TITLE:");
+                Ok(BoxDef { folder_exists: true, file_exists: true, text, title })
+            }
+            Err(_) => Ok(BoxDef { folder_exists: true, file_exists: false, text: String::new(), title: None }),
+        }
+    })
+    .await
 }
 
 #[tauri::command]
 pub async fn write_box_def(app: tauri::AppHandle, base: String, rel_path: String, text: String) -> Result<(), String> {
-    crate::guard::checked(&app, &base)?;
-    let dir = resolve_inside(Path::new(&base), &rel_path)?;
-    if !dir.is_dir() {
-        return Err("That folder is not on disk yet".into());
-    }
-    let file = dir.join("box.def");
+    blocking(move || {
+        crate::guard::checked(&app, &base)?;
+        let dir = resolve_inside(Path::new(&base), &rel_path)?;
+        if !dir.is_dir() {
+            return Err("That folder is not on disk yet".into());
+        }
+        let file = dir.join("box.def");
 
-    // Keep the encoding the file already had: the game reads Shift_JIS box.def files and
-    // rewriting one as UTF-8 would turn its Japanese title into mojibake in-game.
-    let was_shift_jis = fs::read(&file)
-        .map(|bytes| std::str::from_utf8(&bytes).is_err())
-        .unwrap_or(false);
+        // Keep the encoding the file already had: the game reads Shift_JIS box.def files and
+        // rewriting one as UTF-8 would turn its Japanese title into mojibake in-game.
+        let was_shift_jis = fs::read(&file)
+            .map(|bytes| std::str::from_utf8(&bytes).is_err())
+            .unwrap_or(false);
 
-    let bytes = if was_shift_jis {
-        encoding_rs::SHIFT_JIS.encode(&text).0.into_owned()
-    } else {
-        text.into_bytes()
-    };
-    fs::write(&file, bytes).map_err(|e| format!("Could not write box.def: {}", e))
+        let bytes = if was_shift_jis {
+            encoding_rs::SHIFT_JIS.encode(&text).0.into_owned()
+        } else {
+            text.into_bytes()
+        };
+        fs::write(&file, bytes).map_err(|e| format!("Could not write box.def: {}", e))
+    })
+    .await
 }
 
 // ── Folders ─────────────────────────────────────────────────────────────────────────
 
 #[tauri::command]
 pub async fn create_genre_folder(app: tauri::AppHandle, base: String, parent_rel: String, name: String) -> Result<String, String> {
-    crate::guard::checked(&app, &base)?;
-    let parent = resolve_inside(Path::new(&base), &parent_rel)?;
-    fs::create_dir_all(&parent).map_err(|e| format!("Could not reach that folder: {}", e))?;
+    blocking(move || {
+        crate::guard::checked(&app, &base)?;
+        let parent = resolve_inside(Path::new(&base), &parent_rel)?;
+        fs::create_dir_all(&parent).map_err(|e| format!("Could not reach that folder: {}", e))?;
 
-    let dir = unique_dir(&parent, &sanitize_name(&name));
-    fs::create_dir(&dir).map_err(|e| format!("Could not create the folder: {}", e))?;
+        let dir = unique_dir(&parent, &sanitize_name(&name));
+        fs::create_dir(&dir).map_err(|e| format!("Could not create the folder: {}", e))?;
 
-    // A genre folder without a box.def shows in-game as its raw folder name, so give it
-    // one straight away using the name the user typed.
-    // #GENRE drives the game's genre unlockables, so it starts as the displayed name;
-    // a white #BOXCOLOR is a neutral default rather than whatever the game falls back to.
-    let title = sanitize_name(&name);
-    let _ = fs::write(
-        dir.join("box.def"),
-        format!(
-            "#TITLE:{}\r\n#GENRE:{}\r\n#BOXCOLOR:#ffffff\r\n",
-            title, title
-        ),
-    );
+        // A genre folder without a box.def shows in-game as its raw folder name, so give it
+        // one straight away using the name the user typed.
+        // #GENRE drives the game's genre unlockables, so it starts as the displayed name;
+        // a white #BOXCOLOR is a neutral default rather than whatever the game falls back to.
+        let title = sanitize_name(&name);
+        let _ = fs::write(
+            dir.join("box.def"),
+            format!(
+                "#TITLE:{}\r\n#GENRE:{}\r\n#BOXCOLOR:#ffffff\r\n",
+                title, title
+            ),
+        );
 
-    let root = Path::new(&base)
-        .canonicalize()
-        .map_err(|e| format!("The songs folder is unreachable: {}", e))?;
-    Ok(dir
-        .strip_prefix(&root)
-        .map(|p| p.to_string_lossy().replace('\\', "/"))
-        .unwrap_or_else(|_| title))
+        let root = Path::new(&base)
+            .canonicalize()
+            .map_err(|e| format!("The songs folder is unreachable: {}", e))?;
+        Ok(dir
+            .strip_prefix(&root)
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_else(|_| title))
+    })
+    .await
 }
 
 /// Deletes one folder inside the library, with everything under it.
 #[tauri::command]
 pub async fn delete_library_entry(app: tauri::AppHandle, base: String, rel_path: String) -> Result<(), String> {
-    crate::guard::checked(&app, &base)?;
-    if rel_path.trim().is_empty() {
-        return Err("Refusing to delete the whole songs folder".into());
-    }
-    let dir = resolve_inside(Path::new(&base), &rel_path)?;
-    if !dir.exists() {
-        return Ok(());
-    }
-    if !dir.is_dir() {
-        return fs::remove_file(&dir).map_err(|e| format!("Could not delete: {}", e));
-    }
-    fs::remove_dir_all(&dir).map_err(|e| format!("Could not delete the folder: {}", e))
+    blocking(move || {
+        crate::guard::checked(&app, &base)?;
+        if rel_path.trim().is_empty() {
+            return Err("Refusing to delete the whole songs folder".into());
+        }
+        let dir = resolve_inside(Path::new(&base), &rel_path)?;
+        if !dir.exists() {
+            return Ok(());
+        }
+        if !dir.is_dir() {
+            return fs::remove_file(&dir).map_err(|e| format!("Could not delete: {}", e));
+        }
+        fs::remove_dir_all(&dir).map_err(|e| format!("Could not delete the folder: {}", e))
+    })
+    .await
 }
 
 /// Image formats the game reads for a genre's box art.
@@ -212,36 +234,39 @@ const JACKET_EXTS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
 /// disagree about which the game should use. Returns the new file name.
 #[tauri::command]
 pub async fn set_folder_jacket(app: tauri::AppHandle, base: String, rel_path: String, source: String) -> Result<String, String> {
-    crate::guard::checked(&app, &base)?;
-    let dir = resolve_inside(Path::new(&base), &rel_path)?;
-    if !dir.is_dir() {
-        return Err("That folder is not on disk yet".into());
-    }
-
-    let src = PathBuf::from(&source);
-    let ext = src
-        .extension()
-        .map(|e| e.to_string_lossy().to_ascii_lowercase())
-        .unwrap_or_default();
-    let ext = if ext == "jpeg" { "jpg".to_string() } else { ext };
-    if !JACKET_EXTS.contains(&ext.as_str()) {
-        return Err(format!("{} is not an image the game can read", ext));
-    }
-
-    let bytes = fs::read(&src).map_err(|e| format!("Could not read the image: {}", e))?;
-
-    // Remove every existing default.* first: writing default.jpg beside an old
-    // default.png would leave the game picking whichever it finds first.
-    for old in JACKET_EXTS {
-        let path = dir.join(format!("default.{}", old));
-        if path.is_file() {
-            fs::remove_file(&path).map_err(|e| format!("Could not replace the old image: {}", e))?;
+    blocking(move || {
+        crate::guard::checked(&app, &base)?;
+        let dir = resolve_inside(Path::new(&base), &rel_path)?;
+        if !dir.is_dir() {
+            return Err("That folder is not on disk yet".into());
         }
-    }
 
-    let name = format!("default.{}", ext);
-    fs::write(dir.join(&name), bytes).map_err(|e| format!("Could not write the image: {}", e))?;
-    Ok(name)
+        let src = PathBuf::from(&source);
+        let ext = src
+            .extension()
+            .map(|e| e.to_string_lossy().to_ascii_lowercase())
+            .unwrap_or_default();
+        let ext = if ext == "jpeg" { "jpg".to_string() } else { ext };
+        if !JACKET_EXTS.contains(&ext.as_str()) {
+            return Err(format!("{} is not an image the game can read", ext));
+        }
+
+        let bytes = fs::read(&src).map_err(|e| format!("Could not read the image: {}", e))?;
+
+        // Remove every existing default.* first: writing default.jpg beside an old
+        // default.png would leave the game picking whichever it finds first.
+        for old in JACKET_EXTS {
+            let path = dir.join(format!("default.{}", old));
+            if path.is_file() {
+                fs::remove_file(&path).map_err(|e| format!("Could not replace the old image: {}", e))?;
+            }
+        }
+
+        let name = format!("default.{}", ext);
+        fs::write(dir.join(&name), bytes).map_err(|e| format!("Could not write the image: {}", e))?;
+        Ok(name)
+    })
+    .await
 }
 
 // ── A chart's own media ─────────────────────────────────────────────────────────────
@@ -313,24 +338,27 @@ fn any_with_ext(dir: &Path, exts: &[&str]) -> Option<String> {
 /// whose header names nothing usable falls back to the one image or audio file present.
 #[tauri::command]
 pub async fn read_song_media(base: String, rel_path: String) -> Result<SongMedia, String> {
-    let dir = resolve_inside(Path::new(&base), &rel_path)?;
-    if !dir.is_dir() {
-        return Ok(SongMedia { preimage: None, audio: None });
-    }
+    blocking(move || {
+        let dir = resolve_inside(Path::new(&base), &rel_path)?;
+        if !dir.is_dir() {
+            return Ok(SongMedia { preimage: None, audio: None });
+        }
 
-    let header = first_tja(&dir)
-        .and_then(|p| fs::read(p).ok())
-        .map(|bytes| decode_text(&bytes))
-        .unwrap_or_default();
+        let header = first_tja(&dir)
+            .and_then(|p| fs::read(p).ok())
+            .map(|bytes| decode_text(&bytes))
+            .unwrap_or_default();
 
-    let preimage = directive(&header, "#PREIMAGE:")
-        .and_then(|v| named_file(&dir, &v))
-        .or_else(|| any_with_ext(&dir, &JACKET_EXTS));
-    let audio = directive(&header, "#WAVE:")
-        .and_then(|v| named_file(&dir, &v))
-        .or_else(|| any_with_ext(&dir, &AUDIO_EXTS));
+        let preimage = directive(&header, "#PREIMAGE:")
+            .and_then(|v| named_file(&dir, &v))
+            .or_else(|| any_with_ext(&dir, &JACKET_EXTS));
+        let audio = directive(&header, "#WAVE:")
+            .and_then(|v| named_file(&dir, &v))
+            .or_else(|| any_with_ext(&dir, &AUDIO_EXTS));
 
-    Ok(SongMedia { preimage, audio })
+        Ok(SongMedia { preimage, audio })
+    })
+    .await
 }
 
 /// Replaces (or adds) the `#PREIMAGE:` line, keeping every other line byte-identical.
@@ -361,52 +389,55 @@ fn with_preimage(text: &str, name: &str) -> String {
 /// at it. Returns the file name written.
 #[tauri::command]
 pub async fn set_song_preimage(app: tauri::AppHandle, base: String, rel_path: String, source: String) -> Result<String, String> {
-    crate::guard::checked(&app, &base)?;
-    let dir = resolve_inside(Path::new(&base), &rel_path)?;
-    if !dir.is_dir() {
-        return Err("That chart is not on disk".into());
-    }
-
-    let src = PathBuf::from(&source);
-    let ext = src.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
-    let ext = if ext == "jpeg" { "jpg".to_string() } else { ext };
-    if !JACKET_EXTS.contains(&ext.as_str()) {
-        return Err(format!("{} is not an image the game can read", ext));
-    }
-
-    let bytes = fs::read(&src).map_err(|e| format!("Could not read the image: {}", e))?;
-
-    for old in JACKET_EXTS {
-        let path = dir.join(format!("preimage.{}", old));
-        if path.is_file() {
-            fs::remove_file(&path).map_err(|e| format!("Could not replace the old image: {}", e))?;
+    blocking(move || {
+        crate::guard::checked(&app, &base)?;
+        let dir = resolve_inside(Path::new(&base), &rel_path)?;
+        if !dir.is_dir() {
+            return Err("That chart is not on disk".into());
         }
-    }
 
-    let name = format!("preimage.{}", ext);
-    fs::write(dir.join(&name), bytes).map_err(|e| format!("Could not write the image: {}", e))?;
-
-    // Every .tja, not just the first: a chart split across files would otherwise show
-    // its new jacket on some courses and the old one on the rest.
-    for entry in fs::read_dir(&dir).map_err(|e| format!("Could not read the chart folder: {}", e))?.flatten() {
-        let path = entry.path();
-        let is_tja = path.is_file()
-            && path.extension().map(|e| e.to_string_lossy().eq_ignore_ascii_case("tja")).unwrap_or(false);
-        if !is_tja {
-            continue;
+        let src = PathBuf::from(&source);
+        let ext = src.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
+        let ext = if ext == "jpeg" { "jpg".to_string() } else { ext };
+        if !JACKET_EXTS.contains(&ext.as_str()) {
+            return Err(format!("{} is not an image the game can read", ext));
         }
-        let Ok(original) = fs::read(&path) else { continue };
-        let was_shift_jis = std::str::from_utf8(&original).is_err();
-        let updated = with_preimage(&decode_text(&original), &name);
-        let out = if was_shift_jis {
-            encoding_rs::SHIFT_JIS.encode(&updated).0.into_owned()
-        } else {
-            updated.into_bytes()
-        };
-        fs::write(&path, out).map_err(|e| format!("Could not update {}: {}", path.display(), e))?;
-    }
 
-    Ok(name)
+        let bytes = fs::read(&src).map_err(|e| format!("Could not read the image: {}", e))?;
+
+        for old in JACKET_EXTS {
+            let path = dir.join(format!("preimage.{}", old));
+            if path.is_file() {
+                fs::remove_file(&path).map_err(|e| format!("Could not replace the old image: {}", e))?;
+            }
+        }
+
+        let name = format!("preimage.{}", ext);
+        fs::write(dir.join(&name), bytes).map_err(|e| format!("Could not write the image: {}", e))?;
+
+        // Every .tja, not just the first: a chart split across files would otherwise show
+        // its new jacket on some courses and the old one on the rest.
+        for entry in fs::read_dir(&dir).map_err(|e| format!("Could not read the chart folder: {}", e))?.flatten() {
+            let path = entry.path();
+            let is_tja = path.is_file()
+                && path.extension().map(|e| e.to_string_lossy().eq_ignore_ascii_case("tja")).unwrap_or(false);
+            if !is_tja {
+                continue;
+            }
+            let Ok(original) = fs::read(&path) else { continue };
+            let was_shift_jis = std::str::from_utf8(&original).is_err();
+            let updated = with_preimage(&decode_text(&original), &name);
+            let out = if was_shift_jis {
+                encoding_rs::SHIFT_JIS.encode(&updated).0.into_owned()
+            } else {
+                updated.into_bytes()
+            };
+            fs::write(&path, out).map_err(|e| format!("Could not update {}: {}", path.display(), e))?;
+        }
+
+        Ok(name)
+    })
+    .await
 }
 
 // ── Importing dropped archives ──────────────────────────────────────────────────────
@@ -587,27 +618,30 @@ pub async fn import_chart_archives(
     rel_path: String,
     archives: Vec<String>,
 ) -> Result<ImportReport, String> {
-    crate::guard::checked(&app, &base)?;
-    let dest_parent = resolve_inside(Path::new(&base), &rel_path)?;
-    if !dest_parent.is_dir() {
-        return Err("That folder is not on disk yet".into());
-    }
-    let root = Path::new(&base)
-        .canonicalize()
-        .map_err(|e| format!("The songs folder is unreachable: {}", e))?;
-
-    let mut report = ImportReport { charts: Vec::new(), rejected: Vec::new() };
-    for archive in archives {
-        let path = PathBuf::from(&archive);
-        if path.extension().map(|e| e.to_ascii_lowercase() != "zip").unwrap_or(true) {
-            report.rejected.push(
-                path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or(archive.clone()),
-            );
-            continue;
+    blocking(move || {
+        crate::guard::checked(&app, &base)?;
+        let dest_parent = resolve_inside(Path::new(&base), &rel_path)?;
+        if !dest_parent.is_dir() {
+            return Err("That folder is not on disk yet".into());
         }
-        import_one(&path, &dest_parent, &root, &mut report)?;
-    }
-    Ok(report)
+        let root = Path::new(&base)
+            .canonicalize()
+            .map_err(|e| format!("The songs folder is unreachable: {}", e))?;
+
+        let mut report = ImportReport { charts: Vec::new(), rejected: Vec::new() };
+        for archive in archives {
+            let path = PathBuf::from(&archive);
+            if path.extension().map(|e| !e.eq_ignore_ascii_case("zip")).unwrap_or(true) {
+                report.rejected.push(
+                    path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or(archive.clone()),
+                );
+                continue;
+            }
+            import_one(&path, &dest_parent, &root, &mut report)?;
+        }
+        Ok(report)
+    })
+    .await
 }
 
 #[cfg(test)]

@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { ipc } from '$lib/ipc';
+    import { ValidAssetCatalog } from '$lib/utils/validate';
     // Dependencies
     import { onMount } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
@@ -8,7 +10,7 @@
     import { startJob, isCancelled, type Job } from '$lib/stores/activity';
     import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { path } from '@tauri-apps/api';
-    import { invoke, Channel } from '@tauri-apps/api/core';
+    import { Channel } from '@tauri-apps/api/core';
     import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, LocalAsset, ToastContext } from '$lib/types';
 
     import { getContext } from 'svelte';
@@ -77,7 +79,7 @@
     const updateAssetsInfo = async () => {
         catalogFetchFailed = false;
         try {
-            assetsInfo = await fetchCachedJson<AssetCatalog>(assetsInfoUrl);
+            assetsInfo = ValidAssetCatalog(await fetchCachedJson<unknown>(assetsInfoUrl));
         } catch (error) {
             console.error('Failed to fetch the asset catalog:', error);
             assetsInfo = emptyCatalog();
@@ -111,7 +113,7 @@
         const scanned: Record<string, LocalAsset> = {};
         try {
             const baseDir = await path.join(instancePath, assetBaseDirs[assetType]);
-            const found = await invoke<AssetVersion[]>('scan_asset_versions', { baseDir, targetFile: targetFile[assetType] });
+            const found = await ipc.scanAssetVersions(baseDir, targetFile[assetType]);
             for (const { relPath, version } of found) {
                 scanned[relPath] = { assetFolderName: relPath, assetVersion: version };
             }
@@ -277,7 +279,7 @@
 
                 const extractProgress = new Channel<number>();
                 extractProgress.onmessage = (percent) => assetDLProgress[assetType][assetRelpath] = percent;
-                await invoke('unzip_and_get_first_folder', { zipPath, job: job.id, onProgress: extractProgress });
+                await ipc.unzip(zipPath, extractProgress, job.id);
 
                 // All skin zips are flat (files/folders at zip root), so the extraction folder's
                 // content is moved straight into the skin folder. The move is done natively:
@@ -285,7 +287,7 @@
                 // and it skipped any file it failed to copy without saying so. The move also
                 // removes the extraction folder.
                 await remove(zipPath);
-                await invoke('merge_move_dir', { src: assetDownloadFolder, dest: assetFullPath });
+                await ipc.mergeMoveDir(assetDownloadFolder, assetFullPath);
             } else {
                 // Characters and Puchicharas are separate files, downloaded straight into
                 // place a few at a time. The first folder of each catalog path is the

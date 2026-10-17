@@ -49,7 +49,7 @@ fn scan_embedded_pe_version(data: &[u8], want_filename: &str) -> Option<String> 
             u32::from_le_bytes([data[offset + 0x3C], data[offset + 0x3D], data[offset + 0x3E], data[offset + 0x3F]])
                 as usize;
         // Sanity bounds: managed images keep the PE header close to the DOS header
-        if e_lfanew < 0x40 || e_lfanew > 0x1000 || offset + e_lfanew + 4 > data.len() {
+        if !(0x40..=0x1000).contains(&e_lfanew) || offset + e_lfanew + 4 > data.len() {
             continue;
         }
         if &data[offset + e_lfanew..offset + e_lfanew + 4] != b"PE\0\0" {

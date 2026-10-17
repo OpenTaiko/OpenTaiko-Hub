@@ -8,16 +8,11 @@
   "dl": {
     "error": {
       "failed_abort": "Загрузка не удалась, отмена"
-    },
-    "warn": {
-      "failed_retry": "Загрузка не удалась, повторная попытка... ({attempt}/{max})"
     }
   },
   "nav": {
     "home": "Главная",
     "songlist": "Песни",
-    "skins": "Скины",
-    "docs": "Документация",
     "tools": "Инструменты",
     "secrets": "Секреты",
     "information": "Информация",
@@ -26,8 +21,6 @@
     "tooltip": {
       "home": "Управление OpenTaiko и OpenTaiko Hub.",
       "songlist": "Обновляйте свои песни OpenTaiko и скачивайте новые.",
-      "skins": "Скачивайте новейшие скины OpenTaiko и связанные ресурсы.",
-      "docs": "Просмотр документации, входящей в выбранную сборку OpenTaiko.",
       "tools": "Инструменты, которые сделают игру в OpenTaiko ещё удобнее.",
       "secrets": "???",
       "information": "Журналы изменений, документация и решение проблем.",
@@ -88,11 +81,7 @@
     },
     "button": {
       "reload": "Перезагрузить",
-      "download": "Скачать OpenTaiko",
-      "download_stable": "Скачать стабильную",
-      "download_experimental": "Скачать экспериментальную",
       "launch": "Запустить OpenTaiko",
-      "explorer": "Открыть в проводнике",
       "update": "Обновить OpenTaiko",
       "redownload": "Скачать OpenTaiko заново",
       "rebuild": "Пересобрать",
@@ -303,57 +292,27 @@
         "updates_waiting": "{count} можно обновить",
         "search": "Поиск песен и папок..."
     },
-    "col": {
-      "name": "Название песни",
-      "folder": "Папка",
-      "difficulties": "Сложности",
-      "charter": "Автор чарта: ",
-      "size": "Размер",
-      "status": "Статус"
-    },
-    "filter": {
-      "song": "Поиск песни...",
-      "folder": "Поиск папки..."
-    },
     "status": {
       "installed_short": "Установлено",
-      "scanning": "Сканирование...",
       "not_downloaded": "Не скачано",
       "up_to_date": "Актуально",
       "outdated": "Устарело"
     },
     "button": {
-      "bulk_download": "Скачать всё",
-      "download": "Скачать",
-      "redownload": "Скачать заново",
       "update": "Обновить",
       "open_folder": "Открыть папку с песнями"
     },
-    "view": {
-      "list": "Список",
-      "tree": "Дерево"
-    },
     "scan": {
-      "progress": "Сканирование песен... (найдено: {count})",
-      "done": "Песен в библиотеке: {count}"
+      "progress": "Сканирование песен... (найдено: {count})"
     },
     "tree": {
       "show_more": "Показать ещё {count}",
       "get_n": "Загрузить {count}",
       "nothing_here": "Здесь нет ничего, подходящего под текущий фильтр.",
       "installed_of": "{installed} / {total} установлено",
-      "library_total": "Установлено {installed} из {total} песен",
-      "legend_available": "Полупрозрачные — доступны для загрузки",
-      "show_available": "Показывать песни, доступные для загрузки",
       "no_match": "Нет песен, соответствующих запросу.",
       "open_folder_tip": "Открыть эту папку",
-      "download_folder_tip": "Загрузить {count} отсутствующих песен из этой папки",
-      "soundtrack": "Саундтрек OpenTaiko",
-      "custom": "Пользовательские",
-      "songs_count": "Песен: {count}",
-      "empty": "В библиотеке пока нет песен.",
-      "spicy": "Острый",
-      "sweet": "Сладкий"
+      "custom": "Пользовательские"
     },
     "migrate": {
       "banner": "В «{instance}» найдено папок с песнями: {count}. Перенести их в общую библиотеку песен?",
@@ -384,9 +343,7 @@
       "scan_failed": "Не удалось просканировать библиотеку песен: {error}"
     },
     "success": {
-      "all_up_to_date": "Все песни уже актуальны",
-      "download_complete": "Загрузка завершена",
-      "download_nb": "Скачана песня {nb} из {total}"
+      "download_complete": "Загрузка завершена"
     },
     "duplicates": {
       "banner": "Пустых дублирующихся папок в «{instance}»: {count}. Удалить?",
@@ -427,8 +384,7 @@
     },
     "success": {
       "all_up_to_date": "Все {type} уже актуальны",
-      "download_complete": "Загрузка завершена",
-      "download_nb": "Скачано {nb} из {total} ({type})"
+      "download_complete": "Загрузка завершена"
     }
   },
   "asset_cell": {
@@ -476,7 +432,6 @@
     "tab": {
       "changelog_game": "Журнал изменений (игра)",
       "changelog_hub": "Журнал изменений (Hub)",
-      "documentation": "Документация",
       "troubleshooting": "Решение проблем",
       "credits": "Авторы"
     },
@@ -630,10 +585,6 @@
     },
     "debug": {
       "disable_btn": "Отключить режим отладки"
-    },
-    "error": {
-      "theme_json": "Файл theme.json (или папка настроек) не существует или повреждён!<br>Пожалуйста, переустановите OpenTaiko Hub, чтобы это исправить.",
-      "thememode_json": "Файл thememode.json (или папка настроек) не существует или повреждён!<br>Пожалуйста, переустановите OpenTaiko Hub, чтобы это исправить."
     },
     "warn": {
       "same_theme": "Выбранная тема совпадает с текущей.",

@@ -2,7 +2,7 @@
 // that run them and the parts of the UI that need to know: the navigation badge, the
 // instance manager, and the backend, which asks before the window closes on one.
 import { writable, derived, get } from 'svelte/store';
-import { invoke } from '@tauri-apps/api/core';
+import { ipc } from '$lib/ipc';
 import { _ } from 'svelte-i18n';
 
 /** Which navigation tile shows the operation as running. */
@@ -32,26 +32,23 @@ export const startJob = (area: ActivityArea, instanceId: string | null = null): 
     const id = crypto.randomUUID();
     activities.update((list) => [...list, { id, area, instanceId }]);
     const t = get(_);
-    invoke('begin_job', {
-        job: id,
-        prompt: {
-            title: t('jobs.close_title'),
-            message: t('jobs.close_message'),
-            close: t('jobs.close'),
-            keep: t('jobs.keep')
-        }
+    ipc.beginJob(id, {
+        title: t('jobs.close_title'),
+        message: t('jobs.close_message'),
+        close: t('jobs.close'),
+        keep: t('jobs.keep')
     }).catch((error) => console.warn('Could not register the operation:', error));
     let ended = false;
     return {
         id,
         cancel: () => {
-            invoke('cancel_job', { job: id }).catch((error) => console.warn('Could not cancel:', error));
+            ipc.cancelJob(id).catch((error) => console.warn('Could not cancel:', error));
         },
         end: () => {
             if (ended) return;
             ended = true;
             activities.update((list) => list.filter((a) => a.id !== id));
-            invoke('end_job', { job: id }).catch(() => {});
+            ipc.endJob(id).catch(() => {});
         }
     };
 };

@@ -424,57 +424,6 @@ fn raise_open_file_limit() -> Option<String> {
     None
 }
 
-#[cfg(test)]
-mod tests {
-    /// The log folder is resolved from this identifier, so a change in tauri.conf.json
-    /// that is not mirrored here would silently write logs somewhere else.
-    #[test]
-    fn the_identifier_matches_the_bundle_config() {
-        let config = include_str!("../tauri.conf.json");
-        let expected = format!("\"identifier\": \"{}\"", super::APP_IDENTIFIER);
-        assert!(
-            config.contains(&expected),
-            "APP_IDENTIFIER must match tauri.conf.json's identifier"
-        );
-    }
-
-    /// Creating the folder is not proof it can be written to, so the probe has to open a
-    /// file. It must also open the real log file, not a scratch file it leaves behind.
-    #[test]
-    fn the_writability_probe_leaves_only_the_log_file() {
-        let tmp = tempfile::tempdir().unwrap();
-        assert!(super::log_file_is_writable(tmp.path()));
-
-        let entries: Vec<_> = std::fs::read_dir(tmp.path())
-            .unwrap()
-            .map(|e| e.unwrap().file_name())
-            .collect();
-        assert_eq!(entries, vec![std::ffi::OsString::from("OpenTaiko-Hub.log")]);
-    }
-
-    #[test]
-    fn a_folder_that_does_not_exist_is_not_writable() {
-        let tmp = tempfile::tempdir().unwrap();
-        assert!(!super::log_file_is_writable(&tmp.path().join("absent")));
-    }
-
-    /// The log has to land beside the Hub's other working data (`tmp/`, `Songs/`), which
-    /// is where a user looks for it. On Windows that is the executable's own folder, the
-    /// same place the frontend's GetRootPath() resolves to.
-    #[test]
-    fn the_log_folder_sits_with_the_hubs_other_data() {
-        let dir = super::usable_log_dir().expect("a writable log folder must be found");
-        assert!(super::log_file_is_writable(&dir));
-        assert_eq!(dir.file_name().unwrap(), "logs");
-
-        #[cfg(target_os = "windows")]
-        {
-            let exe_dir = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
-            assert_eq!(dir, exe_dir.join("logs"));
-        }
-    }
-}
-
 fn main() {
     install_panic_hook();
 
@@ -601,6 +550,57 @@ fn main() {
             log::error!("The Hub could not start: {}", error);
             eprintln!("The Hub could not start: {}", error);
             std::process::exit(1);
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// The log folder is resolved from this identifier, so a change in tauri.conf.json
+    /// that is not mirrored here would silently write logs somewhere else.
+    #[test]
+    fn the_identifier_matches_the_bundle_config() {
+        let config = include_str!("../tauri.conf.json");
+        let expected = format!("\"identifier\": \"{}\"", super::APP_IDENTIFIER);
+        assert!(
+            config.contains(&expected),
+            "APP_IDENTIFIER must match tauri.conf.json's identifier"
+        );
+    }
+
+    /// Creating the folder is not proof it can be written to, so the probe has to open a
+    /// file. It must also open the real log file, not a scratch file it leaves behind.
+    #[test]
+    fn the_writability_probe_leaves_only_the_log_file() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(super::log_file_is_writable(tmp.path()));
+
+        let entries: Vec<_> = std::fs::read_dir(tmp.path())
+            .unwrap()
+            .map(|e| e.unwrap().file_name())
+            .collect();
+        assert_eq!(entries, vec![std::ffi::OsString::from("OpenTaiko-Hub.log")]);
+    }
+
+    #[test]
+    fn a_folder_that_does_not_exist_is_not_writable() {
+        let tmp = tempfile::tempdir().unwrap();
+        assert!(!super::log_file_is_writable(&tmp.path().join("absent")));
+    }
+
+    /// The log has to land beside the Hub's other working data (`tmp/`, `Songs/`), which
+    /// is where a user looks for it. On Windows that is the executable's own folder, the
+    /// same place the frontend's GetRootPath() resolves to.
+    #[test]
+    fn the_log_folder_sits_with_the_hubs_other_data() {
+        let dir = super::usable_log_dir().expect("a writable log folder must be found");
+        assert!(super::log_file_is_writable(&dir));
+        assert_eq!(dir.file_name().unwrap(), "logs");
+
+        #[cfg(target_os = "windows")]
+        {
+            let exe_dir = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
+            assert_eq!(dir, exe_dir.join("logs"));
         }
     }
 }

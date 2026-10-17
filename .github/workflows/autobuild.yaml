@@ -4,9 +4,71 @@ on:
   push:
     branches:
       - main
+  # Pull requests run the checks only; publishing is limited to pushes to main
+  pull_request:
   
 jobs:
+    # Nothing is published unless the type check, the frontend tests, clippy and the Rust
+    # tests pass, on both systems the Hub ships for. Linux in particular: its code paths
+    # are not exercised on a Windows development machine.
+    check:
+        permissions:
+          contents: read
+        strategy:
+          fail-fast: false
+          matrix:
+            platform: ['ubuntu-22.04', 'windows-latest']
+
+        runs-on: ${{ matrix.platform }}
+        steps:
+          - uses: actions/checkout@v4
+
+          - name: install dependencies (ubuntu only)
+            if: matrix.platform == 'ubuntu-22.04'
+            run: |
+              sudo apt-get update
+              sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+          - name: setup node
+            uses: actions/setup-node@v4
+            with:
+              node-version: lts/*
+              cache: 'npm'
+
+          - name: install Rust stable
+            uses: dtolnay/rust-toolchain@stable
+            with:
+              components: clippy
+
+          - name: Rust cache
+            uses: swatinem/rust-cache@v2
+            with:
+              workspaces: './src-tauri -> target'
+
+          - name: install frontend dependencies
+            run: npm ci
+
+          - name: type check
+            run: npm run check
+
+          - name: frontend tests
+            run: npm test
+
+          # The Rust build embeds the built frontend
+          - name: build frontend
+            run: npm run build
+
+          - name: clippy
+            working-directory: src-tauri
+            run: cargo clippy --all-targets -- -D warnings
+
+          - name: Rust tests
+            working-directory: src-tauri
+            run: cargo test
+
     publish:
+        needs: check
+        if: github.event_name == 'push'
         permissions:
           contents: write
         strategy:

@@ -1,10 +1,10 @@
 <script lang="ts">
+    import { ipc } from '$lib/ipc';
     // Resolves an instance's local Songs folder into the shared library. New charts are
     // moved, byte-identical charts are dropped, and charts that clash with a different
     // version already in the library are resolved by the user — per chart (showing each
     // side's hash and last-edited date) or in bulk.
     import { onMount, getContext } from 'svelte';
-    import { invoke } from '@tauri-apps/api/core';
     import { _, locale } from 'svelte-i18n';
     import { get } from 'svelte/store';
     import { localizedTitle } from '$lib/utils/titles';
@@ -49,10 +49,7 @@
 
     onMount(async () => {
         try {
-            plan = await invoke<MigrationPlan>('plan_migration', {
-                srcSongs: Candidate.srcPath,
-                destSongs: GlobalPath
-            });
+            plan = await ipc.planMigration(Candidate.srcPath, GlobalPath);
             conflicts = plan.items.filter((item) => item.status === 'conflict');
             // Default: keep the version already in the shared library
             choices = Object.fromEntries(conflicts.map((item) => [item.src.relPath, 'keep_global' as const]));
@@ -97,11 +94,7 @@
                 };
             });
 
-            const summary = await invoke<MigrateSummary>('apply_migration', {
-                srcSongs: Candidate.srcPath,
-                destSongs: GlobalPath,
-                decisions
-            });
+            const summary = await ipc.applyMigration(Candidate.srcPath, GlobalPath, decisions);
             TriggerSuccess(get(_)('songs.migrate.applied', {
                 values: { moved: summary.moved, replaced: summary.replaced, discarded: summary.discarded }
             }));

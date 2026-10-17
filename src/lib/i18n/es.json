@@ -8,16 +8,11 @@
   "dl": {
     "error": {
       "failed_abort": "La descarga falló, cancelando"
-    },
-    "warn": {
-      "failed_retry": "La descarga falló, reintentando... ({attempt}/{max})"
     }
   },
   "nav": {
     "home": "Inicio",
     "songlist": "Canciones",
-    "skins": "Skins",
-    "docs": "Docs",
     "tools": "Herramientas",
     "secrets": "Secretos",
     "information": "Información",
@@ -26,8 +21,6 @@
     "tooltip": {
       "home": "Gestiona OpenTaiko y el OpenTaiko Hub.",
       "songlist": "Actualiza tus canciones de OpenTaiko y descarga las más recientes.",
-      "skins": "Obtén los skins de OpenTaiko más recientes y recursos relacionados.",
-      "docs": "Consulta la documentación incluida en la build de OpenTaiko seleccionada.",
       "tools": "Herramientas que pueden mejorar tu experiencia con OpenTaiko.",
       "secrets": "???",
       "information": "Para consultar los registros de cambios, la documentación o la solución de problemas.",
@@ -88,11 +81,7 @@
     },
     "button": {
       "reload": "Recargar",
-      "download": "Descargar OpenTaiko",
-      "download_stable": "Descargar Estable",
-      "download_experimental": "Descargar Experimental",
       "launch": "Iniciar OpenTaiko",
-      "explorer": "Abrir en el Explorador",
       "update": "Actualizar OpenTaiko",
       "redownload": "Volver a descargar OpenTaiko",
       "rebuild": "Recompilar",
@@ -303,57 +292,27 @@
         "updates_waiting": "{count} por actualizar",
         "search": "Buscar canciones y carpetas..."
     },
-    "col": {
-      "name": "Nombre de la canción",
-      "folder": "Carpeta",
-      "difficulties": "Dificultades",
-      "charter": "Autor del chart: ",
-      "size": "Tamaño",
-      "status": "Estado"
-    },
-    "filter": {
-      "song": "Buscar canción...",
-      "folder": "Buscar carpeta..."
-    },
     "status": {
       "installed_short": "Instalada",
-      "scanning": "Escaneando...",
       "not_downloaded": "No descargada",
       "up_to_date": "Actualizada",
       "outdated": "Desactualizada"
     },
     "button": {
-      "bulk_download": "Descarga masiva",
-      "download": "Descargar",
-      "redownload": "Volver a descargar",
       "update": "Actualizar",
       "open_folder": "Abrir la carpeta de canciones"
     },
-    "view": {
-      "list": "Lista",
-      "tree": "Árbol"
-    },
     "scan": {
-      "progress": "Escaneando canciones... ({count} encontradas)",
-      "done": "{count} canciones en la biblioteca"
+      "progress": "Escaneando canciones... ({count} encontradas)"
     },
     "tree": {
       "show_more": "Mostrar {count} más",
       "get_n": "Descargar {count}",
       "nothing_here": "Nada aquí coincide con el filtro actual.",
       "installed_of": "{installed} / {total} instaladas",
-      "library_total": "{installed} de {total} canciones instaladas",
-      "legend_available": "Atenuado = disponible para descargar",
-      "show_available": "Mostrar canciones disponibles para descargar",
       "no_match": "Ninguna canción coincide con esta búsqueda.",
       "open_folder_tip": "Abrir esta carpeta",
-      "download_folder_tip": "Descargar las {count} canciones que faltan en esta carpeta",
-      "soundtrack": "Banda sonora de OpenTaiko",
-      "custom": "Personalizado",
-      "songs_count": "{count} canciones",
-      "empty": "Aún no se encontraron canciones en la biblioteca.",
-      "spicy": "Picante",
-      "sweet": "Dulce"
+      "custom": "Personalizado"
     },
     "migrate": {
       "banner": "Se encontraron {count} carpeta(s) de canciones en «{instance}». ¿Transferirlas a la biblioteca de canciones compartida?",
@@ -384,9 +343,7 @@
       "scan_failed": "No se pudo escanear la biblioteca de canciones: {error}"
     },
     "success": {
-      "all_up_to_date": "Todas las canciones ya están actualizadas",
-      "download_complete": "Descarga completa",
-      "download_nb": "Canción descargada: {nb} de {total}"
+      "download_complete": "Descarga completa"
     },
     "duplicates": {
       "banner": "{count} carpeta(s) vacías duplicadas en «{instance}». ¿Eliminarlas?",
@@ -427,8 +384,7 @@
     },
     "success": {
       "all_up_to_date": "Todos los {type} ya están actualizados",
-      "download_complete": "Descarga completa",
-      "download_nb": "Descargado {type} {nb} de {total}"
+      "download_complete": "Descarga completa"
     }
   },
   "asset_cell": {
@@ -476,7 +432,6 @@
     "tab": {
       "changelog_game": "Registro de cambios (Juego)",
       "changelog_hub": "Registro de cambios (Hub)",
-      "documentation": "Documentación",
       "troubleshooting": "Solución de problemas",
       "credits": "Créditos"
     },
@@ -630,10 +585,6 @@
     },
     "debug": {
       "disable_btn": "Desactivar el modo debug"
-    },
-    "error": {
-      "theme_json": "¡El archivo theme.json (o la carpeta de configuración) no existe o está dañado!<br>Reinstala el OpenTaiko Hub para solucionarlo.",
-      "thememode_json": "¡El archivo thememode.json (o la carpeta de configuración) no existe o está dañado!<br>Reinstala el OpenTaiko Hub para solucionarlo."
     },
     "warn": {
       "same_theme": "El tema seleccionado es el mismo que el tema actual.",

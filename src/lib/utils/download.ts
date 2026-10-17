@@ -1,4 +1,5 @@
-import { Channel, invoke } from '@tauri-apps/api/core';
+import { Channel } from '@tauri-apps/api/core';
+import { ipc, type InstallEntry, type InstallReport } from '$lib/ipc';
 import type { ProgressPayload } from '$lib/types';
 
 // Network access goes through the backend (download.rs): it only accepts the hosts the
@@ -20,24 +21,10 @@ export const download = async (
     attempts?: number,
     job?: string
 ): Promise<void> => {
-    await invoke('download_file', { url, path, attempts, job, onProgress: progressChannel(onProgress) });
+    await ipc.downloadFile(url, path, progressChannel(onProgress), attempts, job);
 };
 
-export interface InstallEntry {
-    url: string;
-    /** Destination relative to the folder the files are installed into. */
-    relPath: string;
-    /** Upstream git blob SHA: an identical local file is kept instead of downloaded. */
-    gitSha?: string | null;
-    /** May be missing upstream; a 404 lists it in `absent` instead of failing. */
-    optional?: boolean;
-}
-
-export interface InstallReport {
-    downloaded: string[];
-    unchanged: string[];
-    absent: string[];
-}
+export type { InstallEntry, InstallReport };
 
 /**
  * Downloads a set of files straight into `destRoot`, a few at a time. Nothing is
@@ -49,7 +36,7 @@ export const installFiles = async (
     onProgress?: (progress: ProgressPayload) => void,
     job?: string
 ): Promise<InstallReport> => {
-    return await invoke<InstallReport>('install_files', { destRoot, entries, job, onProgress: progressChannel(onProgress) });
+    return await ipc.installFiles(destRoot, entries, progressChannel(onProgress), job);
 };
 
 /**
@@ -58,7 +45,7 @@ export const installFiles = async (
  * does not count against GitHub's hourly API limit. Throws `HTTP error status: <code>`.
  */
 export const fetchCached = async (url: string): Promise<ArrayBuffer> => {
-    return await invoke<ArrayBuffer>('fetch_cached', { url });
+    return await ipc.fetchCached(url);
 };
 
 export const fetchCachedText = async (url: string): Promise<string> => {

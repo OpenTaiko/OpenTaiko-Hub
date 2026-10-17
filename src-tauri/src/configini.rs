@@ -22,14 +22,15 @@ fn normalize_for_compare(path: &str) -> String {
 /// removed instead, so the game only reads the shared library; custom paths are kept.
 /// Returns the resulting TJAPath value.
 #[tauri::command]
-pub fn ensure_config_tjapath(
+pub async fn ensure_config_tjapath(
     app: tauri::AppHandle,
     instance_dir: String,
     global_songs_path: String,
     include_local: bool,
 ) -> Result<String, String> {
     crate::guard::checked(&app, &instance_dir)?;
-    write_tjapath(instance_dir, global_songs_path, include_local)
+    // A sync command runs on the main thread, which also drives the window
+    crate::library::blocking(move || write_tjapath(instance_dir, global_songs_path, include_local)).await
 }
 
 fn write_tjapath(

@@ -1,9 +1,15 @@
+/// <reference types="vitest/config" />
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	// Unit tests cover the modules that run without the Tauri backend (npm test)
+	test: {
+		include: ['src/**/*.test.ts'],
+		environment: 'node',
+	},
 	resolve: {
 		dedupe: ['svelte'],
 	},

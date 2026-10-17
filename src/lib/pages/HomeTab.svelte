@@ -1,10 +1,12 @@
 <script lang="ts">
+    import { ipc } from '$lib/ipc';
+    import { InstallReleaseZip, IsInstallComplete, WriteVersionJson as WriteVersionFile } from '$lib/services/install';
     import { getContext } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { writeTextFile, mkdir, exists, remove } from '@tauri-apps/plugin-fs';
+    import { mkdir, exists, remove } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
-    import { invoke, Channel } from '@tauri-apps/api/core';
+    import { Channel } from '@tauri-apps/api/core';
     import { listen } from '@tauri-apps/api/event';
     import { onMount } from 'svelte';
     import { _ } from 'svelte-i18n';
@@ -13,7 +15,7 @@
     import type { BuildOption, GitHubRelease, HubOS, IndevBuildInfo, Instance, ToastContext } from '$lib/types';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
-    import { GetOS, GetTmpPath, GetBuildPath } from "$lib/utils/path";
+    import { GetOS, GetBuildPath } from "$lib/utils/path";
     import { startJob, isCancelled, type Job } from "$lib/stores/activity";
     import { DescribeError, ErrorText } from "$lib/utils/errors";
     import { openUrl } from '@tauri-apps/plugin-opener';
@@ -222,68 +224,38 @@
         });
     };
 
-    const WriteVersionJson = async (instancePath: string, version: string | null) => {
-        // Backwards compatibility with pre-0.2 Hub versions
-        try {
-            const versionFile = await path.join(instancePath, 'version.json');
-            await writeTextFile(versionFile, JSON.stringify({ version, build: optk_OS }));
-        } catch (error) {
-            console.error('Failed to write version.json:', error);
-        }
-    };
+    const WriteVersionJson = (instancePath: string, version: string | null) => WriteVersionFile(instancePath, version, optk_OS);
 
-    // A finished install must at least contain the game executable; a missing one
-    // means the install was interrupted or the build output is broken.
     const VerifyInstall = async (instancePath: string) => {
-        const exeName = optk_OS === 'Win' ? 'OpenTaiko.exe' : 'OpenTaiko';
-        if (!(await exists(await path.join(instancePath, exeName)))) {
+        if (!(await IsInstallComplete(instancePath, optk_OS))) {
             throw new Error(get(_)('home.error.incomplete_build'));
         }
     };
 
-    // Downloads a release zip and merges its content into the instance folder.
+    // Downloads a release zip and merges its content into the instance folder
     const DownloadAndInstallZip = async (url: string, instancePath: string, job: Job): Promise<boolean> => {
-        const tmpDir = await GetTmpPath(crypto.randomUUID());
-        await mkdir(tmpDir, { recursive: true });
-        const zipPath = await path.join(tmpDir, 'OpenTaiko.zip');
-
-        try {
-            const success = await backoffDownload(
-                url,
-                zipPath,
-                (pr) => {
-                    // progressTotal rather than a running sum of chunk sizes: a retry
-                    // restarts the transfer, and a sum kept across attempts would count
-                    // the re-downloaded bytes twice and drive the bar past 100%.
-                    progress = pr.total ? 100 * (pr.progressTotal / pr.total) : undefined;
-                },
+        const installed = await InstallReleaseZip(url, instancePath, job.id, {
+            onProgress: (percent) => progress = percent,
+            onStage: (stage) => {
+                if (stage === 'extract') TriggerSuccess(get(_)('home.success.unzipping'));
+                if (stage === 'install') {
+                    TriggerSuccess(get(_)('home.success.installing'));
+                    cancellable = false;
+                }
+            },
+            // progressTotal rather than a running sum of chunk sizes: a retry restarts
+            // the transfer, and a sum kept across attempts would count the re-downloaded
+            // bytes twice and drive the bar past 100%.
+            download: (zipUrl, dest, onProgress) => backoffDownload(
+                zipUrl,
+                dest,
+                (pr) => onProgress(pr.total ? 100 * (pr.progressTotal / pr.total) : undefined),
                 undefined,
                 job.id
-            );
-            if (!success) {
-                return false;
-            }
-
-            TriggerSuccess(get(_)('home.success.unzipping'));
-            progress = undefined;
-
-            const extractProgress = new Channel<number>();
-            extractProgress.onmessage = (percent) => progress = percent;
-            const sourceFolder = await invoke<string>('unzip_and_get_first_folder', { zipPath, job: job.id, onProgress: extractProgress });
-
-            TriggerSuccess(get(_)('home.success.installing'));
-            progress = undefined;
-            cancellable = false;
-
-            await remove(zipPath);
-            // Songs live in the shared library, so never install a build's own copies
-            await invoke('strip_song_content', { songsDir: await path.join(sourceFolder, 'Songs') });
-            await invoke('merge_move_dir', { src: sourceFolder, dest: instancePath });
-            await VerifyInstall(instancePath);
-            return true;
-        } finally {
-            try { await remove(tmpDir, { recursive: true }); } catch {}
-        }
+            )
+        });
+        if (installed) await VerifyInstall(instancePath);
+        return installed;
     };
 
     // What a release install needs to know, found once the busy flag is held
@@ -425,12 +397,7 @@
             sdkChannel.onmessage = (lines) => sdkLines.push(...lines);
             let sdkExitCode = -1;
             try {
-                sdkExitCode = await invoke<number>('run_dotnet', {
-                    args: ['--list-sdks'],
-                    cwd: null,
-                    job: job.id,
-                    onOutput: sdkChannel
-                });
+                sdkExitCode = await ipc.runDotnet(['--list-sdks'], null, sdkChannel, job.id);
             } catch (error) {
                 if (isCancelled(error)) throw error;
                 sdkExitCode = -1;
@@ -486,13 +453,13 @@
             progress = 0;
             const extractProgress = new Channel<number>();
             extractProgress.onmessage = (percent) => progress = percent;
-            const extracted = await invoke<string>('unzip_and_get_first_folder', { zipPath: srcZip, job: job.id, onProgress: extractProgress });
+            const extracted = await ipc.unzip(srcZip, extractProgress, job.id);
             await remove(srcZip);
             // The archive unpacks into `OpenTaiko-<40 character commit>`. Every character
             // of that name counts against the Windows path limit for the whole build, so
             // it is moved to a one-letter folder before the compiler sees it.
             const srcFolder = await path.join(tmpDir, 's');
-            await invoke('merge_move_dir', { src: extracted, dest: srcFolder });
+            await ipc.mergeMoveDir(extracted, srcFolder);
 
             // 5. Build (same command as the game's build scripts)
             buildStage = 'build';
@@ -514,12 +481,12 @@
             // path limit. Both output folders sit directly in the build folder instead.
             const publishDir = await path.join(tmpDir, 'p');
             const outDir = await path.join(tmpDir, 'b') + path.sep();
-            const exitCode = await invoke<number>('run_dotnet', {
-                args: ['publish', 'OpenTaiko/OpenTaiko.csproj', '--configuration', 'Release', '--self-contained', '-p:PublishSingleFile=true', '--runtime', rid, '--output', publishDir, `-p:OutDir=${outDir}`],
-                cwd: srcFolder,
-                job: job.id,
-                onOutput: logChannel
-            });
+            const exitCode = await ipc.runDotnet(
+                ['publish', 'OpenTaiko/OpenTaiko.csproj', '--configuration', 'Release', '--self-contained', '-p:PublishSingleFile=true', '--runtime', rid, '--output', publishDir, `-p:OutDir=${outDir}`],
+                srcFolder,
+                logChannel,
+                job.id
+            );
             flushBuildLog();
             if (exitCode !== 0) {
                 throw new Error(`dotnet publish exited with code ${exitCode}`);
@@ -530,12 +497,12 @@
             cancellable = false;
             // A local publish carries the repository's whole Songs tree; drop those
             // charts so the instance uses only the shared library
-            await invoke('strip_song_content', { songsDir: await path.join(publishDir, 'Songs') });
-            await invoke('merge_move_dir', { src: publishDir, dest: instance.path });
+            await ipc.stripSongContent(await path.join(publishDir, 'Songs'));
+            await ipc.mergeMoveDir(publishDir, instance.path);
             await VerifyInstall(instance.path);
             const docsDir = await path.join(srcFolder, 'OpenTaiko', 'docs');
             if (await exists(docsDir)) {
-                await invoke('merge_move_dir', { src: docsDir, dest: await path.join(instance.path, 'docs') });
+                await ipc.mergeMoveDir(docsDir, await path.join(instance.path, 'docs'));
             }
 
             // 7. Record build metadata for update checks and link the shared library
@@ -586,7 +553,7 @@
         if (!current) return;
         try {
             const appPath = await path.join(current.path, "OpenTaiko");
-            await invoke('execute_external_app', { path: appPath });
+            await ipc.executeExternalApp(appPath);
         } catch (error) {
             TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
         }

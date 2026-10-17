@@ -8,16 +8,11 @@
   "dl": {
     "error": {
       "failed_abort": "ダウンロードに失敗しました。中止します。"
-    },
-    "warn": {
-      "failed_retry": "ダウンロードに失敗しました。再試行中... ({attempt}/{max})"
     }
   },
   "nav": {
     "home": "ホーム",
     "songlist": "曲一覧",
-    "skins": "スキン",
-    "docs": "ドキュメント",
     "tools": "ツール",
     "secrets": "シークレット",
     "information": "情報",
@@ -26,8 +21,6 @@
     "tooltip": {
       "home": "OpenTaikoとOpenTaiko Hubを管理します。",
       "songlist": "OpenTaikoの曲を更新し、最新の曲をダウンロードします。",
-      "skins": "最新のOpenTaikoスキンと関連アセットを取得します。",
-      "docs": "選択中のOpenTaikoビルドに含まれるドキュメントを閲覧します。",
       "tools": "OpenTaikoの体験を向上させるツールです。",
       "secrets": "???",
       "information": "更新履歴、ドキュメント、またはトラブルシューティングの参照に。",
@@ -88,11 +81,7 @@
     },
     "button": {
       "reload": "再読み込み",
-      "download": "OpenTaikoをダウンロード",
-      "download_stable": "安定版をダウンロード",
-      "download_experimental": "実験版をダウンロード",
       "launch": "OpenTaikoを起動",
-      "explorer": "エクスプローラーで開く",
       "update": "OpenTaikoを更新",
       "redownload": "OpenTaikoを再ダウンロード",
       "rebuild": "再ビルド",
@@ -303,57 +292,27 @@
         "updates_waiting": "{count} 曲に更新あり",
         "search": "曲・フォルダーを検索..."
     },
-    "col": {
-      "name": "曲名",
-      "folder": "フォルダ",
-      "difficulties": "難易度",
-      "charter": "譜面作成：",
-      "size": "サイズ",
-      "status": "状態"
-    },
-    "filter": {
-      "song": "曲を検索...",
-      "folder": "フォルダを検索..."
-    },
     "status": {
       "installed_short": "所持",
-      "scanning": "スキャン中...",
       "not_downloaded": "未ダウンロード",
       "up_to_date": "最新",
       "outdated": "古い"
     },
     "button": {
-      "bulk_download": "一括ダウンロード",
-      "download": "ダウンロード",
-      "redownload": "再ダウンロード",
       "update": "更新",
       "open_folder": "曲フォルダを開く"
     },
-    "view": {
-      "list": "リスト",
-      "tree": "ツリー"
-    },
     "scan": {
-      "progress": "曲をスキャン中...（{count}曲見つかりました）",
-      "done": "ライブラリに{count}曲あります"
+      "progress": "曲をスキャン中...（{count}曲見つかりました）"
     },
     "tree": {
       "show_more": "さらに {count} 件を表示",
       "get_n": "{count} 曲取得",
       "nothing_here": "現在の絞り込みに一致するものはありません。",
       "installed_of": "{total} 曲中 {installed} 曲",
-      "library_total": "ライブラリ: {total} 曲中 {installed} 曲インストール済み",
-      "legend_available": "薄い表示 = ダウンロード可能",
-      "show_available": "ダウンロード可能な曲を表示",
       "no_match": "検索に一致する曲がありません。",
       "open_folder_tip": "このフォルダーを開く",
-      "download_folder_tip": "このフォルダーの未所持 {count} 曲をダウンロード",
-      "soundtrack": "OpenTaiko サウンドトラック",
-      "custom": "カスタム",
-      "songs_count": "{count}曲",
-      "empty": "ライブラリにはまだ曲がありません。",
-      "spicy": "辛口",
-      "sweet": "甘口"
+      "custom": "カスタム"
     },
     "migrate": {
       "banner": "「{instance}」内に {count} 個の曲フォルダが見つかりました。共有曲ライブラリに移動しますか？",
@@ -384,9 +343,7 @@
       "scan_failed": "曲ライブラリのスキャンに失敗しました：{error}"
     },
     "success": {
-      "all_up_to_date": "すべての曲は最新の状態です",
-      "download_complete": "ダウンロード完了",
-      "download_nb": "曲 {nb}/{total} をダウンロードしました"
+      "download_complete": "ダウンロード完了"
     },
     "duplicates": {
       "banner": "「{instance}」に空の重複フォルダが {count} 個あります。削除しますか？",
@@ -427,8 +384,7 @@
     },
     "success": {
       "all_up_to_date": "{type}はすべて最新の状態です",
-      "download_complete": "ダウンロード完了",
-      "download_nb": "{type} {nb}/{total} をダウンロードしました"
+      "download_complete": "ダウンロード完了"
     }
   },
   "asset_cell": {
@@ -476,7 +432,6 @@
     "tab": {
       "changelog_game": "更新履歴（ゲーム）",
       "changelog_hub": "更新履歴（Hub）",
-      "documentation": "ドキュメント",
       "troubleshooting": "トラブルシューティング",
       "credits": "クレジット"
     },
@@ -630,10 +585,6 @@
     },
     "debug": {
       "disable_btn": "デバッグモードを無効にする"
-    },
-    "error": {
-      "theme_json": "theme.jsonファイル（または設定フォルダー）が存在しないか破損しています！<br>OpenTaiko Hubを再インストールして修正してください。",
-      "thememode_json": "thememode.jsonファイル（または設定フォルダー）が存在しないか破損しています！<br>OpenTaiko Hubを再インストールして修正してください。"
     },
     "warn": {
       "same_theme": "選択されたテーマは現在のテーマと同じです。",
