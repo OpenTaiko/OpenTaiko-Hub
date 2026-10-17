@@ -3,7 +3,8 @@
     "fetch_error": "불러오기 오류",
     "retry": "재시도",
     "reload": "새로고침",
-    "cancel": "취소"
+    "cancel": "취소",
+    "clear": "지우기"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "시크릿",
     "information": "정보",
     "links": "링크",
-    "themes": "OpTk Hub 테마",
+    "themes": "설정",
     "tooltip": {
       "home": "OpenTaiko와 OpenTaiko Hub를 관리합니다.",
       "songlist": "OpenTaiko 곡을 업데이트하고 최신 곡을 다운로드하세요.",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "체인지로그와 문서를 확인하거나 문제를 해결할 때 이용하세요.",
       "links": "OpenTaiko의 소셜 미디어와 웹사이트를 둘러보세요!",
-      "themes": "OpenTaiko Hub의 테마를 변경합니다.",
+      "themes": "OpenTaiko Hub의 테마와 언어를 변경합니다.",
       "github": "OpenTaiko Hub 소스 코드를 확인합니다."
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "OpenTaiko 다시 다운로드",
       "rebuild": "다시 빌드",
       "retry": "재시도",
-      "install": "빌드 설치..."
+      "install": "빌드 설치...",
+      "change_build": "빌드 변경"
     },
     "warn": {
       "skin_update": "(업데이트하면 스킨 업데이트가 필요합니다)"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "개요"
-    }
+    },
+    "first_run_text": "OpenTaiko가 아직 설치되지 않았습니다.",
+    "first_run_install": "OpenTaiko 설치",
+    "first_run_folder": "설치 위치: {folder}"
   },
   "docs": {
     "title": "문서",
@@ -224,7 +229,10 @@
         "jacket_hint": "게임에서 상자에 표시됩니다. PNG, JPG 또는 WebP.",
         "jacket_pick": "이미지 선택...",
         "jacket_saved": "{name}(으)로 저장했습니다",
-        "jacket_failed": "이미지를 설정할 수 없습니다: {error}"
+        "jacket_failed": "이미지를 설정할 수 없습니다: {error}",
+      "discard_title": "저장되지 않은 변경 사항",
+      "discard_message": "폴더 설정에 저장되지 않은 변경 사항이 있습니다. 버리시겠습니까?",
+      "discard": "버리기"
     },
     "folder": {
         "loading": "곡을 불러오는 중입니다.",
@@ -269,7 +277,8 @@
         "help_hint": "폴더를 열어 둘러보거나, ‘받기’로 빠진 곡을 한 번에 내려받으세요.",
         "get_size": "다운로드 ({size})",
         "open_song_folder": "폴더 열기",
-        "set_jacket": "재킷 설정"
+        "set_jacket": "재킷 설정",
+      "website": "웹사이트"
     },
     "course": {
         "easy": "쉬움",
@@ -312,7 +321,9 @@
       "installed_of": "{total}곡 중 {installed}곡 설치됨",
       "no_match": "검색과 일치하는 곡이 없습니다.",
       "open_folder_tip": "이 폴더 열기",
-      "custom": "커스텀"
+      "custom": "커스텀",
+      "all_updated": "모두 최신 상태입니다.",
+      "none_installed": "아직 설치된 곡이 없습니다."
     },
     "migrate": {
       "banner": "\"{instance}\"에서 {count}개의 곡 폴더를 찾았습니다. 공유 곡 라이브러리로 옮기시겠습니까?",
@@ -418,7 +429,9 @@
       "perfect": "퍼펙트",
       "full_combo": "풀 콤보",
       "clear": "클리어"
-    }
+    },
+    "modal_title": "명예의 전당: {title} ({course} #{rank})",
+    "crown": "명예의 전당"
   },
   "version_chip": {
     "incompatible": "현재 OpenTaiko 버전과 호환되지 않습니다",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "재생",
-    "pause": "일시정지"
+    "pause": "일시정지",
+    "position": "재생 위치"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "{total}개 중 {count}개 다운로드 완료",
     "failed": "{total}개 중 {count}개 다운로드 완료. 실패: {failed}",
     "cancelled": "취소됨. {total}개 중 {count}개 다운로드 완료"
+  },
+  "files": {
+    "images": "이미지",
+    "chart_archives": "채보 압축 파일",
+    "optk_save": "OpenTaiko 세이브"
   }
 }

@@ -4,18 +4,22 @@
 	import { localizedTitle, localizedSubtitle } from '$lib/utils/titles';
 
 	interface Props {
-		songInfo: SoundtrackEntry;
+		/** The catalog entry, or null for a song of the user's own that the soundtrack
+		 *  does not have: it plays from disk and shows Title and Subtitle instead. */
+		songInfo: SoundtrackEntry | null;
 		/** Local audio for an installed chart. Falls back to the soundtrack repo only
 		 *  when the chart is not on disk, so a downloaded library plays offline and
 		 *  does not hammer the repository. */
 		Src?: string | null;
+		Title?: string;
+		Subtitle?: string | null;
 	}
 
-	let { songInfo, Src = null }: Props = $props();
+	let { songInfo, Src = null, Title = '', Subtitle = null }: Props = $props();
 
 	let source = $derived(
 		Src
-		?? `https://github.com/OpenTaiko/OpenTaiko-Soundtrack/raw/refs/heads/main/${songInfo.chartAudioFilePath}`
+		?? (songInfo ? `https://github.com/OpenTaiko/OpenTaiko-Soundtrack/raw/refs/heads/main/${songInfo.chartAudioFilePath}` : null)
 	);
 
 	let time = $state(0);
@@ -32,8 +36,8 @@
 		time = 0;
 	});
 
-	let title = $derived(localizedTitle(songInfo, $locale));
-	let subtitle = $derived(localizedSubtitle(songInfo, $locale));
+	let title = $derived(songInfo ? localizedTitle(songInfo, $locale) : Title);
+	let subtitle = $derived(songInfo ? localizedSubtitle(songInfo, $locale) : (Subtitle ?? ''));
 
 	function format(time: number): string {
 		if (isNaN(time)) return '...';
@@ -75,10 +79,20 @@
 				class="slider"
 				role="slider"
 				tabindex="0"
-				aria-label={$_('player.play')}
+				aria-label={$_('player.position')}
 				aria-valuemin={0}
 				aria-valuemax={duration || 0}
 				aria-valuenow={time}
+				aria-valuetext={format(time)}
+				onkeydown={(e) => {
+					if (!duration) return;
+					const step = { ArrowLeft: -5, ArrowDown: -5, ArrowRight: 5, ArrowUp: 5 }[e.key];
+					if (step !== undefined) time = Math.min(duration, Math.max(0, time + step));
+					else if (e.key === 'Home') time = 0;
+					else if (e.key === 'End') time = duration;
+					else return;
+					e.preventDefault();
+				}}
 				onpointerdown={e => {
 					const div = e.currentTarget;
 					

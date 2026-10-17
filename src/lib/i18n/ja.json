@@ -3,7 +3,8 @@
     "fetch_error": "取得エラー",
     "retry": "再試行",
     "reload": "再読み込み",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "clear": "クリア"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "シークレット",
     "information": "情報",
     "links": "リンク",
-    "themes": "Hubテーマ",
+    "themes": "設定",
     "tooltip": {
       "home": "OpenTaikoとOpenTaiko Hubを管理します。",
       "songlist": "OpenTaikoの曲を更新し、最新の曲をダウンロードします。",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "更新履歴、ドキュメント、またはトラブルシューティングの参照に。",
       "links": "OpenTaikoのSNSとウェブサイトをチェック！",
-      "themes": "OpenTaiko Hubのテーマを変更します。",
+      "themes": "OpenTaiko Hubのテーマと言語を変更します。",
       "github": "OpenTaiko HubのソースコードをGitHubで見る。"
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "OpenTaikoを再ダウンロード",
       "rebuild": "再ビルド",
       "retry": "再試行",
-      "install": "ビルドをインストール..."
+      "install": "ビルドをインストール...",
+      "change_build": "ビルドを変更"
     },
     "warn": {
       "skin_update": "（更新にはスキンの更新が必要です）"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "概要"
-    }
+    },
+    "first_run_text": "OpenTaikoはまだインストールされていません。",
+    "first_run_install": "OpenTaikoをインストール",
+    "first_run_folder": "インストール先: {folder}"
   },
   "docs": {
     "title": "ドキュメント",
@@ -224,7 +229,10 @@
         "jacket_hint": "ゲーム内のボックスに表示されます。PNG・JPG・WebP に対応。",
         "jacket_pick": "画像を選択...",
         "jacket_saved": "{name} として保存しました",
-        "jacket_failed": "画像を設定できませんでした: {error}"
+        "jacket_failed": "画像を設定できませんでした: {error}",
+      "discard_title": "未保存の変更",
+      "discard_message": "フォルダ設定に保存されていない変更があります。破棄しますか？",
+      "discard": "破棄"
     },
     "folder": {
         "loading": "楽曲を読み込んでいます。",
@@ -269,7 +277,8 @@
         "help_hint": "フォルダーを開いて閲覧するか、「取得」で不足分をまとめてダウンロードできます。",
         "get_size": "ダウンロード（{size}）",
         "open_song_folder": "フォルダーを開く",
-        "set_jacket": "ジャケットを設定"
+        "set_jacket": "ジャケットを設定",
+      "website": "ウェブサイト"
     },
     "course": {
         "easy": "かんたん",
@@ -312,7 +321,9 @@
       "installed_of": "{total} 曲中 {installed} 曲",
       "no_match": "検索に一致する曲がありません。",
       "open_folder_tip": "このフォルダーを開く",
-      "custom": "カスタム"
+      "custom": "カスタム",
+      "all_updated": "すべて最新です。",
+      "none_installed": "まだ楽曲がインストールされていません。"
     },
     "migrate": {
       "banner": "「{instance}」内に {count} 個の曲フォルダが見つかりました。共有曲ライブラリに移動しますか？",
@@ -418,7 +429,9 @@
       "perfect": "全良",
       "full_combo": "フルコンボ",
       "clear": "クリア"
-    }
+    },
+    "modal_title": "殿堂入り: {title}（{course} #{rank}）",
+    "crown": "殿堂入り"
   },
   "version_chip": {
     "incompatible": "現在のOpenTaikoバージョンと互換性がありません",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "再生",
-    "pause": "一時停止"
+    "pause": "一時停止",
+    "position": "再生位置"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "{total} 件中 {count} 件をダウンロードしました",
     "failed": "{total} 件中 {count} 件をダウンロードしました。失敗: {failed}",
     "cancelled": "中止しました。{total} 件中 {count} 件をダウンロード済み"
+  },
+  "files": {
+    "images": "画像",
+    "chart_archives": "譜面アーカイブ",
+    "optk_save": "OpenTaikoのセーブ"
   }
 }

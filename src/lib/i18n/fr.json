@@ -3,7 +3,8 @@
     "fetch_error": "Erreur de récupération",
     "retry": "Réessayer",
     "reload": "Recharger",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "clear": "Effacer"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "Secrets",
     "information": "Informations",
     "links": "Liens",
-    "themes": "Thèmes OpTk Hub",
+    "themes": "Réglages",
     "tooltip": {
       "home": "Gérez OpenTaiko et l'OpenTaiko Hub.",
       "songlist": "Mettez à jour vos chansons OpenTaiko et téléchargez les plus récentes.",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "Pour consulter les changelogs, la documentation, ou en cas de problème.",
       "links": "Découvrez les réseaux sociaux et les sites web d'OpenTaiko !",
-      "themes": "Changez le thème de l'OpenTaiko Hub.",
+      "themes": "Thème et langue de l'OpenTaiko Hub.",
       "github": "Voir le code source de l'OpenTaiko Hub."
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "Retélécharger OpenTaiko",
       "rebuild": "Recompiler",
       "retry": "Réessayer",
-      "install": "Installer un build..."
+      "install": "Installer un build...",
+      "change_build": "Changer de version"
     },
     "warn": {
       "skin_update": "(La mise à jour nécessitera une mise à jour du skin)"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "Vue d'ensemble"
-    }
+    },
+    "first_run_text": "OpenTaiko n'est pas encore installé.",
+    "first_run_install": "Installer OpenTaiko",
+    "first_run_folder": "Il sera installé dans {folder}"
   },
   "docs": {
     "title": "Documentation",
@@ -224,7 +229,10 @@
         "jacket_hint": "Affichée sur la boîte en jeu. PNG, JPG ou WebP.",
         "jacket_pick": "Choisir une image...",
         "jacket_saved": "Enregistrée sous {name}",
-        "jacket_failed": "Impossible de définir l'image : {error}"
+        "jacket_failed": "Impossible de définir l'image : {error}",
+      "discard_title": "Modifications non enregistrées",
+      "discard_message": "Les réglages du dossier ont des modifications non enregistrées. Les abandonner ?",
+      "discard": "Abandonner"
     },
     "folder": {
         "loading": "Les chansons sont en cours de chargement.",
@@ -238,7 +246,7 @@
         "created": "« {name} » créé",
         "create_failed": "Impossible de créer le dossier : {error}",
         "delete": "Supprimer",
-        "delete_confirm": "Supprimer « {name} » et les {count} chansons qu'il contient ? Action irréversible.",
+        "delete_confirm": "Supprimer « {name} »{count, plural, =0 { ?} one { et la chanson qu'il contient ?} other { et les # chansons qu'il contient ?}} Action irréversible.",
         "delete_song_confirm": "Supprimer « {name} » ? Action irréversible.",
         "deleted": "« {name} » supprimé",
         "delete_failed": "Suppression impossible : {error}",
@@ -251,7 +259,7 @@
         "drop_hint": "Déposez des .zip de fichiers ici pour les ajouter à ce dossier",
         "browse_zip": "Choisir des fichiers...",
         "importing": "Ajout des fichiers...",
-        "imported": "{count} chansons ajoutées",
+        "imported": "{count, plural, one {# chanson ajoutée} other {# chansons ajoutées}}",
         "import_rejected": "Pas une archive de fichiers : {names}",
         "import_failed": "Impossible d'ajouter les fichiers : {error}",
         "drop_needs_folder": "Sélectionnez d'abord un de vos dossiers, puis déposez-y les fichiers."
@@ -269,7 +277,8 @@
         "help_hint": "Ouvrez un dossier pour le parcourir, ou utilisez Télécharger pour récupérer ce qui manque.",
         "get_size": "Télécharger ({size})",
         "open_song_folder": "Ouvrir le dossier",
-        "set_jacket": "Définir la jaquette"
+        "set_jacket": "Définir la jaquette",
+      "website": "Site web"
     },
     "course": {
         "easy": "Facile",
@@ -312,15 +321,17 @@
       "installed_of": "{installed} / {total} installés",
       "no_match": "Aucune chanson ne correspond à cette recherche.",
       "open_folder_tip": "Ouvrir ce dossier",
-      "custom": "Personnalisé"
+      "custom": "Personnalisé",
+      "all_updated": "Tout est à jour.",
+      "none_installed": "Aucune chanson n'est encore installée."
     },
     "migrate": {
-      "banner": "{count} dossier(s) de chansons trouvé(s) dans « {instance} ». Les transférer vers la bibliothèque de chansons partagée ?",
+      "banner": "{count, plural, one {# dossier de chansons trouvé} other {# dossiers de chansons trouvés}} dans « {instance} ». {count, plural, one {Le transférer} other {Les transférer}} vers la bibliothèque de chansons partagée ?",
       "button": "Transférer les chansons",
       "later": "Plus tard",
       "modal_title": "Transférer les chansons de « {instance} »",
-      "summary_new": "{count} nouveau(x) dossier(s) de chanson seront ajoutés à la bibliothèque partagée.",
-      "summary_identical": "{count} dossier(s) de chanson identiques seront retirés de cette instance.",
+      "summary_new": "{count, plural, one {# nouveau dossier de chanson sera ajouté} other {# nouveaux dossiers de chanson seront ajoutés}} à la bibliothèque partagée.",
+      "summary_identical": "{count, plural, one {# dossier de chanson identique sera retiré} other {# dossiers de chanson identiques seront retirés}} de cette instance.",
       "nothing": "Cette instance n'a aucun chart à transférer.",
       "conflicts_title": "Conflits ({count})",
       "conflicts_hint": "Ces chansons existent déjà dans la bibliothèque partagée avec un contenu différent. Choisissez la version à conserver.",
@@ -335,7 +346,7 @@
       "error": "Échec du transfert des chansons : {error}"
     },
     "metadata": {
-      "updated": "{count} dossier(s) de genre mis à jour (box.def / preimages)"
+      "updated": "{count, plural, one {# dossier de genre mis à jour} other {# dossiers de genre mis à jour}} (box.def / preimages)"
     },
     "error": {
       "open_folder": "Impossible d'ouvrir le dossier : {error}",
@@ -346,9 +357,9 @@
       "download_complete": "Téléchargement terminé"
     },
     "duplicates": {
-      "banner": "{count} dossier(s) vides en double dans « {instance} ». Les supprimer ?",
+      "banner": "{count, plural, one {# dossier vide en double} other {# dossiers vides en double}} dans « {instance} ». {count, plural, one {Le supprimer ?} other {Les supprimer ?}}",
       "button": "Nettoyer",
-      "success": "{count} dossier(s) en double supprimé(s).",
+      "success": "{count, plural, one {# dossier en double supprimé} other {# dossiers en double supprimés}}.",
       "error": "Échec de la suppression des dossiers en double : {error}"
     }
   },
@@ -418,7 +429,9 @@
       "perfect": "Perfect",
       "full_combo": "Full Combo",
       "clear": "Clear"
-    }
+    },
+    "modal_title": "Hall of Fame : {title} ({course} #{rank})",
+    "crown": "Hall of Fame"
   },
   "version_chip": {
     "incompatible": "Non compatible avec la version actuelle d'OpenTaiko",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "lecture",
-    "pause": "pause"
+    "pause": "pause",
+    "position": "Position"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "{count} sur {total} téléchargés",
     "failed": "{count} sur {total} téléchargés. Échecs : {failed}",
     "cancelled": "Annulé. {count} sur {total} téléchargés"
+  },
+  "files": {
+    "images": "Images",
+    "chart_archives": "Archives de charts",
+    "optk_save": "Sauvegarde OpenTaiko"
   }
 }

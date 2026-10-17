@@ -7,6 +7,8 @@
     // here. Whatever the form does not cover is listed read-only at the bottom, and the
     // raw file is one click away.
     import { _ } from 'svelte-i18n';
+    import { onDestroy } from 'svelte';
+    import { unsavedBoxDef } from '$lib/stores/editing';
     import { parseBoxDef, serializeBoxDef, getField, setField, asColor, directivesOf, BOX_LANGS } from '$lib/utils/boxdef';
     import type { BoxDefDoc } from '$lib/utils/boxdef';
 
@@ -25,6 +27,7 @@
     let loadedFrom = $state<string | null>(null);
     let showLangs = $state(false);
     let showRaw = $state(false);
+    let genreHelpOpen = $state(false);
     let lang = $state<string>('JA');
 
     // Reload when the file changes underneath, but never while the user is mid-edit.
@@ -36,6 +39,12 @@
     });
 
     let dirty = $derived(doc !== null && Text !== null && serializeBoxDef(doc) !== Text);
+
+    // Told to the page, which asks before another selection would throw the changes away
+    $effect(() => {
+        unsavedBoxDef.set(dirty && !ReadOnly);
+    });
+    onDestroy(() => unsavedBoxDef.set(false));
 
     const set = (key: string, value: string) => {
         if (!doc || ReadOnly) return;
@@ -93,10 +102,11 @@
         <label class="field">
             <span>
                 {$_('songs.box.genre')}
-                <button type="button" class="help" title={$_('songs.box.genre_help')} aria-label={$_('songs.box.genre_help')}>?</button>
+                <button type="button" class="help" title={$_('songs.box.genre_help')} aria-label={$_('songs.box.genre_help')} aria-expanded={genreHelpOpen} onclick={() => genreHelpOpen = !genreHelpOpen}>?</button>
             </span>
             <input type="text" value={getField(doc, '#GENRE')} disabled={ReadOnly}
                 oninput={(e) => set('#GENRE', e.currentTarget.value)}>
+            {#if genreHelpOpen}<small class="hint">{$_('songs.box.genre_help')}</small>{/if}
         </label>
 
         <fieldset class="group">
@@ -182,7 +192,7 @@
             {#if showRaw}
                 <ul class="others">
                     {#each others as d (d.key)}
-                        <li><code>{d.key}</code><span>{d.value}</span></li>
+                        <li><code>{d.key}</code><span title={d.value}>{d.value}</span></li>
                     {/each}
                 </ul>
                 <p class="dim">{$_('songs.box.others_note')}</p>
@@ -306,6 +316,7 @@
         vertical-align: middle;
     }
     .help:hover {opacity: 1;}
+    .hint {font-size: 0.75rem; opacity: 0.75;}
 
     .others {list-style: none; margin: 0; padding: 0 0 0 0.5rem; display: flex; flex-direction: column; gap: 0.15rem;}
     .others li {display: flex; gap: 0.4rem; font-size: 0.72rem; margin: 0;}

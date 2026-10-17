@@ -11,38 +11,33 @@
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
 
-    // Version Number
-    let VersionHub = $state("Loading...")
+    import { compareVersions } from '$lib/utils/versions';
 
-    async function getHubVersion() {
-        const appVersion = await getVersion();
-        VersionHub = "v" + appVersion;
-        console.log(VersionHub);
-    }
-
-    // Check version number
-    const repoOwner = 'OpenTaiko';//'OpenTaiko';
-    const repoName = 'OpenTaiko-Hub';//OpenTaiko-Dev-Mirror';
-    let latestVersion = $state('Loading...');
+    // This Hub's version and the latest release's, without the leading "v"
+    let currentVersion = $state<string | null>(null);
+    let latestVersion = $state<string | null>(null);
     let latestVersionErrorFound = $state(false);
 
+    // Compared as versions: a string comparison called a newer local build outdated and
+    // warned about it on every launch
+    let outdated = $derived(
+        currentVersion !== null && latestVersion !== null && (compareVersions(latestVersion, currentVersion) ?? 0) > 0
+    );
+
+    const repoOwner = 'OpenTaiko';
+    const repoName = 'OpenTaiko-Hub';
 
     const TryFetchingLatestVersion = async () => {
+        latestVersionErrorFound = false;
         try {
-            latestVersionErrorFound = false;
             const data = await fetchCachedJson<{ tag_name: string }>(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
-            latestVersion = data.tag_name; // Latest tag version number
-
-            if (VersionHub == latestVersion) {
-                console.log("Hub version is up to date!");
-            }
-            else if (VersionHub != latestVersion) {
-                console.log("Hub version is out of date, or newer than the current version on GitHub.");
-                TriggerWarning(get(_)('hub.warn.outdated_toast'));
-            }
+            latestVersion = data.tag_name.replace(/^v/i, '');
+            if (outdated) TriggerWarning(get(_)('hub.warn.outdated_toast'));
         } catch (err) {
+            // Shown on this card with a Retry button. No toast: offline, the Home page
+            // already reports the same failed connection.
+            console.error('Hub update check failed:', err);
             latestVersionErrorFound = true;
-            TriggerError(get(_)('hub.error.fetch', { values: { error: String(err) } }));
         }
     }
 
@@ -57,7 +52,12 @@
     }
 
     onMount(async () => {
-        getHubVersion()
+        // Read first, so the check compares against it
+        try {
+            currentVersion = await getVersion();
+        } catch (error) {
+            console.error('Could not read the Hub version:', error);
+        }
         await TryFetchingLatestVersion();
     });
 </script>
@@ -69,12 +69,12 @@
             {#if latestVersionErrorFound === true}
                 <span>{$_('hub.status.fetch_failed')}</span>
                 <span class="fetch-error"><b>{$_('common.fetch_error')}</b></span>
-                <button type="button" onclick={TryFetchingLatestVersion} class="button-red button-main"><i class="fa-solid fa-triangle-exclamation"></i> {$_('common.retry')}</button>
-            {:else if latestVersion === "Loading..."}
+                <button type="button" onclick={TryFetchingLatestVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('common.retry')}</button>
+            {:else if latestVersion === null}
                 <span>{$_('hub.status.checking')}</span>
-            {:else if VersionHub != latestVersion}
+            {:else if outdated}
                 <span><b>{$_('hub.status.outdated')}</b></span>
-                <button type="button" onclick={UpdateHub} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('hub.button.update', { values: { version: latestVersion.slice(1) } })}</button>
+                <button type="button" onclick={UpdateHub} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('hub.button.update', { values: { version: latestVersion } })}</button>
             {:else}
                 <span><b>{$_('hub.status.up_to_date')}</b></span>
             {/if}
@@ -82,7 +82,7 @@
     </div>
 </section>
 
-<div class="card p-4 hubversionnumber">OpenTaiko Hub ({VersionHub})</div>
+<div class="card p-4 hubversionnumber">OpenTaiko Hub {#if currentVersion}(v{currentVersion}){/if}</div>
 
 <style>
     .hubversionnumber {

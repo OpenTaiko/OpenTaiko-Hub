@@ -3,7 +3,8 @@
     "fetch_error": "Abruffehler",
     "retry": "Erneut versuchen",
     "reload": "Neu laden",
-    "cancel": "Abbrechen"
+    "cancel": "Abbrechen",
+    "clear": "Leeren"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "Geheimnisse",
     "information": "Infos",
     "links": "Links",
-    "themes": "OpTk Hub Themes",
+    "themes": "Optionen",
     "tooltip": {
       "home": "OpenTaiko und den OpenTaiko Hub verwalten.",
       "songlist": "OpenTaiko-Songs aktualisieren und die neuesten herunterladen.",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "Zum Nachlesen der Changelogs und der Dokumentation oder zur Fehlerbehebung.",
       "links": "OpenTaikos Social-Media-Kanäle und Websites entdecken!",
-      "themes": "Das Theme des OpenTaiko Hub ändern.",
+      "themes": "Theme und Sprache des OpenTaiko Hub.",
       "github": "Den Quellcode des OpenTaiko Hub ansehen."
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "OpenTaiko erneut herunterladen",
       "rebuild": "Neu erstellen",
       "retry": "Erneut versuchen",
-      "install": "Build installieren..."
+      "install": "Build installieren...",
+      "change_build": "Version wechseln"
     },
     "warn": {
       "skin_update": "(Nach dem Aktualisieren ist ein Skin-Update erforderlich)"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "Übersicht"
-    }
+    },
+    "first_run_text": "OpenTaiko ist noch nicht installiert.",
+    "first_run_install": "OpenTaiko installieren",
+    "first_run_folder": "Wird installiert in {folder}"
   },
   "docs": {
     "title": "Dokumentation",
@@ -224,7 +229,10 @@
         "jacket_hint": "Wird im Spiel auf der Box angezeigt. PNG, JPG oder WebP.",
         "jacket_pick": "Bild auswählen...",
         "jacket_saved": "Als {name} gespeichert",
-        "jacket_failed": "Bild konnte nicht gesetzt werden: {error}"
+        "jacket_failed": "Bild konnte nicht gesetzt werden: {error}",
+      "discard_title": "Ungespeicherte Änderungen",
+      "discard_message": "Die Ordnereinstellungen haben ungespeicherte Änderungen. Verwerfen?",
+      "discard": "Verwerfen"
     },
     "folder": {
         "loading": "Die Lieder werden gerade geladen.",
@@ -238,7 +246,7 @@
         "created": "„{name}“ erstellt",
         "create_failed": "Ordner konnte nicht erstellt werden: {error}",
         "delete": "Löschen",
-        "delete_confirm": "„{name}“ und die {count} enthaltenen Lieder löschen? Das lässt sich nicht rückgängig machen.",
+        "delete_confirm": "„{name}“{count, plural, =0 {} one { und das enthaltene Lied} other { und die # enthaltenen Lieder}} löschen? Das lässt sich nicht rückgängig machen.",
         "delete_song_confirm": "„{name}“ löschen? Das lässt sich nicht rückgängig machen.",
         "deleted": "„{name}“ gelöscht",
         "delete_failed": "Löschen fehlgeschlagen: {error}",
@@ -251,7 +259,7 @@
         "drop_hint": "Lege Chart-.zip-Dateien hier ab, um sie diesem Ordner hinzuzufügen",
         "browse_zip": "Dateien auswählen...",
         "importing": "Charts werden hinzugefügt...",
-        "imported": "{count} Lieder hinzugefügt",
+        "imported": "{count, plural, one {# Lied} other {# Lieder}} hinzugefügt",
         "import_rejected": "Kein Chart-Archiv: {names}",
         "import_failed": "Charts konnten nicht hinzugefügt werden: {error}",
         "drop_needs_folder": "Wähle zuerst einen eigenen Ordner und lege die Dateien dann dort ab."
@@ -269,7 +277,8 @@
         "help_hint": "Öffne einen Ordner zum Durchsehen, oder lade mit „Laden“ alles Fehlende herunter.",
         "get_size": "Herunterladen ({size})",
         "open_song_folder": "Ordner öffnen",
-        "set_jacket": "Cover festlegen"
+        "set_jacket": "Cover festlegen",
+      "website": "Website"
     },
     "course": {
         "easy": "Einfach",
@@ -312,15 +321,17 @@
       "installed_of": "{installed} / {total} installiert",
       "no_match": "Keine Lieder entsprechen dieser Suche.",
       "open_folder_tip": "Diesen Ordner öffnen",
-      "custom": "Benutzerdefiniert"
+      "custom": "Benutzerdefiniert",
+      "all_updated": "Alles ist aktuell.",
+      "none_installed": "Noch keine Lieder installiert."
     },
     "migrate": {
       "banner": "{count} Song-Ordner in „{instance}“ gefunden. In die geteilte Song-Bibliothek übertragen?",
       "button": "Songs übertragen",
       "later": "Später",
       "modal_title": "Songs aus „{instance}“ übertragen",
-      "summary_new": "{count} neue Song-Ordner werden zur geteilten Bibliothek hinzugefügt.",
-      "summary_identical": "{count} identische Song-Ordner werden aus dieser Instanz entfernt.",
+      "summary_new": "{count, plural, one {# neuer Song-Ordner wird} other {# neue Song-Ordner werden}} zur geteilten Bibliothek hinzugefügt.",
+      "summary_identical": "{count, plural, one {# identischer Song-Ordner wird} other {# identische Song-Ordner werden}} aus dieser Instanz entfernt.",
       "nothing": "Diese Instanz hat keine Charts zum Übertragen.",
       "conflicts_title": "Konflikte ({count})",
       "conflicts_hint": "Diese Songs sind bereits mit anderem Inhalt in der geteilten Bibliothek vorhanden. Wähle die zu behaltende Version.",
@@ -346,9 +357,9 @@
       "download_complete": "Download abgeschlossen"
     },
     "duplicates": {
-      "banner": "{count} leere doppelte Ordner in „{instance}“. Entfernen?",
+      "banner": "{count, plural, one {# leerer doppelter Ordner} other {# leere doppelte Ordner}} in „{instance}“. Entfernen?",
       "button": "Aufräumen",
-      "success": "{count} doppelte(r) Ordner entfernt.",
+      "success": "{count, plural, one {# doppelter Ordner} other {# doppelte Ordner}} entfernt.",
       "error": "Doppelte Ordner konnten nicht entfernt werden: {error}"
     }
   },
@@ -418,7 +429,9 @@
       "perfect": "Perfect",
       "full_combo": "Full Combo",
       "clear": "Clear"
-    }
+    },
+    "modal_title": "Hall of Fame: {title} ({course} #{rank})",
+    "crown": "Hall of Fame"
   },
   "version_chip": {
     "incompatible": "Nicht mit der aktuellen OpenTaiko-Version kompatibel",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "abspielen",
-    "pause": "pausieren"
+    "pause": "pausieren",
+    "position": "Position"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "{count} von {total} heruntergeladen",
     "failed": "{count} von {total} heruntergeladen. Fehlgeschlagen: {failed}",
     "cancelled": "Abgebrochen. {count} von {total} heruntergeladen"
+  },
+  "files": {
+    "images": "Bilder",
+    "chart_archives": "Chart-Archive",
+    "optk_save": "OpenTaiko-Spielstand"
   }
 }

@@ -6,6 +6,7 @@
     // Validation is live rather than on submit, so a name that is already taken is
     // refused before the folder is created rather than by a toast afterwards.
     import { _ } from 'svelte-i18n';
+    import Modal from '$lib/components/Modal.svelte';
 
     interface Props {
         Title: string;
@@ -33,12 +34,8 @@
     const focus = (node: HTMLInputElement) => node.focus();
 </script>
 
-<svelte:window onkeydown={(e) => { if (e.key === 'Escape') OnCancel(); }} />
-
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={() => OnCancel()}>
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="card prompt" onclick={(e) => e.stopPropagation()}>
+<Modal Label={Title} OnClose={OnCancel}>
+    <div class="prompt">
         <h2>{Title}</h2>
 
         <label class="field">
@@ -66,21 +63,11 @@
             </button>
         </div>
     </div>
-</div>
+</Modal>
 
 <style>
-    .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        z-index: 60;
-        display: grid;
-        place-items: center;
-        padding: 1rem;
-        background-color: rgb(0 0 0 / 0.5);
-    }
-
     .prompt {
-        width: min(26rem, 100%);
+        width: min(26rem, calc(100vw - 2rem));
         display: flex;
         flex-direction: column;
         gap: 0.5rem;

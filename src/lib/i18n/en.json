@@ -3,7 +3,8 @@
     "fetch_error": "Fetch Error",
     "retry": "Retry",
     "reload": "Reload",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "clear": "Clear"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "Secrets",
     "information": "Information",
     "links": "Links",
-    "themes": "OpTk Hub Themes",
+    "themes": "Settings",
     "tooltip": {
       "home": "Manage OpenTaiko and the OpenTaiko Hub.",
       "songlist": "Update your OpenTaiko songs and download the latest ones.",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "To consult the changelogs, the documentation, or for troubleshooting.",
       "links": "Check out OpenTaiko's socials and websites!",
-      "themes": "Change the theme of the OpenTaiko Hub.",
+      "themes": "Theme and language of the OpenTaiko Hub.",
       "github": "View the OpenTaiko Hub source code."
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "Redownload OpenTaiko",
       "rebuild": "Rebuild",
       "retry": "Retry",
-      "install": "Install a build..."
+      "install": "Install a build...",
+      "change_build": "Change build"
     },
     "warn": {
       "skin_update": "(Updating will require a skin update)"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "Overview"
-    }
+    },
+    "first_run_text": "OpenTaiko is not installed yet.",
+    "first_run_install": "Install OpenTaiko",
+    "first_run_folder": "It will be installed in {folder}"
   },
   "docs": {
     "title": "Documentation",
@@ -224,7 +229,10 @@
         "jacket_hint": "Shown on the box in game. PNG, JPG or WebP.",
         "jacket_pick": "Choose image...",
         "jacket_saved": "Saved as {name}",
-        "jacket_failed": "Could not set the image: {error}"
+        "jacket_failed": "Could not set the image: {error}",
+      "discard_title": "Unsaved changes",
+      "discard_message": "The folder settings have changes that are not saved. Discard them?",
+      "discard": "Discard"
     },
     "folder": {
         "loading": "The songs are currently loading.",
@@ -238,7 +246,7 @@
         "created": "Created \"{name}\"",
         "create_failed": "Could not create the folder: {error}",
         "delete": "Delete",
-        "delete_confirm": "Delete \"{name}\" and the {count} songs in it? This cannot be undone.",
+        "delete_confirm": "Delete \"{name}\"{count, plural, =0 {?} one { and the song in it?} other { and the # songs in it?}} This cannot be undone.",
         "delete_song_confirm": "Delete \"{name}\"? This cannot be undone.",
         "deleted": "Deleted \"{name}\"",
         "delete_failed": "Could not delete: {error}",
@@ -251,7 +259,7 @@
         "drop_hint": "Drop chart .zip files here to add them to this folder",
         "browse_zip": "Choose files...",
         "importing": "Adding charts...",
-        "imported": "Added {count} songs",
+        "imported": "Added {count, plural, one {# song} other {# songs}}",
         "import_rejected": "Not a chart archive: {names}",
         "import_failed": "Could not add the charts: {error}",
         "drop_needs_folder": "Select one of your own folders first, then drop the files into it."
@@ -269,7 +277,8 @@
         "help_hint": "Open a folder to browse it, or use Get to download everything it is missing.",
         "get_size": "Download ({size})",
         "open_song_folder": "Open folder",
-        "set_jacket": "Set jacket"
+        "set_jacket": "Set jacket",
+      "website": "Website"
     },
     "course": {
         "easy": "Easy",
@@ -312,15 +321,17 @@
       "installed_of": "{installed} / {total} installed",
       "no_match": "No song matches this search.",
       "open_folder_tip": "Open this folder",
-      "custom": "Custom"
+      "custom": "Custom",
+      "all_updated": "Everything is up to date.",
+      "none_installed": "No song is installed yet."
     },
     "migrate": {
-      "banner": "{count} song folder(s) were found inside \"{instance}\". Transfer them to the shared Songs library?",
+      "banner": "{count, plural, one {# song folder was} other {# song folders were}} found inside \"{instance}\". {count, plural, one {Transfer it} other {Transfer them}} to the shared Songs library?",
       "button": "Transfer songs",
       "later": "Later",
       "modal_title": "Transfer songs from \"{instance}\"",
-      "summary_new": "{count} new song folder(s) will be added to the shared library.",
-      "summary_identical": "{count} identical song folder(s) will be removed from this instance.",
+      "summary_new": "{count, plural, one {# new song folder} other {# new song folders}} will be added to the shared library.",
+      "summary_identical": "{count, plural, one {# identical song folder} other {# identical song folders}} will be removed from this instance.",
       "nothing": "This instance has no charts to transfer.",
       "conflicts_title": "Conflicts ({count})",
       "conflicts_hint": "These songs already exist in the shared library with different content. Choose which version to keep.",
@@ -335,7 +346,7 @@
       "error": "Failed to transfer the songs: {error}"
     },
     "metadata": {
-      "updated": "Updated {count} genre folder(s) (box.def / preimages)"
+      "updated": "Updated {count, plural, one {# genre folder} other {# genre folders}} (box.def / preimages)"
     },
     "error": {
       "open_folder": "Could not open the folder: {error}",
@@ -346,9 +357,9 @@
       "download_complete": "Download complete"
     },
     "duplicates": {
-      "banner": "{count} empty duplicate folder(s) in \"{instance}\". Remove them?",
+      "banner": "{count, plural, one {# empty duplicate folder} other {# empty duplicate folders}} in \"{instance}\". {count, plural, one {Remove it?} other {Remove them?}}",
       "button": "Clean up",
-      "success": "Removed {count} duplicate folder(s).",
+      "success": "Removed {count, plural, one {# duplicate folder} other {# duplicate folders}}.",
       "error": "Failed to remove the duplicate folders: {error}"
     }
   },
@@ -418,7 +429,9 @@
       "perfect": "Perfect",
       "full_combo": "Full Combo",
       "clear": "Clear"
-    }
+    },
+    "modal_title": "Hall of Fame: {title} ({course} #{rank})",
+    "crown": "Hall of Fame"
   },
   "version_chip": {
     "incompatible": "Not compatible with the current OpenTaiko version",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "play",
-    "pause": "pause"
+    "pause": "pause",
+    "position": "Position"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "Downloaded {count} of {total}",
     "failed": "Downloaded {count} of {total}. Failed: {failed}",
     "cancelled": "Cancelled. Downloaded {count} of {total}"
+  },
+  "files": {
+    "images": "Images",
+    "chart_archives": "Chart archives",
+    "optk_save": "OpenTaiko save"
   }
 }

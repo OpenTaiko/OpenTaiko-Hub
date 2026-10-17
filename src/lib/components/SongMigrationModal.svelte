@@ -1,4 +1,6 @@
 <script lang="ts">
+    import Modal from '$lib/components/Modal.svelte';
+    import { formatDateTime } from '$lib/utils/format';
     import { ipc } from '$lib/ipc';
     // Resolves an instance's local Songs folder into the shared library. New charts are
     // moved, byte-identical charts are dropped, and charts that clash with a different
@@ -71,7 +73,7 @@
     };
     const EditedDate = (entry: MigrationSongEntry | null): string => {
         if (!entry?.modified) return '—';
-        return new Date(entry.modified * 1000).toLocaleString();
+        return formatDateTime(new Date(entry.modified * 1000));
     };
 
     const SetAll = (action: ConflictChoice) => {
@@ -106,13 +108,12 @@
     };
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={OnClose}>
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
+<!-- Busy while applying: closing then would hide a move that is still running -->
+<Modal Label={$_('songs.migrate.modal_title', { values: { instance: Candidate.instance.name } })} OnClose={OnClose} Busy={applying}>
+    <div class="p-6 space-y-4 modal-body">
         <div class="flex justify-between items-center">
             <h2 class="h3">{$_('songs.migrate.modal_title', { values: { instance: Candidate.instance.name } })}</h2>
-            <button class="btn-icon btn-icon-sm preset-filled" onclick={OnClose} aria-label={$_('common.cancel')}>✕</button>
+            <button type="button" class="btn-icon btn-icon-sm preset-tonal" onclick={OnClose} disabled={applying} aria-label={$_('hof.close')} title={$_('hof.close')}><i class="fa-solid fa-xmark"></i></button>
         </div>
 
         {#if loading}
@@ -175,30 +176,18 @@
             {/if}
 
             <div class="flex gap-3 justify-end">
-                <button type="button" class="button-gray button-main" onclick={OnClose}>{$_('common.cancel')}</button>
+                <button type="button" class="button-gray button-main" onclick={OnClose} disabled={applying}>{$_('common.cancel')}</button>
                 <button type="button" class="button-green button-main" disabled={applying} onclick={Apply}>
                     <i class="fa-solid fa-right-left"></i> {$_('songs.migrate.apply')}
                 </button>
             </div>
         {/if}
     </div>
-</div>
+</Modal>
 
 <style>
-    .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-    }
-    .modal-card {
-        max-width: 900px;
-        width: 94%;
-        max-height: 85vh;
-        overflow-y: auto;
+    .modal-body {
+        width: min(900px, calc(100vw - 2rem));
     }
     .conflict-list {
         display: flex;

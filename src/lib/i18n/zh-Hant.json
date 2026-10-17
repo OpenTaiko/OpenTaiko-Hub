@@ -3,7 +3,8 @@
     "fetch_error": "擷取錯誤",
     "retry": "重試",
     "reload": "重新整理",
-    "cancel": "取消"
+    "cancel": "取消",
+    "clear": "清除"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "祕密",
     "information": "資訊",
     "links": "鏈結",
-    "themes": "Hub 主題",
+    "themes": "設定",
     "tooltip": {
       "home": "管理 OpenTaiko 與 OpenTaiko Hub。",
       "songlist": "更新並下載最新的 OpenTaiko 歌曲。",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "查看更新紀錄、說明文件、疑難排解。",
       "links": "查看 OpenTaiko 的社群與官方網站！",
-      "themes": "更改 OpenTaiko Hub 的主題。",
+      "themes": "變更 OpenTaiko Hub 的主題和語言。",
       "github": "查看 OpenTaiko Hub 原始碼。"
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "重新下載 OpenTaiko",
       "rebuild": "重新建置",
       "retry": "重試",
-      "install": "安裝版本..."
+      "install": "安裝版本...",
+      "change_build": "更換版本"
     },
     "warn": {
       "skin_update": "（更新後需要在「主題」頁面更新主題）"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "概覽"
-    }
+    },
+    "first_run_text": "尚未安裝 OpenTaiko。",
+    "first_run_install": "安裝 OpenTaiko",
+    "first_run_folder": "將安裝到 {folder}"
   },
   "docs": {
     "title": "說明文件",
@@ -224,7 +229,10 @@
         "jacket_hint": "在遊戲中顯示於盒子上。支援 PNG、JPG 或 WebP。",
         "jacket_pick": "選擇圖片...",
         "jacket_saved": "已儲存為 {name}",
-        "jacket_failed": "無法設定圖片：{error}"
+        "jacket_failed": "無法設定圖片：{error}",
+      "discard_title": "未儲存的變更",
+      "discard_message": "資料夾設定有未儲存的變更。要捨棄嗎？",
+      "discard": "捨棄"
     },
     "folder": {
         "loading": "正在載入歌曲。",
@@ -269,7 +277,8 @@
         "help_hint": "展開資料夾進行瀏覽，或使用「取得」下載其中缺少的內容。",
         "get_size": "下載（{size}）",
         "open_song_folder": "開啟資料夾",
-        "set_jacket": "設定封面"
+        "set_jacket": "設定封面",
+      "website": "網站"
     },
     "course": {
         "easy": "簡單",
@@ -312,7 +321,9 @@
       "installed_of": "已安裝 {installed} / {total}",
       "no_match": "沒有符合搜尋條件的歌曲。",
       "open_folder_tip": "開啟此資料夾",
-      "custom": "自訂"
+      "custom": "自訂",
+      "all_updated": "全部都是最新的。",
+      "none_installed": "尚未安裝任何歌曲。"
     },
     "migrate": {
       "banner": "在「{instance}」中找到 {count} 個歌曲資料夾。是否移動到共享曲庫？",
@@ -418,7 +429,9 @@
       "perfect": "全良連段",
       "full_combo": "全連段",
       "clear": "過關"
-    }
+    },
+    "modal_title": "名人堂：{title}（{course} #{rank}）",
+    "crown": "名人堂"
   },
   "version_chip": {
     "incompatible": "與目前的 OpenTaiko 版本不相容",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "播放",
-    "pause": "暫停"
+    "pause": "暫停",
+    "position": "播放位置"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "已下載 {count} / {total}",
     "failed": "已下載 {count} / {total}。失敗：{failed}",
     "cancelled": "已取消。已下載 {count} / {total}"
+  },
+  "files": {
+    "images": "圖片",
+    "chart_archives": "譜面壓縮檔",
+    "optk_save": "OpenTaiko 存檔"
   }
 }

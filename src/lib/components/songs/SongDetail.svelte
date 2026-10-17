@@ -71,7 +71,8 @@
         { key: 'spotify', icon: 'fa-brands fa-spotify', label: 'Spotify' },
         { key: 'bandcamp', icon: 'fa-brands fa-bandcamp', label: 'Bandcamp' },
         { key: 'bilibili', icon: 'fa-solid fa-tv', label: 'Bilibili' },
-        { key: 'other', icon: 'fa-solid fa-link', label: 'Website' }
+        // The rest are brand names, the same in every language
+        { key: 'other', icon: 'fa-solid fa-link', label: '' }
     ];
 </script>
 
@@ -130,7 +131,8 @@
         </div>
 
         {#if playable}
-            <AudioPlayer songInfo={Entry.catalog as SoundtrackEntry} Src={LocalAudio} />
+            <!-- A custom song has no catalog entry: it plays from disk under its own name -->
+            <AudioPlayer songInfo={Entry.catalog} Src={LocalAudio} Title={Entry.label} Subtitle={Entry.subtitle} />
         {/if}
 
         <div class="actions">
@@ -139,7 +141,7 @@
             {:else if Entry.catalog && (Entry.status === 'available' || Entry.status === 'outdated')}
                 <button
                     type="button"
-                    class="{Entry.status === 'outdated' ? 'button-blue' : 'button-green'} button-main"
+                    class="button-green button-main"
                     disabled={Disabled}
                     onclick={() => OnGet?.(Entry.catalog as SoundtrackEntry)}
                 >
@@ -170,7 +172,7 @@
                         <span class="clevel">{FormatLevel(Entry.levels[course] as number)}</span>
                         <span class="cmaker">{Entry.catalog?.chartMakers?.[course] ?? ''}</span>
                         {#if rank !== undefined && Entry.catalog}
-                            <button type="button" class="crown" title="OpenTaiko Hall of Fame" onclick={() => OnHoF?.(Entry.catalog as SoundtrackEntry, course)}>
+                            <button type="button" class="crown" title={$_('hof.crown')} onclick={() => OnHoF?.(Entry.catalog as SoundtrackEntry, course)}>
                                 <i class="fa-solid fa-crown"></i> {rank}
                             </button>
                         {/if}
@@ -187,7 +189,7 @@
                         <span class="links">
                             {#each LINKS as link (link.key)}
                                 {#if artist[link.key]}
-                                    <a href={artist[link.key]} target="_blank" rel="noreferrer" title={link.label}>
+                                    <a href={artist[link.key]} target="_blank" rel="noreferrer" title={link.label || $_('songs.detail.website')}>
                                         <i class={link.icon}></i>
                                     </a>
                                 {/if}

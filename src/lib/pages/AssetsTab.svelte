@@ -1,5 +1,6 @@
 <script lang="ts">
     import { ipc } from '$lib/ipc';
+    import { formatSize } from '$lib/utils/format';
     import { ValidAssetCatalog } from '$lib/utils/validate';
     // Dependencies
     import { onMount } from 'svelte';
@@ -374,7 +375,7 @@
 <aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
 	<i class="fa-solid fa-triangle-exclamation text-red-500"></i>
 	<span class="flex-1"><b>{$_('common.fetch_error')}</b></span>
-	<button type="button" class="button-red button-main" onclick={updateAssetsInfo}>
+	<button type="button" class="button-blue button-main" onclick={updateAssetsInfo}>
 		<i class="fa-solid fa-rotate"></i> {$_('common.retry')}
 	</button>
 </aside>
@@ -417,7 +418,7 @@
 				</td>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Resolution')}</td>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Creator')}</td>
-				<td>{SizeMb(info, AssetTabPrefix(currentAsset))}Mb</td>
+				<td>{formatSize(SizeMb(info, AssetTabPrefix(currentAsset)))}</td>
 				<td>
 					<AssetStatusCell
 						IsScanning={assetScanning}

@@ -46,7 +46,7 @@
     const renderLink = renderer.link.bind(renderer);
     renderer.link = function (token) {
         const link = renderLink(token);
-        return link.replace("<a", "<a target='_blank' class='text-blue-600 underline'");
+        return link.replace("<a", "<a target='_blank' class='underline'");
     };
     marked.setOptions({
         renderer: renderer,
@@ -181,9 +181,9 @@
     <div class="content">
         <h1>{$_('info.troubleshoot.title')}</h1>
         <p>{$_('info.troubleshoot.intro')}</p>
-        <a href="https://discord.gg/5xfpGuwASU" target='_blank' class='text-blue-600 underline'>{$_('info.troubleshoot.discord')}</a>
+        <a href="https://discord.gg/5xfpGuwASU" target='_blank' class='underline'>{$_('info.troubleshoot.discord')}</a>
         <br />
-        <a href="https://github.com/0auBSQ/OpenTaiko/issues" target='_blank' class='text-blue-600 underline'>{$_('info.troubleshoot.github')}</a>
+        <a href="https://github.com/0auBSQ/OpenTaiko/issues" target='_blank' class='underline'>{$_('info.troubleshoot.github')}</a>
         <p>{$_('info.troubleshoot.note')}</p>
 
         {#if logDir}

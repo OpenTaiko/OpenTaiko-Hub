@@ -138,7 +138,7 @@
             const suggested = `OpenTaiko-${entry.name}.optksave`.replace(/[\\/:*?"<>|]/g, '_');
             const dest = await saveDialog({
                 defaultPath: suggested,
-                filters: [{ name: 'OpenTaiko Save', extensions: ['optksave'] }]
+                filters: [{ name: get(_)('files.optk_save'), extensions: ['optksave'] }]
             });
             if (!dest) return;
             busy = true;
@@ -217,7 +217,7 @@
         try {
             const src = await openDialog({
                 multiple: false,
-                filters: [{ name: 'OpenTaiko Save', extensions: ['optksave', 'json'] }]
+                filters: [{ name: get(_)('files.optk_save'), extensions: ['optksave', 'json'] }]
             });
             if (!src) return;
 
@@ -412,7 +412,7 @@
                                  needs its 5 playable slots to stay filled -->
                             {#if entry.slot === null}
                                 <button type="button" class="button-red button-main" disabled={busy} title={$_('saves.delete')} aria-label={$_('saves.delete')} onclick={() => DeleteSave(entry)}>
-                                    <i class="fa-solid fa-xmark"></i>
+                                    <i class="fa-solid fa-trash"></i>
                                 </button>
                             {/if}
                         </td>

@@ -2,6 +2,10 @@ import { appConfigDir, tempDir, join } from '@tauri-apps/api/path';
 import { type, arch } from '@tauri-apps/plugin-os';
 import { ipc } from '$lib/ipc';
 import type { HubOS } from '$lib/types';
+import { get } from 'svelte/store';
+import { _ } from 'svelte-i18n';
+import { toaster } from '$lib/utils/toaster';
+import { DescribeError, ErrorText } from '$lib/utils/errors';
 
 // These folders cannot change while the Hub runs, and each lookup is a call to the
 // backend, so every one is resolved once. A failed lookup is forgotten so the next call
@@ -113,9 +117,22 @@ export const IsPlainRelPath = (p: string): boolean =>
     p.length > 0 && !/^([a-zA-Z]:|[\\/])/.test(p) && !p.split(/[\\/]/).some((part) => part === '..');
 
 // Opens a folder in the system file manager. Folders only: the page has no permission to
-// open paths itself, since opening a program's path runs it.
-export const OpenFolder = async (path: string): Promise<void> => {
-    await ipc.openFolder(path);
+// open paths itself, since opening a program's path runs it. A failure is reported here,
+// the same way from every button that opens a folder (some used to stay silent, one
+// called it an error launching the game); the caller learns of it from the result.
+export const OpenFolder = async (path: string): Promise<boolean> => {
+    try {
+        await ipc.openFolder(path);
+        return true;
+    } catch (error) {
+        console.error(`Could not open ${path}:`, error);
+        toaster.error({
+            description: get(_)('songs.error.open_folder', { values: { error: DescribeError(error) } }),
+            duration: Infinity,
+            meta: { details: `${path}: ${ErrorText(error)}` }
+        });
+        return false;
+    }
 }
 
 // Pre-0.2 single-instance game folder, adopted as the first instance on upgrade

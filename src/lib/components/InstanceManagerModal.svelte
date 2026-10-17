@@ -4,6 +4,7 @@
     import { get } from 'svelte/store';
     import { open } from '@tauri-apps/plugin-dialog';
     import { OpenFolder as OpenFolderPath } from '$lib/utils/path';
+    import Modal from '$lib/components/Modal.svelte';
     import { busyInstanceIds } from '$lib/stores/activity';
 
     import {
@@ -79,23 +80,15 @@
         TriggerSuccess(get(_)('instances.success.detached', { values: { name: inst.name } }));
     };
 
-    const OpenFolder = async (inst: Instance) => {
-        try {
-            await OpenFolderPath(inst.path);
-        } catch (error) {
-            TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
-        }
-    };
+    const OpenFolder = (inst: Instance) => OpenFolderPath(inst.path);
 </script>
 
 {#if Show}
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={OnClose}>
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
+<Modal Label={$_('instances.title')} OnClose={OnClose}>
+    <div class="p-6 space-y-4 modal-body">
         <div class="flex justify-between items-center">
             <h2 class="h3">{$_('instances.title')}</h2>
-            <button class="button-red button-main" onclick={OnClose}>{$_('hof.close')}</button>
+            <button type="button" class="btn-icon btn-icon-sm preset-tonal" onclick={OnClose} aria-label={$_('hof.close')} title={$_('hof.close')}><i class="fa-solid fa-xmark"></i></button>
         </div>
 
         {#if $instances.length === 0}
@@ -128,10 +121,10 @@
                         <td>{$instanceVersions[inst.id] ?? '—'}</td>
                         <td class="path-cell" title={inst.path}>{inst.path}</td>
                         <td class="whitespace-nowrap">
-                            <button class="button-blue button-main" title={$_('instances.open_folder')} onclick={() => OpenFolder(inst)}>
+                            <button class="button-blue button-main" title={$_('instances.open_folder')} aria-label={$_('instances.open_folder')} onclick={() => OpenFolder(inst)}>
                                 <i class="fa-solid fa-folder-open"></i>
                             </button>
-                            <button class="button-red button-main disabled:opacity-50" title={$busyInstanceIds.has(inst.id) ? $_('jobs.instance_busy') : $_('instances.detach')} disabled={$busyInstanceIds.has(inst.id)} onclick={() => DoDetach(inst)}>
+                            <button type="button" class="button-gray button-main disabled:opacity-50" title={$busyInstanceIds.has(inst.id) ? $_('jobs.instance_busy') : $_('instances.detach')} aria-label={$_('instances.detach')} disabled={$busyInstanceIds.has(inst.id)} onclick={() => DoDetach(inst)}>
                                 <i class="fa-solid fa-link-slash"></i>
                             </button>
                         </td>
@@ -152,8 +145,9 @@
             </button>
             <span class="opacity-50">|</span>
             <input
-                class="rounded-md px-3 py-2 bg-white text-blue-950"
+                class="name-field"
                 placeholder={$_('instances.create_name_placeholder')}
+                aria-label={$_('instances.create_name_placeholder')}
                 bind:value={newInstanceName}
             />
             <button class="button-green button-main" onclick={() => showBuildPicker = true}>
@@ -161,27 +155,25 @@
             </button>
         </div>
     </div>
-</div>
+</Modal>
 {/if}
 
 <BuildPickerModal Show={showBuildPicker} OnClose={() => showBuildPicker = false} OnPick={DoCreate} />
 
 <style>
-    .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
+    .modal-body {
+        width: min(1000px, calc(100vw - 2rem));
     }
-    .modal-card {
-        max-width: 1000px;
-        width: 95%;
-        max-height: 85vh;
-        overflow-y: auto;
+    /* Theme colours rather than a fixed white field, which glared on dark themes */
+    .name-field {
+        font: inherit;
+        padding: 0.4rem 0.75rem;
+        border-radius: 0.375rem;
+        border: 1px solid color-mix(in oklab, var(--color-surface-500) 40%, transparent);
+        background-color: light-dark(var(--color-surface-50), var(--color-surface-900));
+        color: light-dark(var(--color-surface-950), var(--color-surface-50));
     }
+    .name-field:focus {outline: none; border-color: var(--color-primary-500);}
     .path-cell {
         max-width: 280px;
         overflow: hidden;

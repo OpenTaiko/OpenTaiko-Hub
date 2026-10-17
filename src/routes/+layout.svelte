@@ -30,6 +30,13 @@
 
     setupI18n();
 
+    // The page language follows the Hub's: screen readers read with the right voice, and
+    // for Chinese, Japanese and Korean text the system picks the matching glyph variants
+    // when it falls back from the themes' Latin-only fonts. It was always "en".
+    locale.subscribe((value) => {
+        if (value) document.documentElement.lang = value;
+    });
+
     // Errors stay until dismissed: they often carry what to do next, and a report needs
     // their text, which used to vanish after four seconds. The copy button takes the raw
     // details when the message is a friendlier rewording of them.

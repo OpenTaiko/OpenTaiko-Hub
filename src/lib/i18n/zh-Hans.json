@@ -3,7 +3,8 @@
     "fetch_error": "获取错误",
     "retry": "重试",
     "reload": "重新加载",
-    "cancel": "取消"
+    "cancel": "取消",
+    "clear": "清除"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "秘密",
     "information": "信息",
     "links": "链接",
-    "themes": "Hub 主题",
+    "themes": "设置",
     "tooltip": {
       "home": "管理 OpenTaiko 和 OpenTaiko Hub。",
       "songlist": "更新 OpenTaiko 歌曲并下载最新歌曲。",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "查看更新日志、文档或故障排除。",
       "links": "查看 OpenTaiko 的社交媒体和网站！",
-      "themes": "更改 OpenTaiko Hub 的主题。",
+      "themes": "更改 OpenTaiko Hub 的主题和语言。",
       "github": "查看 OpenTaiko Hub 源代码。"
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "重装 OpenTaiko",
       "rebuild": "重新构建",
       "retry": "重试",
-      "install": "安装版本..."
+      "install": "安装版本...",
+      "change_build": "更换版本"
     },
     "warn": {
       "skin_update": "（更新需要同步更新皮肤文件）"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "概览"
-    }
+    },
+    "first_run_text": "尚未安装 OpenTaiko。",
+    "first_run_install": "安装 OpenTaiko",
+    "first_run_folder": "将安装到 {folder}"
   },
   "docs": {
     "title": "文档",
@@ -224,7 +229,10 @@
         "jacket_hint": "在游戏中显示于盒子上。支持 PNG、JPG 或 WebP。",
         "jacket_pick": "选择图片...",
         "jacket_saved": "已保存为 {name}",
-        "jacket_failed": "无法设置图片：{error}"
+        "jacket_failed": "无法设置图片：{error}",
+      "discard_title": "未保存的更改",
+      "discard_message": "文件夹设置有未保存的更改。要放弃吗？",
+      "discard": "放弃"
     },
     "folder": {
         "loading": "正在加载歌曲。",
@@ -269,7 +277,8 @@
         "help_hint": "展开文件夹进行浏览，或使用“获取”下载其中缺少的内容。",
         "get_size": "下载（{size}）",
         "open_song_folder": "打开文件夹",
-        "set_jacket": "设置封面"
+        "set_jacket": "设置封面",
+      "website": "网站"
     },
     "course": {
         "easy": "简单",
@@ -312,7 +321,9 @@
       "installed_of": "已安装 {installed} / {total}",
       "no_match": "没有符合搜索条件的歌曲。",
       "open_folder_tip": "打开此文件夹",
-      "custom": "自定义"
+      "custom": "自定义",
+      "all_updated": "全部已是最新。",
+      "none_installed": "尚未安装任何歌曲。"
     },
     "migrate": {
       "banner": "在“{instance}”中找到 {count} 个歌曲文件夹。是否移动到共享曲库？",
@@ -418,7 +429,9 @@
       "perfect": "全良",
       "full_combo": "全连",
       "clear": "通关"
-    }
+    },
+    "modal_title": "名人堂：{title}（{course} #{rank}）",
+    "crown": "名人堂"
   },
   "version_chip": {
     "incompatible": "与当前 OpenTaiko 版本不兼容",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "播放",
-    "pause": "暂停"
+    "pause": "暂停",
+    "position": "播放位置"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "已下载 {count} / {total}",
     "failed": "已下载 {count} / {total}。失败：{failed}",
     "cancelled": "已取消。已下载 {count} / {total}"
+  },
+  "files": {
+    "images": "图片",
+    "chart_archives": "谱面压缩包",
+    "optk_save": "OpenTaiko 存档"
   }
 }

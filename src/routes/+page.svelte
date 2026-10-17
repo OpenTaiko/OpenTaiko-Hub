@@ -54,7 +54,7 @@
     const trailTiles: NavTile[] = [
         { value: 5, icon: 'fa-regular fa-file-lines', label: 'nav.information', tooltip: 'nav.tooltip.information' },
         { value: 6, icon: 'fa-solid fa-globe', label: 'nav.links', tooltip: 'nav.tooltip.links' },
-        { value: 7, icon: 'fa-solid fa-palette', label: 'nav.themes', tooltip: 'nav.tooltip.themes' }
+        { value: 7, icon: 'fa-solid fa-gear', label: 'nav.themes', tooltip: 'nav.tooltip.themes' }
     ];
 
     onMount(async () => {
@@ -156,7 +156,7 @@
             <LinksTab />
         {/if}
 
-        <!-- OpTk Hub Themes -->
+        <!-- Settings: theme, mode and language -->
         <ThemesTab {currentTile} />
       </main>
     </div>

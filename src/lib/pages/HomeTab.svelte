@@ -1,5 +1,6 @@
 <script lang="ts">
     import { ipc } from '$lib/ipc';
+    import { formatBytes } from '$lib/utils/format';
     import { InstallReleaseZip, IsInstallComplete, WriteVersionJson as WriteVersionFile } from '$lib/services/install';
     import { getContext } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
@@ -15,7 +16,7 @@
     import type { BuildOption, GitHubRelease, HubOS, IndevBuildInfo, Instance, ToastContext } from '$lib/types';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
-    import { GetOS, GetBuildPath, GetBuildTarget } from "$lib/utils/path";
+    import { GetOS, GetBuildPath, GetBuildTarget, GetRootPath } from "$lib/utils/path";
     import { startJob, isCancelled, type Job } from "$lib/stores/activity";
     import { DescribeError, ErrorText } from "$lib/utils/errors";
     import { openUrl } from '@tauri-apps/plugin-opener';
@@ -34,7 +35,8 @@
         instanceVersions,
         refreshInstanceVersion,
         updateInstance,
-        linkGlobalSongs
+        linkGlobalSongs,
+        createInstance
     } from "$lib/stores/instances";
 
     // Components
@@ -99,16 +101,6 @@
     /** How much compiler output is kept on screen and written to the log on a failure. */
     const BUILD_LOG_LINES = 200;
 
-    /**
-     * Digits and a unit only, so it needs no translation. Carries a KB step because this
-     * is what tells a slow transfer apart from a stuck one, and a connection under
-     * ~50 KB/s — exactly the case worth reporting — would otherwise read "0.0 MB/s".
-     */
-    const formatBytes = (n: number): string => {
-        if (n >= 1024 ** 3) return `${(n / 1024 ** 3).toFixed(2)} GB`;
-        if (n >= 1024 ** 2) return `${(n / 1024 ** 2).toFixed(1)} MB`;
-        return `${Math.round(n / 1024)} KB`;
-    };
 
     // Build picker
     let showBuildPicker = $state(false);
@@ -212,6 +204,24 @@
             await DownloadIndev(build);
         } else if (build.kind === 'prerelease') {
             await DownloadPrerelease(build);
+        }
+    };
+
+    // First run: one button goes straight from nothing to an install, instead of sending
+    // the user through Manage, Create and the picker. The picked build is installed into
+    // a new instance as soon as it exists, as from the instance manager.
+    let hubRoot = $state<string | null>(null);
+    GetRootPath().then((root) => hubRoot = root).catch(() => {});
+
+    const OnFirstInstall = async (build: BuildOption) => {
+        try {
+            const instance = await createInstance(null);
+            await updateInstance(instance.id, {
+                channel: build.kind === 'stable' ? 'stable' : 'experimental',
+                pendingInstall: build
+            });
+        } catch (error) {
+            TriggerError(get(_)('instances.error.create_failed', { values: { error: String(error) } }));
         }
     };
 
@@ -567,13 +577,21 @@
         }
     };
 
+    // The game takes a moment to show its window, and a second click in that time started
+    // a second copy. The button shows the launch and ignores clicks until it is under way.
+    let launching = $state(false);
+    const LAUNCH_SETTLE_MS = 3000;
+
     const LaunchOpenTaiko = async () => {
-        if (!current) return;
+        if (!current || launching) return;
+        launching = true;
         try {
             const appPath = await path.join(current.path, "OpenTaiko");
             await ipc.executeExternalApp(appPath);
+            setTimeout(() => launching = false, LAUNCH_SETTLE_MS);
         } catch (error) {
-            TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
+            launching = false;
+            TriggerError(get(_)('home.error.launch', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     }
 
@@ -663,12 +681,18 @@
 
 <!-- Overview (bottom padding keeps content scrollable above the fixed Hub-version footer) -->
 <div class="pb-24" style:display={homeSubTab === 0 ? null : 'none'}>
-    <img src={optkLogoUrl} alt="Logo" class="mx-auto" />
+    <img src={optkLogoUrl} alt="OpenTaiko" class="mx-auto" />
 
     <section class="card w-full">
         {#if !current}
-            <div class="p-4 space-y-4">
-                <p><b>{$_('instances.none')}</b></p>
+            <div class="p-4 space-y-3 text-center">
+                <p><b>{$_('home.first_run_text')}</b></p>
+                <button type="button" class="button-green button-main" onclick={() => showBuildPicker = true}>
+                    <i class="fa-solid fa-download"></i> {$_('home.first_run_install')}
+                </button>
+                {#if hubRoot}
+                    <p class="text-sm opacity-70">{$_('home.first_run_folder', { values: { folder: hubRoot } })}</p>
+                {/if}
             </div>
         {:else}
             <div class="p-4 space-y-4">
@@ -710,23 +734,24 @@
                             <!-- Empty instance: pick which build to install -->
                             <button type="button" onclick={() => showBuildPicker = true} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.install')}</button>
                         {:else if isIndev}
-                            <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
+                            <button type="button" onclick={LaunchOpenTaiko} disabled={launching} class="button-blue button-main"><i class="fa-solid {launching ? 'fa-spinner fa-spin' : 'fa-rocket'}"></i> {$_('home.button.launch')}</button>
                             {#if indevUpdateAvailable}
-                                <button type="button" onclick={() => DownloadIndev(indevBuild ?? {})} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
+                                <button type="button" onclick={() => DownloadIndev(indevBuild ?? {})} class="button-green button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.update')}</button>
                             {:else}
                                 <button type="button" onclick={() => DownloadIndev(indevBuild ?? {})} class="button-gray button-main"><i class="fa-solid fa-hammer"></i> {$_('home.button.rebuild')}</button>
                             {/if}
                         {:else if isPrerelease}
-                            <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
-                            <button type="button" onclick={() => showBuildPicker = true} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
+                            <button type="button" onclick={LaunchOpenTaiko} disabled={launching} class="button-blue button-main"><i class="fa-solid {launching ? 'fa-spinner fa-spin' : 'fa-rocket'}"></i> {$_('home.button.launch')}</button>
+                            <!-- Opens the build picker, so it is named for that rather than "Redownload" -->
+                            <button type="button" onclick={() => showBuildPicker = true} class="button-gray button-main"><i class="fa-solid fa-code-branch"></i> {$_('home.button.change_build')}</button>
                         {:else if latestVersion !== null && latestVersion !== currentVersion}
-                            <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
-                            <button type="button" onclick={DownloadStable} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('home.button.update')}</button>
+                            <button type="button" onclick={LaunchOpenTaiko} disabled={launching} class="button-blue button-main"><i class="fa-solid {launching ? 'fa-spinner fa-spin' : 'fa-rocket'}"></i> {$_('home.button.launch')}</button>
+                            <button type="button" onclick={DownloadStable} class="button-green button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.update')}</button>
                             {#if checkSkinCompatibility(latestVersion, currentVersion) === false}
                                 <span class="text-red-500">{$_('home.warn.skin_update')}</span>
                             {/if}
                         {:else}
-                            <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
+                            <button type="button" onclick={LaunchOpenTaiko} disabled={launching} class="button-blue button-main"><i class="fa-solid {launching ? 'fa-spinner fa-spin' : 'fa-rocket'}"></i> {$_('home.button.launch')}</button>
                             <button type="button" onclick={DownloadStable} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
                         {/if}
                         {#if downloadBusy && busyInstance}
@@ -756,7 +781,7 @@
                         <span class="nowrap"><b>{$_('home.label.latest_version')}</b></span>
                         {#if latestVersionErrorFound === true}
                             <span class="fetch-error"><b>{$_('common.fetch_error')}</b></span>
-                            <button type="button" onclick={TryFetchingLatestVersion} class="button-red button-main"><i class="fa-solid fa-triangle-exclamation"></i> {$_('home.button.retry')}</button>
+                            <button type="button" onclick={TryFetchingLatestVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.retry')}</button>
                         {:else if latestLoading}
                             <div class="placeholder animate-pulse flex-1"></div>
                         {:else}
@@ -815,7 +840,7 @@
     <SavesTab />
 {/if}
 
-<BuildPickerModal Show={showBuildPicker} OnClose={() => showBuildPicker = false} OnPick={OnBuildPicked} />
+<BuildPickerModal Show={showBuildPicker} OnClose={() => showBuildPicker = false} OnPick={current ? OnBuildPicked : OnFirstInstall} />
 
 <style>
     .nowrap {white-space: nowrap;}

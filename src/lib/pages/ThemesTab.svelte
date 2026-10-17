@@ -73,20 +73,16 @@
 
     const ThemeChanger = async (e: Event) => {
         const themevalue = (e.currentTarget as HTMLSelectElement).value;
+        // Picking the theme already in use is not a mistake worth a warning
+        if (getAppliedTheme() == themevalue) return;
 
-        if (getAppliedTheme() == themevalue) {
-            TriggerWarning(get(_)('themes.warn.same_theme'));
-        }
-        else {
-            const prefsDir = await GetPreferencesPath();
-            await mkdir(prefsDir, { recursive: true });
-            const theme_settings = await path.join(prefsDir, 'theme.json');
-            await writeTextFile(theme_settings, JSON.stringify({ theme: themevalue }));
+        const prefsDir = await GetPreferencesPath();
+        await mkdir(prefsDir, { recursive: true });
+        const theme_settings = await path.join(prefsDir, 'theme.json');
+        await writeTextFile(theme_settings, JSON.stringify({ theme: themevalue }));
 
-            currentTheme = themevalue;
-            applyTheme(themevalue);
-            console.log("theme has been changed")
-        }
+        currentTheme = themevalue;
+        applyTheme(themevalue);
     }
 
     // Theme mode
@@ -107,7 +103,6 @@
         }
 
         applyMode(currentThemeMode);
-        console.log(`mode has been changed to ${currentThemeMode}`)
     }
 
     const ThemeModeChanger = async (mode: string) => {
@@ -118,7 +113,6 @@
         await writeTextFile(thememode_settings, JSON.stringify({ thememode: mode }));
 
         applyMode(mode);
-        console.log(`mode has been changed to ${mode}`)
     }
 
     // Language persistence
@@ -145,7 +139,7 @@
                 <div class="p-4 space-y-4">
                     <h1>{debugMode ? $_('themes.title_debug') : $_('themes.title')}</h1>
                     <div class="flex gap-2">
-                        <select size="11" class="select w-full max-w-[265px]" value={currentTheme} onchange={debugMode ? ThemeChangerDebug : ThemeChanger} onclick={debugMode ? () => {} : TryFetchingCurrentTheme}>
+                        <select size="11" class="select w-full max-w-[265px]" aria-label={$_('themes.title')} value={currentTheme} onchange={debugMode ? ThemeChangerDebug : ThemeChanger}>
                             <optgroup label={$_('themes.optgroup.optk')}>
                                 <option value="gleamingsky">Gleaming Sky</option>
                                 <option value="dashy">888</option>
@@ -207,14 +201,8 @@
 
                             <hr class="m-4">
 
-                            <h2>{$_('themes.credits.title')}</h2>
-                            <p>{$_('themes.credits.text')}</p>
-                            <a href="https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md" target="_blank">https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md</a>
-
-                            <hr class="m-4">
-
                             <h2>{$_('lang.label')}</h2>
-                            <select class="select w-full max-w-[200px]" bind:value={$locale} onchange={() => SaveLocale($locale)}>
+                            <select class="select w-full max-w-[200px]" aria-label={$_('lang.label')} bind:value={$locale} onchange={() => SaveLocale($locale)}>
                                 <option value="en">{$_('lang.en')}</option>
                                 <option value="ja">{$_('lang.ja')}</option>
                                 <option value="zh-Hans">{$_('lang.zh_Hans')}</option>
@@ -226,6 +214,12 @@
                                 <option value="ko">{$_('lang.ko')}</option>
                                 <option value="ru">{$_('lang.ru')}</option>
                             </select>
+
+                            <hr class="m-4">
+
+                            <h2>{$_('themes.credits.title')}</h2>
+                            <p>{$_('themes.credits.text')}</p>
+                            <a href="https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md" target="_blank">https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md</a>
                         </div>
                     </div>
 

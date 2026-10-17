@@ -157,6 +157,16 @@ export const updateInstance = async (id: string, patch: Partial<Instance>): Prom
     return get(instances).find((inst) => inst.id === id) ?? null;
 };
 
+// "OpenTaiko", then "OpenTaiko (2)", "OpenTaiko (3)"... for an instance created without
+// a name. The folder keeps its unique name; this is only what the user reads.
+export const DefaultInstanceName = (taken: string[]): string => {
+    const names = new Set(taken.map((name) => name.trim().toLowerCase()));
+    if (!names.has('opentaiko')) return 'OpenTaiko';
+    let n = 2;
+    while (names.has(`opentaiko (${n})`)) n++;
+    return `OpenTaiko (${n})`;
+};
+
 export const createInstance = async (name: string | null | undefined): Promise<Instance> => {
     const folderName = `OpenTaiko-${crypto.randomUUID()}`;
     // Created by the backend, which also gives the Hub access to it: the Hub root itself
@@ -164,7 +174,7 @@ export const createInstance = async (name: string | null | undefined): Promise<I
     const path = await ipc.createInstanceDir(folderName);
     const instance: Instance = {
         id: crypto.randomUUID(),
-        name: name?.trim() || folderName,
+        name: name?.trim() || DefaultInstanceName(get(instances).map((inst) => inst.name)),
         path,
         channel: null,
         experimental: null,

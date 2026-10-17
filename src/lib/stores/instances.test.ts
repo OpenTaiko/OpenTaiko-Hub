@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveInstances } from './instances';
+import { resolveInstances, DefaultInstanceName } from './instances';
 import type { Instance } from '$lib/types';
 
 const instance = (id: string, path: string): Instance => ({
@@ -43,5 +43,14 @@ describe('resolveInstances', () => {
         expect((await resolve([a, b], 'b', null, ['/games/a', '/games/b'])).activeId).toBe('b');
         expect((await resolve([a, b], 'gone', null, ['/games/b'])).activeId).toBe('b');
         expect((await resolve([], null, null, [])).activeId).toBeNull();
+    });
+});
+
+describe('DefaultInstanceName', () => {
+    it('numbers unnamed instances after the first', () => {
+        expect(DefaultInstanceName([])).toBe('OpenTaiko');
+        expect(DefaultInstanceName(['OpenTaiko'])).toBe('OpenTaiko (2)');
+        expect(DefaultInstanceName(['opentaiko', 'OpenTaiko (2)'])).toBe('OpenTaiko (3)');
+        expect(DefaultInstanceName(['My build'])).toBe('OpenTaiko');
     });
 });

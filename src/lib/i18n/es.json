@@ -3,7 +3,8 @@
     "fetch_error": "Error al obtener los datos",
     "retry": "Reintentar",
     "reload": "Recargar",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "clear": "Borrar"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "Secretos",
     "information": "Información",
     "links": "Enlaces",
-    "themes": "Temas de OpTk Hub",
+    "themes": "Ajustes",
     "tooltip": {
       "home": "Gestiona OpenTaiko y el OpenTaiko Hub.",
       "songlist": "Actualiza tus canciones de OpenTaiko y descarga las más recientes.",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "Para consultar los registros de cambios, la documentación o la solución de problemas.",
       "links": "¡Echa un vistazo a las redes sociales y sitios web de OpenTaiko!",
-      "themes": "Cambia el tema del OpenTaiko Hub.",
+      "themes": "Tema e idioma del OpenTaiko Hub.",
       "github": "Ver el código fuente del OpenTaiko Hub."
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "Volver a descargar OpenTaiko",
       "rebuild": "Recompilar",
       "retry": "Reintentar",
-      "install": "Instalar una versión..."
+      "install": "Instalar una versión...",
+      "change_build": "Cambiar versión"
     },
     "warn": {
       "skin_update": "(Actualizar requerirá una actualización del skin)"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "Resumen"
-    }
+    },
+    "first_run_text": "OpenTaiko aún no está instalado.",
+    "first_run_install": "Instalar OpenTaiko",
+    "first_run_folder": "Se instalará en {folder}"
   },
   "docs": {
     "title": "Documentación",
@@ -224,7 +229,10 @@
         "jacket_hint": "Se muestra en la caja dentro del juego. PNG, JPG o WebP.",
         "jacket_pick": "Elegir imagen...",
         "jacket_saved": "Guardada como {name}",
-        "jacket_failed": "No se pudo establecer la imagen: {error}"
+        "jacket_failed": "No se pudo establecer la imagen: {error}",
+      "discard_title": "Cambios sin guardar",
+      "discard_message": "Los ajustes de la carpeta tienen cambios sin guardar. ¿Descartarlos?",
+      "discard": "Descartar"
     },
     "folder": {
         "loading": "Las canciones se están cargando.",
@@ -238,7 +246,7 @@
         "created": "Se creó «{name}»",
         "create_failed": "No se pudo crear la carpeta: {error}",
         "delete": "Eliminar",
-        "delete_confirm": "¿Eliminar «{name}» y las {count} canciones que contiene? No se puede deshacer.",
+        "delete_confirm": "¿Eliminar «{name}»{count, plural, =0 {?} one { y la canción que contiene?} other { y las # canciones que contiene?}} No se puede deshacer.",
         "delete_song_confirm": "¿Eliminar «{name}»? No se puede deshacer.",
         "deleted": "Se eliminó «{name}»",
         "delete_failed": "No se pudo eliminar: {error}",
@@ -251,7 +259,7 @@
         "drop_hint": "Suelta archivos .zip de partituras aquí para añadirlos a esta carpeta",
         "browse_zip": "Elegir archivos...",
         "importing": "Añadiendo partituras...",
-        "imported": "Se añadieron {count} canciones",
+        "imported": "Se {count, plural, one {añadió # canción} other {añadieron # canciones}}",
         "import_rejected": "No es un archivo de partituras: {names}",
         "import_failed": "No se pudieron añadir las partituras: {error}",
         "drop_needs_folder": "Selecciona primero una de tus carpetas y suelta los archivos en ella."
@@ -269,7 +277,8 @@
         "help_hint": "Abre una carpeta para explorarla, o usa Descargar para obtener lo que falta.",
         "get_size": "Descargar ({size})",
         "open_song_folder": "Abrir carpeta",
-        "set_jacket": "Establecer la portada"
+        "set_jacket": "Establecer la portada",
+      "website": "Sitio web"
     },
     "course": {
         "easy": "Fácil",
@@ -312,15 +321,17 @@
       "installed_of": "{installed} / {total} instaladas",
       "no_match": "Ninguna canción coincide con esta búsqueda.",
       "open_folder_tip": "Abrir esta carpeta",
-      "custom": "Personalizado"
+      "custom": "Personalizado",
+      "all_updated": "Todo está actualizado.",
+      "none_installed": "Aún no hay canciones instaladas."
     },
     "migrate": {
-      "banner": "Se encontraron {count} carpeta(s) de canciones en «{instance}». ¿Transferirlas a la biblioteca de canciones compartida?",
+      "banner": "Se {count, plural, one {encontró # carpeta de canciones} other {encontraron # carpetas de canciones}} en «{instance}». ¿{count, plural, one {Transferirla} other {Transferirlas}} a la biblioteca de canciones compartida?",
       "button": "Transferir canciones",
       "later": "Más tarde",
       "modal_title": "Transferir canciones de «{instance}»",
-      "summary_new": "Se añadirán {count} carpeta(s) de canción nuevas a la biblioteca compartida.",
-      "summary_identical": "Se eliminarán {count} carpeta(s) de canción idénticas de esta instancia.",
+      "summary_new": "Se {count, plural, one {añadirá # carpeta de canción nueva} other {añadirán # carpetas de canción nuevas}} a la biblioteca compartida.",
+      "summary_identical": "Se {count, plural, one {eliminará # carpeta de canción idéntica} other {eliminarán # carpetas de canción idénticas}} de esta instancia.",
       "nothing": "Esta instancia no tiene charts para transferir.",
       "conflicts_title": "Conflictos ({count})",
       "conflicts_hint": "Estas canciones ya existen en la biblioteca compartida con contenido diferente. Elige qué versión conservar.",
@@ -335,7 +346,7 @@
       "error": "No se pudieron transferir las canciones: {error}"
     },
     "metadata": {
-      "updated": "Se actualizaron {count} carpeta(s) de género (box.def / preimages)"
+      "updated": "Se {count, plural, one {actualizó # carpeta de género} other {actualizaron # carpetas de género}} (box.def / preimages)"
     },
     "error": {
       "open_folder": "No se pudo abrir la carpeta: {error}",
@@ -346,9 +357,9 @@
       "download_complete": "Descarga completa"
     },
     "duplicates": {
-      "banner": "{count} carpeta(s) vacías duplicadas en «{instance}». ¿Eliminarlas?",
+      "banner": "{count, plural, one {# carpeta vacía duplicada} other {# carpetas vacías duplicadas}} en «{instance}». ¿{count, plural, one {Eliminarla} other {Eliminarlas}}?",
       "button": "Limpiar",
-      "success": "Se eliminaron {count} carpeta(s) duplicada(s).",
+      "success": "Se {count, plural, one {eliminó # carpeta duplicada} other {eliminaron # carpetas duplicadas}}.",
       "error": "No se pudieron eliminar las carpetas duplicadas: {error}"
     }
   },
@@ -418,7 +429,9 @@
       "perfect": "Perfecto",
       "full_combo": "Full Combo",
       "clear": "Superado"
-    }
+    },
+    "modal_title": "Salón de la fama: {title} ({course} #{rank})",
+    "crown": "Salón de la fama"
   },
   "version_chip": {
     "incompatible": "No compatible con la versión actual de OpenTaiko",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "reproducir",
-    "pause": "pausar"
+    "pause": "pausar",
+    "position": "Posición"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "Descargados {count} de {total}",
     "failed": "Descargados {count} de {total}. Fallidos: {failed}",
     "cancelled": "Cancelado. Descargados {count} de {total}"
+  },
+  "files": {
+    "images": "Imágenes",
+    "chart_archives": "Archivos de charts",
+    "optk_save": "Partida de OpenTaiko"
   }
 }

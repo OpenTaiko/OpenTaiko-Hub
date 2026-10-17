@@ -4,6 +4,7 @@
     // others — which is what stops the tab rendering hundreds of rows at once.
     import CollectionBar from './CollectionBar.svelte';
     import SongRow from './SongRow.svelte';
+    import SongRowHeader from './SongRowHeader.svelte';
     import { _ } from 'svelte-i18n';
     import { formatSize } from '$lib/utils/library';
     import type { LibraryEntry, LibraryFolder } from '$lib/utils/library';
@@ -101,9 +102,9 @@
             </span>
 
             <span class="ident">
-                <span class="label">{Node.label}</span>
+                <span class="label" title={Node.label}>{Node.label}</span>
                 {#if Node.rawName !== Node.label}
-                    <span class="raw">{Node.rawName}</span>
+                    <span class="raw" title={Node.rawName}>{Node.rawName}</span>
                 {/if}
             </span>
 
@@ -167,6 +168,7 @@
                 />
             {/each}
 
+            {#if visibleEntries.length > 0}<SongRowHeader />{/if}
             {#each visibleEntries as entry (entry.key)}
                 <SongRow
                     Entry={entry}

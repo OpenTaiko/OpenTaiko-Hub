@@ -3,6 +3,7 @@
     // Stable (latest GitHub release) or one of the available experimental builds
     // (grayed out when none exist).
     import { _ } from 'svelte-i18n';
+    import Modal from '$lib/components/Modal.svelte';
     import { fetchLatestRelease, fetchExperimentalOptions } from '$lib/utils/builds';
     import type { BuildOption } from '$lib/types';
 
@@ -16,6 +17,9 @@
 
     let loading = $state(false);
     let latestTag = $state<string | null>(null);
+    // The release list could not be read: shown as such rather than as a release without a
+    // version, and nothing can be installed until it is read
+    let fetchFailed = $state(false);
     let experimentalOptions = $state<Exclude<BuildOption, { kind: 'stable' }>[]>([]);
     let selected = $state<'stable' | number>('stable');   // 'stable' | index into experimentalOptions
     let loadedFor = false;             // bookkeeping only, never rendered
@@ -24,6 +28,7 @@
     const LoadOptions = async () => {
         loading = true;
         latestTag = null;
+        fetchFailed = false;
         experimentalOptions = [];
         selected = 'stable';
         try {
@@ -31,6 +36,7 @@
             latestTag = release.tag_name;
         } catch (error) {
             console.error('Failed to fetch the latest release:', error);
+            fetchFailed = true;
         }
         experimentalOptions = (await fetchExperimentalOptions(latestTag)).filter((option) => option.kind !== 'stable');
         loading = false;
@@ -58,14 +64,20 @@
 </script>
 
 {#if Show}
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={OnClose}>
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
+<Modal Label={$_('instances.picker.title')} OnClose={OnClose}>
+    <div class="p-6 space-y-4 modal-body">
         <h2 class="h3">{$_('instances.picker.title')}</h2>
 
         {#if loading}
             <div class="placeholder animate-pulse w-full h-16"></div>
+        {:else if fetchFailed}
+            <div class="flex items-center gap-3 flex-wrap">
+                <i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+                <span class="flex-1"><b>{$_('common.fetch_error')}</b></span>
+                <button type="button" class="button-blue button-main" onclick={LoadOptions}>
+                    <i class="fa-solid fa-rotate"></i> {$_('common.retry')}
+                </button>
+            </div>
         {:else}
             <label class="option-row" class:selected={selected === 'stable'}>
                 <input type="radio" name="build" value="stable" bind:group={selected} />
@@ -104,27 +116,17 @@
 
         <div class="flex gap-3 justify-end">
             <button type="button" class="button-gray button-main" onclick={OnClose}>{$_('common.cancel')}</button>
-            <button type="button" class="button-green button-main" disabled={loading} onclick={Confirm}>
+            <button type="button" class="button-green button-main" disabled={loading || fetchFailed} onclick={Confirm}>
                 <i class="fa-solid fa-download"></i> {$_('instances.picker.install')}
             </button>
         </div>
     </div>
-</div>
+</Modal>
 {/if}
 
 <style>
-    .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-    }
-    .modal-card {
-        max-width: 480px;
-        width: 92%;
+    .modal-body {
+        width: min(480px, calc(100vw - 2rem));
     }
     .option-row {
         display: flex;

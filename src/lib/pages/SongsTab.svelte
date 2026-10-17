@@ -1,5 +1,7 @@
 <script lang="ts">
     import { ipc } from '$lib/ipc';
+    import Modal from '$lib/components/Modal.svelte';
+    import { ConfirmDiscardEdits } from '$lib/stores/editing';
     import { LoadHallOfFame, ChartScores, HOF_DIFFICULTY_INDEX, type HoFRanks } from '$lib/services/hof';
     import { LoadSongArtists } from '$lib/services/artists';
     import { FetchSoundtrackCatalog, FetchRemoteShaMap, SongInstallEntries, SongGenrePaths, SoundtrackFileUrl } from '$lib/services/soundtrack';
@@ -48,6 +50,7 @@
     import LibraryHeader from '$lib/components/songs/LibraryHeader.svelte';
     import CollectionBar from '$lib/components/songs/CollectionBar.svelte';
     import SongRow from '$lib/components/songs/SongRow.svelte';
+    import SongRowHeader from '$lib/components/songs/SongRowHeader.svelte';
     import SongDetail from '$lib/components/songs/SongDetail.svelte';
     import FolderDetail from '$lib/components/songs/FolderDetail.svelte';
     import { buildLibraryTree, viewOf, pendingUnder, formatSize } from '$lib/utils/library';
@@ -220,7 +223,7 @@
     const PickSongPreimage = async (entry: LibraryEntry) => {
         const picked = await open({
             multiple: false,
-            filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+            filters: [{ name: get(_)('files.images'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
         });
         if (!picked || Array.isArray(picked)) return;
         try {
@@ -255,7 +258,18 @@
         ReleaseSongMedia();
     });
 
+    // Selecting something else replaces the folder settings form, so unsaved edits there
+    // are confirmed first instead of being dropped
+    const SelectEntry = async (entry: LibraryEntry) => {
+        if (selectedKey === entry.key) return;
+        if (!(await ConfirmDiscardEdits())) return;
+        selectedKey = entry.key;
+        selectedFolder = null;
+    };
+
     const SelectFolder = async (folder: LibraryFolder) => {
+        if (selectedFolder === folder.relPath) return;
+        if (!(await ConfirmDiscardEdits())) return;
         selectedFolder = folder.relPath;
         selectedKey = null;
         boxText = null;
@@ -303,7 +317,7 @@
     const PickJacket = async (relPath: string) => {
         const picked = await open({
             multiple: false,
-            filters: [{ name: 'Images', extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
+            filters: [{ name: get(_)('files.images'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
         });
         if (!picked || Array.isArray(picked)) return;
         try {
@@ -455,7 +469,7 @@
     const PickArchives = async (relPath: string) => {
         const picked = await open({
             multiple: true,
-            filters: [{ name: 'Chart archives', extensions: ['zip'] }]
+            filters: [{ name: get(_)('files.chart_archives'), extensions: ['zip'] }]
         });
         if (!picked) return;
         await ImportArchives(relPath, Array.isArray(picked) ? picked : [picked]);
@@ -736,7 +750,8 @@
             await mkdir(songsDir, { recursive: true });
             await OpenFolder(songsDir);
         } catch (error) {
-            TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
+            // OpenFolder reports its own failures; this is the folder creation failing
+            TriggerError(get(_)('songs.error.open_folder', { values: { error: String(error) } }));
         }
     }
 
@@ -965,7 +980,7 @@
 <aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
 	<i class="fa-solid fa-triangle-exclamation text-red-500"></i>
 	<span class="flex-1"><b>{$_('common.fetch_error')}</b></span>
-	<button type="button" class="button-red button-main" onclick={updateSoundtrackInfo}>
+	<button type="button" class="button-blue button-main" onclick={updateSoundtrackInfo}>
 		<i class="fa-solid fa-rotate"></i> {$_('common.retry')}
 	</button>
 </aside>
@@ -1043,7 +1058,19 @@
 				</div>
 			</div>
 		{:else if view === null}
-			<p class="nomatch">{$_('songs.tree.no_match')}</p>
+			<!-- Says why the list is empty: a search that found nothing reads differently
+			     from a library with nothing to update -->
+			<p class="nomatch">
+				{#if librarySearch.trim()}
+					{$_('songs.tree.no_match')}
+				{:else if scope === 'updates'}
+					<i class="fa-solid fa-check"></i> {$_('songs.tree.all_updated')}
+				{:else if scope === 'installed'}
+					{$_('songs.tree.none_installed')}
+				{:else}
+					{$_('songs.tree.nothing_here')}
+				{/if}
+			</p>
 		{:else}
 			{#each topCollections as node (node.relPath)}
 				<CollectionBar
@@ -1057,7 +1084,7 @@
 					BulkDisabled={bulkBusy || songBusy || scanning}
 					ArtUrl={GenreArtUrl}
 					OnToggle={(p) => openCollection = openCollection === p ? null : p}
-					OnSelect={(entry) => { selectedKey = entry.key; selectedFolder = null; }}
+					OnSelect={SelectEntry}
 					OnSelectFolder={SelectFolder}
 					OnGet={(entry) => DownloadSong(entry, currentSongs[entry.uniqueId] ?? null)}
 					OnGetFolder={DownloadFolder}
@@ -1069,13 +1096,14 @@
 				<i class="fa-solid fa-plus"></i> {$_('songs.folder.new_folder')}
 			</button>
 
+			{#if view.entries.length > 0}<SongRowHeader />{/if}
 			{#each view.entries as entry (entry.key)}
 				<SongRow
 					Entry={entry}
 					Selected={selectedKey === entry.key}
 					Progress={entry.catalog ? songDLProgress[entry.catalog.uniqueId] : undefined}
 					Disabled={bulkBusy || scanning}
-					OnSelect={(e) => { selectedKey = e.key; selectedFolder = null; }}
+					OnSelect={SelectEntry}
 					OnGet={(e) => DownloadSong(e, currentSongs[e.uniqueId] ?? null)}
 				/>
 			{/each}
@@ -1135,16 +1163,15 @@
 {/if}
 
 {#if hofModalOpen && hofModalSongInfo && hofModalDifficulty}
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={() => hofModalOpen = false}>
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
+{@const hofTitle = $_('hof.modal_title', { values: { title: localizedTitle(hofModalSongInfo, $locale), course: hofDiffShortMap[hofModalDifficulty] ?? '', rank: hofMap[hofModalSongInfo.uniqueId]?.[hofModalDifficulty] ?? '' } })}
+<Modal Label={hofTitle} OnClose={() => hofModalOpen = false}>
+    <div class="p-6 space-y-4 hof-modal">
         <div class="flex justify-between items-center">
-            <h2 class="h3">Hall of Fame — {localizedTitle(hofModalSongInfo, $locale)} ({hofDiffShortMap[hofModalDifficulty]} #{hofMap[hofModalSongInfo.uniqueId]?.[hofModalDifficulty]})</h2>
-            <button class="btn-icon btn-icon-sm preset-filled" onclick={() => hofModalOpen = false} aria-label={$_('hof.close')}>✕</button>
+            <h2 class="h3">{hofTitle}</h2>
+            <button type="button" class="btn-icon btn-icon-sm preset-tonal" onclick={() => hofModalOpen = false} aria-label={$_('hof.close')} title={$_('hof.close')}><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="flex flex-col gap-1">
-            <a href="https://opentaiko.github.io/songinfo/{hofModalSongInfo.uniqueId}?d={HOF_DIFFICULTY_INDEX[hofModalDifficulty]}" target="_blank" class="text-blue-600 underline">
+            <a href="https://opentaiko.github.io/songinfo/{hofModalSongInfo.uniqueId}?d={HOF_DIFFICULTY_INDEX[hofModalDifficulty]}" target="_blank" class="underline">
                 {$_('hof.website_link')} <i class="fa-solid fa-arrow-up-right-from-square"></i>
             </a>
             <span class="text-sm opacity-70">{$_('hof.max_list_points')}: <b>{hofModalMaxListPoints}</b></span>
@@ -1164,7 +1191,7 @@
                         <th>{$_('hof.col.good')}</th>
                         <th>{$_('hof.col.ok')}</th>
                         <th>{$_('hof.col.bad')}</th>
-                        <th>LP</th>
+                        <th>{$_('hof.col.list_points')}</th>
                         <th>{$_('hof.col.video')}</th>
                     </tr>
                 </thead>
@@ -1175,16 +1202,16 @@
                     <tr>
                         <td>{s.rank}</td>
                         <td>{s.player ?? '—'}</td>
-                        <td>{s.score?.toLocaleString()}</td>
+                        <td>{s.score?.toLocaleString($locale ?? undefined)}</td>
                         <td class="grade grade-{gradeClass}">{gradeDisplay}</td>
                         <td class="status status-{s.status?.replace(' ', '-')}">{s.status === 'Perfect' ? $_('hof.status.perfect') : s.status === 'Full Combo' ? $_('hof.status.full_combo') : s.status === 'Clear' ? $_('hof.status.clear') : (s.status ?? '—')}</td>
                         <td>{s.goodCount}</td>
                         <td>{s.okCount}</td>
                         <td>{s.badCount}</td>
-                        <td>{s.listPoints?.toLocaleString()}</td>
+                        <td>{s.listPoints?.toLocaleString($locale ?? undefined)}</td>
                         <td>
                             {#if s.videoLink}
-                                <a href={s.videoLink} target="_blank" class="text-blue-600 underline">{$_('hof.video_link')} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                                <a href={s.videoLink} target="_blank" class="underline">{$_('hof.video_link')} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                             {:else}—{/if}
                         </td>
                     </tr>
@@ -1194,7 +1221,7 @@
         </div>
         {/if}
     </div>
-</div>
+</Modal>
 {/if}
 
 {#if migrationCandidate && migrationGlobalPath}
@@ -1261,25 +1288,13 @@
         .library-body {grid-template-columns: minmax(0, 1fr);}
     }
 
-    .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
-    }
-    .modal-card {
-        max-width: 800px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
+    .hof-modal {
+        width: min(800px, calc(100vw - 2rem));
     }
 
     /* Grade letter colors */
     .grade { font-weight: bold; }
-    .grade-E { color: #ffffff; }
+    .grade-E { color: light-dark(#6b7280, #ffffff); }
     .grade-D { color: #ff4444; }
     .grade-C { color: #ff9933; }
     .grade-B { color: #ffdd00; }
@@ -1294,7 +1309,7 @@
     }
     .grade-omega {
         font-family: 'Segoe UI', Arial, sans-serif;
-        background: linear-gradient(90deg, #1a237e, #3949ab, #5c6bc0, #3949ab, #1a237e);
+        background: linear-gradient(90deg, light-dark(#1a237e, #8c9eff), light-dark(#3949ab, #b3bcff), light-dark(#5c6bc0, #dfe3ff), light-dark(#3949ab, #b3bcff), light-dark(#1a237e, #8c9eff));
         background-size: 200% auto;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;

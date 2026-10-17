@@ -28,14 +28,14 @@ export interface BoxDefDoc {
 export const BOX_LANGS = [
     { code: 'EN', name: 'English' },
     { code: 'GB', name: 'English (UK)' },
-    { code: 'JA', name: '日本語 — Japanese' },
-    { code: 'FR', name: 'Français — French' },
-    { code: 'ES', name: 'Español — Spanish' },
-    { code: 'DE', name: 'Deutsch — German' },
-    { code: 'NL', name: 'Nederlands — Dutch' },
-    { code: 'ZH', name: '中文 — Chinese' },
-    { code: 'KO', name: '한국어 — Korean' },
-    { code: 'RU', name: 'Русский — Russian' }
+    { code: 'JA', name: '日本語' },
+    { code: 'FR', name: 'Français' },
+    { code: 'ES', name: 'Español' },
+    { code: 'DE', name: 'Deutsch' },
+    { code: 'NL', name: 'Nederlands' },
+    { code: 'ZH', name: '中文' },
+    { code: 'KO', name: '한국어' },
+    { code: 'RU', name: 'Русский' }
 ] as const;
 
 export type BoxLang = (typeof BOX_LANGS)[number]['code'];

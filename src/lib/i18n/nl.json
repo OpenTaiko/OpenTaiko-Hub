@@ -3,7 +3,8 @@
     "fetch_error": "Ophaalfout",
     "retry": "Opnieuw proberen",
     "reload": "Herladen",
-    "cancel": "Annuleren"
+    "cancel": "Annuleren",
+    "clear": "Wissen"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "Geheimen",
     "information": "Informatie",
     "links": "Links",
-    "themes": "OpTk Hub-thema's",
+    "themes": "Opties",
     "tooltip": {
       "home": "Beheer OpenTaiko en de OpenTaiko Hub.",
       "songlist": "Werk je OpenTaiko-nummers bij en download de nieuwste.",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "Voor changelogs, documentatie of probleemoplossing.",
       "links": "Bekijk de socials en websites van OpenTaiko!",
-      "themes": "Verander het thema van de OpenTaiko Hub.",
+      "themes": "Thema en taal van de OpenTaiko Hub.",
       "github": "Bekijk de broncode van de OpenTaiko Hub."
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "OpenTaiko opnieuw downloaden",
       "rebuild": "Opnieuw bouwen",
       "retry": "Opnieuw proberen",
-      "install": "Een build installeren..."
+      "install": "Een build installeren...",
+      "change_build": "Versie wijzigen"
     },
     "warn": {
       "skin_update": "(Na het bijwerken is ook een skin-update nodig)"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "Overzicht"
-    }
+    },
+    "first_run_text": "OpenTaiko is nog niet geïnstalleerd.",
+    "first_run_install": "OpenTaiko installeren",
+    "first_run_folder": "Het wordt geïnstalleerd in {folder}"
   },
   "docs": {
     "title": "Documentatie",
@@ -224,7 +229,10 @@
         "jacket_hint": "Wordt in het spel op de box getoond. PNG, JPG of WebP.",
         "jacket_pick": "Afbeelding kiezen...",
         "jacket_saved": "Opgeslagen als {name}",
-        "jacket_failed": "Kon de afbeelding niet instellen: {error}"
+        "jacket_failed": "Kon de afbeelding niet instellen: {error}",
+      "discard_title": "Niet-opgeslagen wijzigingen",
+      "discard_message": "De mapinstellingen hebben niet-opgeslagen wijzigingen. Verwerpen?",
+      "discard": "Verwerpen"
     },
     "folder": {
         "loading": "De nummers worden geladen.",
@@ -238,7 +246,7 @@
         "created": "\"{name}\" aangemaakt",
         "create_failed": "Kon de map niet aanmaken: {error}",
         "delete": "Verwijderen",
-        "delete_confirm": "\"{name}\" en de {count} nummers erin verwijderen? Dit kan niet ongedaan worden gemaakt.",
+        "delete_confirm": "\"{name}\"{count, plural, =0 {} one { en het nummer erin} other { en de # nummers erin}} verwijderen? Dit kan niet ongedaan worden gemaakt.",
         "delete_song_confirm": "\"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt.",
         "deleted": "\"{name}\" verwijderd",
         "delete_failed": "Kon niet verwijderen: {error}",
@@ -251,7 +259,7 @@
         "drop_hint": "Sleep chart-.zip-bestanden hierheen om ze aan deze map toe te voegen",
         "browse_zip": "Bestanden kiezen...",
         "importing": "Charts toevoegen...",
-        "imported": "{count} nummers toegevoegd",
+        "imported": "{count, plural, one {# nummer} other {# nummers}} toegevoegd",
         "import_rejected": "Geen chart-archief: {names}",
         "import_failed": "Kon de charts niet toevoegen: {error}",
         "drop_needs_folder": "Selecteer eerst een eigen map en zet de bestanden daar neer."
@@ -269,7 +277,8 @@
         "help_hint": "Open een map om te bladeren, of gebruik Ophalen om alles wat ontbreekt te downloaden.",
         "get_size": "Downloaden ({size})",
         "open_song_folder": "Map openen",
-        "set_jacket": "Omslag instellen"
+        "set_jacket": "Omslag instellen",
+      "website": "Website"
     },
     "course": {
         "easy": "Makkelijk",
@@ -312,15 +321,17 @@
       "installed_of": "{installed} / {total} geïnstalleerd",
       "no_match": "Geen nummers komen overeen met deze zoekopdracht.",
       "open_folder_tip": "Deze map openen",
-      "custom": "Aangepast"
+      "custom": "Aangepast",
+      "all_updated": "Alles is up-to-date.",
+      "none_installed": "Er zijn nog geen nummers geïnstalleerd."
     },
     "migrate": {
-      "banner": "{count} muziekmap(pen) gevonden in \"{instance}\". Overzetten naar de gedeelde muziekbibliotheek?",
+      "banner": "{count, plural, one {# muziekmap} other {# muziekmappen}} gevonden in \"{instance}\". Overzetten naar de gedeelde muziekbibliotheek?",
       "button": "Nummers overzetten",
       "later": "Later",
       "modal_title": "Nummers overzetten uit \"{instance}\"",
-      "summary_new": "{count} nieuwe muziekmap(pen) worden toegevoegd aan de gedeelde bibliotheek.",
-      "summary_identical": "{count} identieke muziekmap(pen) worden uit deze instantie verwijderd.",
+      "summary_new": "{count, plural, one {# nieuwe muziekmap wordt} other {# nieuwe muziekmappen worden}} toegevoegd aan de gedeelde bibliotheek.",
+      "summary_identical": "{count, plural, one {# identieke muziekmap wordt} other {# identieke muziekmappen worden}} uit deze instantie verwijderd.",
       "nothing": "Deze instantie heeft geen charts om over te zetten.",
       "conflicts_title": "Conflicten ({count})",
       "conflicts_hint": "Deze nummers bestaan al in de gedeelde bibliotheek met andere inhoud. Kies welke versie je wilt behouden.",
@@ -335,7 +346,7 @@
       "error": "Kon de nummers niet overzetten: {error}"
     },
     "metadata": {
-      "updated": "{count} genremap(pen) bijgewerkt (box.def / preimages)"
+      "updated": "{count, plural, one {# genremap} other {# genremappen}} bijgewerkt (box.def / preimages)"
     },
     "error": {
       "open_folder": "Kon de map niet openen: {error}",
@@ -346,9 +357,9 @@
       "download_complete": "Download voltooid"
     },
     "duplicates": {
-      "banner": "{count} lege dubbele map(pen) in \"{instance}\". Verwijderen?",
+      "banner": "{count, plural, one {# lege dubbele map} other {# lege dubbele mappen}} in \"{instance}\". Verwijderen?",
       "button": "Opruimen",
-      "success": "{count} dubbele map(pen) verwijderd.",
+      "success": "{count, plural, one {# dubbele map} other {# dubbele mappen}} verwijderd.",
       "error": "Kon de dubbele mappen niet verwijderen: {error}"
     }
   },
@@ -418,7 +429,9 @@
       "perfect": "Perfect",
       "full_combo": "Full Combo",
       "clear": "Clear"
-    }
+    },
+    "modal_title": "Hall of Fame: {title} ({course} #{rank})",
+    "crown": "Hall of Fame"
   },
   "version_chip": {
     "incompatible": "Niet compatibel met de huidige OpenTaiko-versie",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "afspelen",
-    "pause": "pauzeren"
+    "pause": "pauzeren",
+    "position": "Positie"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "{count} van {total} gedownload",
     "failed": "{count} van {total} gedownload. Mislukt: {failed}",
     "cancelled": "Geannuleerd. {count} van {total} gedownload"
+  },
+  "files": {
+    "images": "Afbeeldingen",
+    "chart_archives": "Chart-archieven",
+    "optk_save": "OpenTaiko-opslag"
   }
 }

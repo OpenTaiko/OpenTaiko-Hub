@@ -3,7 +3,8 @@
     "fetch_error": "Ошибка загрузки данных",
     "retry": "Повторить",
     "reload": "Перезагрузить",
-    "cancel": "Отмена"
+    "cancel": "Отмена",
+    "clear": "Очистить"
   },
   "dl": {
     "error": {
@@ -17,7 +18,7 @@
     "secrets": "Секреты",
     "information": "Информация",
     "links": "Ссылки",
-    "themes": "Темы OpTk Hub",
+    "themes": "Настройки",
     "tooltip": {
       "home": "Управление OpenTaiko и OpenTaiko Hub.",
       "songlist": "Обновляйте свои песни OpenTaiko и скачивайте новые.",
@@ -25,7 +26,7 @@
       "secrets": "???",
       "information": "Журналы изменений, документация и решение проблем.",
       "links": "Загляните в соцсети и на сайты OpenTaiko!",
-      "themes": "Смена темы OpenTaiko Hub.",
+      "themes": "Тема и язык OpenTaiko Hub.",
       "github": "Исходный код OpenTaiko Hub."
     }
   },
@@ -86,7 +87,8 @@
       "redownload": "Скачать OpenTaiko заново",
       "rebuild": "Пересобрать",
       "retry": "Повторить",
-      "install": "Установить сборку..."
+      "install": "Установить сборку...",
+      "change_build": "Сменить сборку"
     },
     "warn": {
       "skin_update": "(После обновления потребуется обновить скин)"
@@ -128,7 +130,10 @@
     },
     "tab": {
       "overview": "Обзор"
-    }
+    },
+    "first_run_text": "OpenTaiko ещё не установлен.",
+    "first_run_install": "Установить OpenTaiko",
+    "first_run_folder": "Будет установлен в {folder}"
   },
   "docs": {
     "title": "Документация",
@@ -224,7 +229,10 @@
         "jacket_hint": "Показывается на коробке в игре. PNG, JPG или WebP.",
         "jacket_pick": "Выбрать изображение...",
         "jacket_saved": "Сохранено как {name}",
-        "jacket_failed": "Не удалось задать изображение: {error}"
+        "jacket_failed": "Не удалось задать изображение: {error}",
+      "discard_title": "Несохранённые изменения",
+      "discard_message": "В настройках папки есть несохранённые изменения. Отменить их?",
+      "discard": "Отменить изменения"
     },
     "folder": {
         "loading": "Песни загружаются.",
@@ -238,7 +246,7 @@
         "created": "Создано «{name}»",
         "create_failed": "Не удалось создать папку: {error}",
         "delete": "Удалить",
-        "delete_confirm": "Удалить «{name}» и {count} песен внутри? Это необратимо.",
+        "delete_confirm": "Удалить «{name}»{count, plural, =0 {?} one { и # песню внутри?} few { и # песни внутри?} many { и # песен внутри?} other { и # песни внутри?}} Это необратимо.",
         "delete_song_confirm": "Удалить «{name}»? Это необратимо.",
         "deleted": "Удалено «{name}»",
         "delete_failed": "Не удалось удалить: {error}",
@@ -251,7 +259,7 @@
         "drop_hint": "Перетащите сюда .zip с картами, чтобы добавить их в эту папку",
         "browse_zip": "Выбрать файлы...",
         "importing": "Добавление карт...",
-        "imported": "Добавлено {count} песен",
+        "imported": "{count, plural, one {Добавлена # песня} few {Добавлено # песни} many {Добавлено # песен} other {Добавлено # песни}}",
         "import_rejected": "Это не архив с картами: {names}",
         "import_failed": "Не удалось добавить карты: {error}",
         "drop_needs_folder": "Сначала выберите свою папку, затем перетащите в неё файлы."
@@ -269,7 +277,8 @@
         "help_hint": "Откройте папку для просмотра или нажмите «Загрузить», чтобы получить недостающее.",
         "get_size": "Загрузить ({size})",
         "open_song_folder": "Открыть папку",
-        "set_jacket": "Задать обложку"
+        "set_jacket": "Задать обложку",
+      "website": "Сайт"
     },
     "course": {
         "easy": "Лёгкий",
@@ -312,7 +321,9 @@
       "installed_of": "{installed} / {total} установлено",
       "no_match": "Нет песен, соответствующих запросу.",
       "open_folder_tip": "Открыть эту папку",
-      "custom": "Пользовательские"
+      "custom": "Пользовательские",
+      "all_updated": "Всё обновлено.",
+      "none_installed": "Песни ещё не установлены."
     },
     "migrate": {
       "banner": "В «{instance}» найдено папок с песнями: {count}. Перенести их в общую библиотеку песен?",
@@ -418,7 +429,9 @@
       "perfect": "Идеально",
       "full_combo": "Фулл-комбо",
       "clear": "Пройдено"
-    }
+    },
+    "modal_title": "Зал славы: {title} ({course} #{rank})",
+    "crown": "Зал славы"
   },
   "version_chip": {
     "incompatible": "Несовместимо с текущей версией OpenTaiko",
@@ -426,7 +439,8 @@
   },
   "player": {
     "play": "воспроизвести",
-    "pause": "пауза"
+    "pause": "пауза",
+    "position": "Позиция"
   },
   "info": {
     "tab": {
@@ -636,5 +650,10 @@
     "done": "Загружено {count} из {total}",
     "failed": "Загружено {count} из {total}. Ошибок: {failed}",
     "cancelled": "Отменено. Загружено {count} из {total}"
+  },
+  "files": {
+    "images": "Изображения",
+    "chart_archives": "Архивы чартов",
+    "optk_save": "Сохранение OpenTaiko"
   }
 }

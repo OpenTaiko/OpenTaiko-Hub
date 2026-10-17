@@ -26,37 +26,41 @@
     let danLevel = $derived(Entry.levels.Dan);
 </script>
 
+<!-- The song's name is the row's button, reached with Tab and Enter. The row as a whole
+     is a button too only for the mouse: as a real one it would hold the Get button inside
+     it, which assistive technology cannot represent. -->
+<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
 <div
     class="row"
     class:available={!Entry.installed}
     class:selected={Selected}
-    role="button"
-    tabindex="0"
     onclick={() => OnSelect?.(Entry)}
-    onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); OnSelect?.(Entry); } }}
 >
     <span class="mark" class:outdated={Entry.status === 'outdated'} class:custom={Entry.status === 'custom'}></span>
 
-    <span class="names">
-        <span class="title">{Entry.label}</span>
-        {#if Entry.subtitle}<span class="sub">{Entry.subtitle}</span>{/if}
-    </span>
+    <button type="button" class="names" aria-pressed={Selected} onclick={(e) => { e.stopPropagation(); OnSelect?.(Entry); }}>
+        <span class="title" title={Entry.label}>{Entry.label}</span>
+        {#if Entry.subtitle}<span class="sub" title={Entry.subtitle}>{Entry.subtitle}</span>{/if}
+    </button>
 
-    <!-- Fixed cells under the fixed header, so a level always sits under its course. -->
+    <!-- Fixed cells under the column labels (SongRowHeader), so a level always sits under
+         its course. Each cell also names its course, for a tooltip and a screen reader. -->
     <span class="levels">
         {#if towerLevel !== undefined || danLevel !== undefined}
             <!-- One chip, coloured by kind: the words did not survive the column width. -->
             <span
                 class="cell {towerLevel !== undefined ? 'c-Tower' : 'c-Dan'}"
-                title={towerLevel !== undefined ? $_('songs.course.tower') : $_('songs.course.dan')}
+                title="{towerLevel !== undefined ? $_('songs.course.tower') : $_('songs.course.dan')} {FormatLevel((towerLevel ?? danLevel) as number)}"
+                aria-label="{towerLevel !== undefined ? $_('songs.course.tower') : $_('songs.course.dan')} {FormatLevel((towerLevel ?? danLevel) as number)}"
             >{FormatLevel((towerLevel ?? danLevel) as number)}</span>
         {:else}
             {#each MAIN_COURSES as course (course)}
                 {@const level = Entry.levels[course as CourseName]}
                 {#if level === undefined}
-                    <span class="cell none">–</span>
+                    <span class="cell none" aria-hidden="true">–</span>
                 {:else}
-                    <span class="cell c-{course}">{FormatLevel(level)}</span>
+                    {@const label = `${$_(`songs.course.${course.toLowerCase()}`)} ${FormatLevel(level)}`}
+                    <span class="cell c-{course}" title={label} aria-label={label}>{FormatLevel(level)}</span>
                 {/if}
             {/each}
         {/if}
@@ -77,7 +81,7 @@
         {:else if Entry.status === 'outdated' && Entry.catalog}
             <button
                 type="button"
-                class="button-blue button-main get"
+                class="button-green button-main get"
                 disabled={Disabled}
                 onclick={(e) => { e.stopPropagation(); OnGet?.(Entry.catalog as SoundtrackEntry); }}
             >
@@ -124,7 +128,22 @@
     .row:not(.available) .mark.outdated {background-color: #d97706;}
     .row:not(.available) .mark.custom {background-color: var(--color-primary-500);}
 
-    .names {flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2;}
+    .names {
+        flex: 1;
+        min-width: 0;
+        display: flex;
+        flex-direction: column;
+        line-height: 1.2;
+        /* A button that looks like the text it was */
+        padding: 0;
+        border: 0;
+        background: none;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+    }
+    .names:focus-visible {outline: 2px solid var(--color-primary-500); outline-offset: 2px; border-radius: 0.2rem;}
     .title {white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
     .sub {font-size: 0.72rem; opacity: 0.65; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
 

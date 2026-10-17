@@ -416,5 +416,5 @@ export const shownUnder = (node: LibraryFolder): number => {
     return n;
 };
 
-export const formatSize = (mb: number): string =>
-    mb >= 1024 ? `${(mb / 1024).toFixed(1)} GB` : `${Math.max(1, Math.round(mb))} MB`;
+// Kept here for the components that already import it from the library model
+export { formatSize } from './format';

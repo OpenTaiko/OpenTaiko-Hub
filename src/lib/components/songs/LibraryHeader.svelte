@@ -127,11 +127,12 @@
             <input
                 type="text"
                 placeholder={$_('songs.library.search')}
+                aria-label={$_('songs.library.search')}
                 value={Search}
                 oninput={(e) => OnSearch?.(e.currentTarget.value)}
             >
             {#if Search}
-                <button type="button" class="clear" aria-label={$_('common.cancel')} onclick={() => OnSearch?.('')}>✕</button>
+                <button type="button" class="clear" aria-label={$_('common.clear')} title={$_('common.clear')} onclick={() => OnSearch?.('')}>✕</button>
             {/if}
         </div>
     </div>
