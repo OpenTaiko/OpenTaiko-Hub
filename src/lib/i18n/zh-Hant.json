@@ -627,7 +627,9 @@
     "not_found": "伺服器上缺少該檔案。",
     "offline": "無法連線到伺服器。請檢查網路連線。",
     "disk_full": "磁碟已滿。",
-    "access_denied": "檔案存取遭拒。如果遊戲正在執行，請關閉後再試。"
+    "access_denied": "檔案存取遭拒。如果遊戲正在執行，請關閉後再試。",
+    "no_build_for_system": "此版本沒有適用於 {system} 的下載。",
+    "songs_link_failed": "無法將曲庫連結到 {name}，遊戲中將不會顯示這些歌曲。"
   },
   "bulk": {
     "status": "正在下載 {done} / {total} · 剩餘 {size}",

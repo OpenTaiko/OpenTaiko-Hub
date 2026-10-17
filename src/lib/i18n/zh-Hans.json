@@ -627,7 +627,9 @@
     "not_found": "服务器上缺少该文件。",
     "offline": "无法连接到服务器。请检查网络连接。",
     "disk_full": "磁盘已满。",
-    "access_denied": "文件访问被拒绝。如果游戏正在运行，请关闭后重试。"
+    "access_denied": "文件访问被拒绝。如果游戏正在运行，请关闭后重试。",
+    "no_build_for_system": "此版本没有适用于 {system} 的下载。",
+    "songs_link_failed": "无法将曲库关联到 {name}，游戏中将不会显示这些歌曲。"
   },
   "bulk": {
     "status": "正在下载 {done} / {total} · 剩余 {size}",

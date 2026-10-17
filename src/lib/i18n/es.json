@@ -627,7 +627,9 @@
     "not_found": "El archivo no está en el servidor.",
     "offline": "No se pudo conectar con el servidor. Comprueba tu conexión a internet.",
     "disk_full": "El disco está lleno.",
-    "access_denied": "Se denegó el acceso a un archivo. Si el juego está abierto, ciérralo e inténtalo de nuevo."
+    "access_denied": "Se denegó el acceso a un archivo. Si el juego está abierto, ciérralo e inténtalo de nuevo.",
+    "no_build_for_system": "Esta versión no tiene descarga para {system}.",
+    "songs_link_failed": "No se pudo vincular la biblioteca de canciones a {name}, así que el juego no mostrará sus canciones."
   },
   "bulk": {
     "status": "Descargando {done} / {total} · faltan {size}",

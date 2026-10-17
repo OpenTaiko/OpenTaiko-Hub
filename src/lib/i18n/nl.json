@@ -627,7 +627,9 @@
     "not_found": "Het bestand ontbreekt op de server.",
     "offline": "Kan de server niet bereiken. Controleer je internetverbinding.",
     "disk_full": "De schijf is vol.",
-    "access_denied": "Toegang tot een bestand geweigerd. Als het spel draait, sluit het en probeer het opnieuw."
+    "access_denied": "Toegang tot een bestand geweigerd. Als het spel draait, sluit het en probeer het opnieuw.",
+    "no_build_for_system": "Deze versie heeft geen download voor {system}.",
+    "songs_link_failed": "Kan de nummerbibliotheek niet koppelen aan {name}, dus het spel toont de nummers niet."
   },
   "bulk": {
     "status": "Downloaden {done} / {total} · nog {size}",

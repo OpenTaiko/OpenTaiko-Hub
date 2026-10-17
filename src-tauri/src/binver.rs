@@ -96,33 +96,18 @@ pub async fn get_game_version(instance_dir: String) -> Result<Option<String>, St
 mod tests {
     use super::*;
 
-    // Linux single-file release binary (ELF apphost with embedded OpenTaiko.dll),
-    // when present, must report the release version via the bundle scan.
+    // Needs a real game binary, which the repository does not ship. Run with
+    //   OTK_TEST_GAME_BINARY=<path to OpenTaiko(.exe)> OTK_TEST_GAME_VERSION=<expected>
+    //   cargo test -- --ignored
+    // Worth doing with a Linux single-file release (ELF apphost with an embedded
+    // OpenTaiko.dll, read through the bundle scan) and with a Windows build (read from
+    // its version resource), since the two are read differently.
     #[test]
-    fn reads_version_from_linux_single_file_bundle() {
-        let path = std::path::Path::new(concat!(
-            "C:/Users/raphael/AppData/Local/Temp/claude/c--Users-raphael-Documents-GitHub-OpenTaiko-Hub/",
-            "ec0f8566-0080-4132-9b36-0fbdad314293/scratchpad/OpenTaiko-linux-elf"
-        ));
-        if !path.is_file() {
-            eprintln!("skipped: no downloaded linux release binary");
-            return;
-        }
-        let version = version_from_file(path);
-        assert_eq!(version.as_deref(), Some("0.6.0.107"));
-    }
-
-    // Local build of the 0.6.1 branch, when present, must report its csproj version.
-    #[test]
-    fn reads_version_from_local_game_build() {
-        let path = std::path::Path::new(
-            "C:/Users/raphael/Documents/GitHub/OpenTaiko/OpenTaiko/bin/Release/net8.0/OpenTaiko.exe",
-        );
-        if !path.is_file() {
-            eprintln!("skipped: no local game build");
-            return;
-        }
-        let version = version_from_file(path);
-        assert_eq!(version.as_deref(), Some("0.6.1.0"));
+    #[ignore = "needs OTK_TEST_GAME_BINARY and OTK_TEST_GAME_VERSION"]
+    fn reads_the_version_of_a_real_game_binary() {
+        let path = std::env::var_os("OTK_TEST_GAME_BINARY").expect("OTK_TEST_GAME_BINARY is not set");
+        let expected = std::env::var("OTK_TEST_GAME_VERSION").expect("OTK_TEST_GAME_VERSION is not set");
+        let version = version_from_file(std::path::Path::new(&path));
+        assert_eq!(version.as_deref(), Some(expected.as_str()));
     }
 }

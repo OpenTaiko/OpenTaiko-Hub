@@ -627,7 +627,9 @@
     "not_found": "The file is missing on the server.",
     "offline": "Could not reach the server. Check your internet connection.",
     "disk_full": "The disk is full.",
-    "access_denied": "Access to a file was refused. If the game is running, close it and try again."
+    "access_denied": "Access to a file was refused. If the game is running, close it and try again.",
+    "no_build_for_system": "This release has no download for {system}.",
+    "songs_link_failed": "Could not link the song library to {name}, so the game will not show its songs."
   },
   "bulk": {
     "status": "Downloading {done} / {total} · {size} left",

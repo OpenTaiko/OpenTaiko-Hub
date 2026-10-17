@@ -15,7 +15,7 @@
     import type { BuildOption, GitHubRelease, HubOS, IndevBuildInfo, Instance, ToastContext } from '$lib/types';
     const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
-    import { GetOS, GetBuildPath } from "$lib/utils/path";
+    import { GetOS, GetBuildPath, GetBuildTarget } from "$lib/utils/path";
     import { startJob, isCancelled, type Job } from "$lib/stores/activity";
     import { DescribeError, ErrorText } from "$lib/utils/errors";
     import { openUrl } from '@tauri-apps/plugin-opener';
@@ -303,12 +303,17 @@
             TriggerWarning(get(_)('jobs.install_cancelled'));
             return;
         }
+        // Nothing failed: the release simply has no build for this system
+        if (err instanceof NoBuildForSystem) {
+            TriggerError(err.message);
+            return;
+        }
         TriggerError(get(_)(key, { values: { error: DescribeError(err) } }), { details: ErrorText(err) });
     };
 
     // Stable and prerelease installs only differ in which release they read and how the
     // instance is recorded afterwards, so both go through here.
-    const InstallRelease = async (resolve: () => Promise<ReleaseToInstall>) => {
+    const InstallRelease = async (resolve: () => Promise<ReleaseToInstall | null>) => {
         if (!current) return;
         // Capture the target so switching instances mid-download cannot retarget it
         const instance = current;
@@ -317,6 +322,7 @@
 
         try {
             const release = await resolve();
+            if (!release) return;
             progress = 0;
 
             const installed = await DownloadAndInstallZip(release.url, instance.path, job);
@@ -334,21 +340,31 @@
         }
     };
 
+    // The release's download for this system, or an error saying there is none
+    // Releases are published for Windows and Linux x64 only (no macOS builds yet), so a
+    // Mac or an ARM machine finds nothing to download. Experimental InDev builds are
+    // compiled from source for the machine itself and are not affected.
+    class NoBuildForSystem extends Error {}
+
+    const FindAsset = async (release: GitHubRelease) => {
+        const target = await GetBuildTarget();
+        const asset = release.assets?.find((asset) => asset.name.endsWith(target.assetSuffix));
+        if (!asset) {
+            throw new NoBuildForSystem(get(_)('errors.no_build_for_system', { values: { system: target.label } }));
+        }
+        return asset;
+    };
+
     const DownloadStable = () => InstallRelease(async () => {
         if (!latestRelease) await TryFetchingLatestVersion();
-        const asset = latestRelease?.assets?.find((asset) => asset.name.endsWith(`${optk_OS}.x64.zip`));
-        if (!asset) {
-            throw new Error('Desired asset not found in the latest release');
-        }
+        // The lookup has already said why it failed
+        if (!latestRelease) return null;
+        const asset = await FindAsset(latestRelease);
         return { url: asset.browser_download_url, version: latestVersion, patch: { channel: 'stable', experimental: null } };
     });
 
     const DownloadPrerelease = (option: { tag: string; label: string }) => InstallRelease(async () => {
-        const release = await fetchReleaseByTag(option.tag);
-        const asset = release.assets?.find((asset) => asset.name.endsWith(`${optk_OS}.x64.zip`));
-        if (!asset) {
-            throw new Error('Desired asset not found in the prerelease');
-        }
+        const asset = await FindAsset(await fetchReleaseByTag(option.tag));
         return {
             url: asset.browser_download_url,
             version: option.tag,
@@ -388,7 +404,7 @@
         };
 
         try {
-            // 1. The build requires the .NET SDK 8
+            // 1. The build requires the .NET SDK 8 or later
             buildStage = 'check_sdk';
             progress = undefined;
             const sdkLines: string[] = [];
@@ -402,7 +418,9 @@
                 if (isCancelled(error)) throw error;
                 sdkExitCode = -1;
             }
-            if (sdkExitCode !== 0 || !sdkLines.some((line) => line.trim().startsWith('8.'))) {
+            // The game targets net8.0, which any SDK from 8 on can build
+            const hasSdk = sdkLines.some((line) => Number(line.trim().match(/^(\d+)\./)?.[1] ?? 0) >= 8);
+            if (sdkExitCode !== 0 || !hasSdk) {
                 TriggerError(get(_)('home.experimental.requires_dotnet'), {
                     action: {
                         label: get(_)('jobs.dotnet_page'),
@@ -464,7 +482,7 @@
             // 5. Build (same command as the game's build scripts)
             buildStage = 'build';
             progress = undefined;
-            const rid = optk_OS === 'Win' ? 'win-x64' : 'linux-x64';
+            const rid = (await GetBuildTarget()).rid;
             const logChannel = new Channel<string[]>();
             logChannel.onmessage = (lines) => {
                 pending.push(...lines);

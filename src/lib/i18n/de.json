@@ -627,7 +627,9 @@
     "not_found": "Die Datei fehlt auf dem Server.",
     "offline": "Server nicht erreichbar. Prüfe deine Internetverbindung.",
     "disk_full": "Der Datenträger ist voll.",
-    "access_denied": "Der Zugriff auf eine Datei wurde verweigert. Falls das Spiel läuft, schließe es und versuche es erneut."
+    "access_denied": "Der Zugriff auf eine Datei wurde verweigert. Falls das Spiel läuft, schließe es und versuche es erneut.",
+    "no_build_for_system": "Diese Version hat keinen Download für {system}.",
+    "songs_link_failed": "Die Songbibliothek konnte nicht mit {name} verknüpft werden, daher zeigt das Spiel ihre Songs nicht an."
   },
   "bulk": {
     "status": "Download {done} / {total} · noch {size}",

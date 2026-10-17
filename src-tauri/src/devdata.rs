@@ -56,44 +56,16 @@ pub fn migrate_from(old_root: &Path, new_root: &Path, registry: &Path) -> Vec<St
         }
     }
     if moved {
-        match rewrite_registry(registry, old_root, new_root) {
+        // Every registry path under the old root moves with it
+        let (old, new) = (old_root.to_string_lossy().into_owned(), new_root.to_string_lossy().into_owned());
+        let moved_path = |path: &str| crate::relocate::strip_root(path, &old).map(|rest| format!("{new}{rest}"));
+        match crate::relocate::rewrite_registry(registry, moved_path) {
             Ok(0) => {}
             Ok(n) => report.push(format!("Updated {} instance path(s) in {}", n, registry.display())),
             Err(e) => report.push(format!("Could not update {}: {}", registry.display(), e)),
         }
     }
     report
-}
-
-/// Rewrites registry paths under `old_root` to the same place under `new_root`.
-fn rewrite_registry(registry: &Path, old_root: &Path, new_root: &Path) -> Result<usize, String> {
-    let Ok(text) = std::fs::read_to_string(registry) else { return Ok(0) };
-    let mut json: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
-    let old = old_root.to_string_lossy().into_owned();
-    let new = new_root.to_string_lossy().into_owned();
-    let mut changed = 0;
-    if let Some(list) = json.get_mut("instances").and_then(|l| l.as_array_mut()) {
-        for instance in list {
-            let Some(path) = instance.get("path").and_then(|p| p.as_str()) else { continue };
-            if let Some(rest) = strip_root(path, &old) {
-                instance["path"] = serde_json::Value::String(format!("{new}{rest}"));
-                changed += 1;
-            }
-        }
-    }
-    if changed > 0 {
-        let pretty = serde_json::to_string_pretty(&json).map_err(|e| e.to_string())?;
-        std::fs::write(registry, pretty).map_err(|e| e.to_string())?;
-    }
-    Ok(changed)
-}
-
-/// What follows `root` in `path`, separator included, when `path` is inside `root`.
-/// Case-insensitive: the frontend may have written the same folder with other casing.
-fn strip_root<'a>(path: &'a str, root: &str) -> Option<&'a str> {
-    let head = path.get(..root.len())?;
-    let rest = &path[root.len()..];
-    (head.eq_ignore_ascii_case(root) && (rest.is_empty() || rest.starts_with(['\\', '/']))).then_some(rest)
 }
 
 #[cfg(test)]
@@ -155,14 +127,5 @@ mod tests {
         assert!(old.join("Songs/A").is_dir());
         assert!(new.join("Songs/B").is_dir());
         assert!(!new.join("Songs/A").exists());
-    }
-
-    #[test]
-    fn a_path_is_inside_a_root_only_at_a_separator() {
-        assert_eq!(strip_root("C:\\x\\debug\\OpenTaiko", "C:\\x\\debug"), Some("\\OpenTaiko"));
-        assert_eq!(strip_root("c:\\X\\DEBUG\\Songs", "C:\\x\\debug"), Some("\\Songs"));
-        assert_eq!(strip_root("C:\\x\\debug", "C:\\x\\debug"), Some(""));
-        assert_eq!(strip_root("C:\\x\\debugger\\a", "C:\\x\\debug"), None);
-        assert_eq!(strip_root("C:\\y", "C:\\x\\debug"), None);
     }
 }

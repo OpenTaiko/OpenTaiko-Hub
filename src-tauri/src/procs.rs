@@ -1,6 +1,7 @@
 // Runs an external program (git-less source fetch uses HTTP, but building the
 // experimental branch needs `dotnet publish`) and streams stdout/stderr lines to the
 // frontend so build progress can be displayed live.
+use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
@@ -24,6 +25,9 @@ fn augmented_tool_path(base_path: &str, home: Option<&str>) -> String {
         "/usr/lib/dotnet".to_string(),
         "/opt/dotnet".to_string(),
         "/snap/bin".to_string(),
+        // macOS: the official installer, and Homebrew on Apple Silicon
+        "/usr/local/share/dotnet".to_string(),
+        "/opt/homebrew/bin".to_string(),
     ];
     if let Some(home) = home {
         candidates.push(format!("{}/.dotnet", home));
@@ -35,6 +39,68 @@ fn augmented_tool_path(base_path: &str, home: Option<&str>) -> String {
         }
     }
     dirs.join(":")
+}
+
+/// A change to a child process's environment: `None` removes the variable.
+pub(crate) type EnvChange = (String, Option<String>);
+
+/// Undoes what an AppImage sets up for the Hub itself. The AppImage runtime and its
+/// GTK hook point library, schema and data paths into the mounted image (and force
+/// GDK_BACKEND=x11 for the Hub's window); a program the Hub starts would load those
+/// instead of the system's own. Path lists keep their entries outside the image.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) fn appimage_cleanup(env: &HashMap<String, String>) -> Vec<EnvChange> {
+    let mut changes = Vec::new();
+    let Some(appdir) = env.get("APPDIR").filter(|dir| !dir.is_empty() && env.contains_key("APPIMAGE")) else {
+        return changes;
+    };
+    for (key, value) in env {
+        if matches!(key.as_str(), "APPDIR" | "APPIMAGE" | "ARGV0" | "OWD" | "GDK_BACKEND") {
+            changes.push((key.clone(), None));
+        } else if value.contains(appdir.as_str()) {
+            let kept: Vec<&str> = value
+                .split(':')
+                .filter(|part| !part.is_empty() && !part.starts_with(appdir.as_str()))
+                .collect();
+            changes.push((key.clone(), (!kept.is_empty()).then(|| kept.join(":"))));
+        }
+    }
+    changes.sort();
+    changes
+}
+
+/// The environment the game gets on Linux: the same as from the official launcher
+/// (special/linux_installer_standalone.bash in the game repository), which finds the
+/// libraries shipped next to the game through LD_LIBRARY_PATH and runs ANGLE on Vulkan.
+/// The game's bundled libraries carry no $ORIGIN path, so without this the system's
+/// copies were loaded instead, or none at all.
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) fn game_env(env: &HashMap<String, String>, game_dir: &str) -> Vec<EnvChange> {
+    let mut changes = appimage_cleanup(env);
+    let inherited_ld = match changes.iter().find(|(key, _)| key == "LD_LIBRARY_PATH") {
+        Some((_, value)) => value.clone(),
+        None => env.get("LD_LIBRARY_PATH").cloned(),
+    };
+    changes.retain(|(key, _)| key != "LD_LIBRARY_PATH");
+    let ld = match inherited_ld.filter(|v| !v.is_empty()) {
+        Some(rest) => format!("{game_dir}:{rest}"),
+        None => game_dir.to_string(),
+    };
+    changes.push(("SDL_VIDEODRIVER".into(), None));
+    changes.push(("StoreValue".into(), None));
+    changes.push(("LD_LIBRARY_PATH".into(), Some(ld)));
+    changes.push(("ANGLE_DEFAULT_PLATFORM".into(), Some("vulkan".into())));
+    changes
+}
+
+#[cfg_attr(not(target_os = "linux"), allow(dead_code))]
+pub(crate) fn apply_env(cmd: &mut Command, changes: Vec<EnvChange>) {
+    for (key, value) in changes {
+        match value {
+            Some(value) => cmd.env(key, value),
+            None => cmd.env_remove(key),
+        };
+    }
 }
 
 /// How often collected output lines are sent to the page.
@@ -118,9 +184,15 @@ pub async fn run_dotnet(
         }
         #[cfg(unix)]
         {
-            let base = std::env::var("PATH").unwrap_or_default();
-            let home = std::env::var("HOME").ok();
-            cmd.env("PATH", augmented_tool_path(&base, home.as_deref()));
+            let env: HashMap<String, String> = std::env::vars().collect();
+            let cleanup = appimage_cleanup(&env);
+            // PATH as the AppImage cleanup leaves it, before adding the dotnet locations
+            let base = match cleanup.iter().find(|(key, _)| key == "PATH") {
+                Some((_, value)) => value.clone().unwrap_or_default(),
+                None => env.get("PATH").cloned().unwrap_or_default(),
+            };
+            apply_env(&mut cmd, cleanup);
+            cmd.env("PATH", augmented_tool_path(&base, env.get("HOME").map(String::as_str)));
         }
 
         let mut child = cmd
@@ -181,6 +253,63 @@ pub async fn run_dotnet(
     })
     .await
     .map_err(|e| format!("Task failed: {e}"))?
+}
+
+#[cfg(test)]
+mod env_tests {
+    use super::*;
+
+    fn env(pairs: &[(&str, &str)]) -> HashMap<String, String> {
+        pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()
+    }
+
+    fn value<'a>(changes: &'a [EnvChange], key: &str) -> Option<&'a Option<String>> {
+        changes.iter().find(|(k, _)| k == key).map(|(_, v)| v)
+    }
+
+    #[test]
+    fn outside_an_appimage_nothing_is_cleaned() {
+        assert!(appimage_cleanup(&env(&[("PATH", "/usr/bin"), ("GDK_BACKEND", "wayland")])).is_empty());
+    }
+
+    #[test]
+    fn an_appimage_keeps_only_paths_outside_the_image() {
+        let changes = appimage_cleanup(&env(&[
+            ("APPIMAGE", "/home/u/Hub.AppImage"),
+            ("APPDIR", "/tmp/.mount_Hub"),
+            ("XDG_DATA_DIRS", "/tmp/.mount_Hub/usr/share:/usr/share"),
+            ("GSETTINGS_SCHEMA_DIR", "/tmp/.mount_Hub/usr/share/glib-2.0/schemas"),
+            ("GDK_BACKEND", "x11"),
+            ("HOME", "/home/u")
+        ]));
+        assert_eq!(value(&changes, "XDG_DATA_DIRS"), Some(&Some("/usr/share".into())));
+        assert_eq!(value(&changes, "GSETTINGS_SCHEMA_DIR"), Some(&None));
+        assert_eq!(value(&changes, "GDK_BACKEND"), Some(&None));
+        assert_eq!(value(&changes, "APPDIR"), Some(&None));
+        assert_eq!(value(&changes, "HOME"), None);
+    }
+
+    #[test]
+    fn the_game_gets_the_official_launcher_environment() {
+        let changes = game_env(&env(&[("SDL_VIDEODRIVER", "x11"), ("LD_LIBRARY_PATH", "/opt/lib")]), "/games/optk");
+        assert_eq!(value(&changes, "LD_LIBRARY_PATH"), Some(&Some("/games/optk:/opt/lib".into())));
+        assert_eq!(value(&changes, "SDL_VIDEODRIVER"), Some(&None));
+        assert_eq!(value(&changes, "ANGLE_DEFAULT_PLATFORM"), Some(&Some("vulkan".into())));
+    }
+
+    #[test]
+    fn the_game_does_not_inherit_the_appimage_libraries() {
+        let changes = game_env(
+            &env(&[
+                ("APPIMAGE", "/home/u/Hub.AppImage"),
+                ("APPDIR", "/tmp/.mount_Hub"),
+                ("LD_LIBRARY_PATH", "/tmp/.mount_Hub/usr/lib")
+            ]),
+            "/games/optk"
+        );
+        assert_eq!(value(&changes, "LD_LIBRARY_PATH"), Some(&Some("/games/optk".into())));
+        assert_eq!(changes.iter().filter(|(k, _)| k == "LD_LIBRARY_PATH").count(), 1);
+    }
 }
 
 #[cfg(test)]

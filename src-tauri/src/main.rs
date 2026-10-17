@@ -14,6 +14,7 @@ mod health;
 mod jobs;
 mod migrate;
 mod procs;
+mod relocate;
 mod scan;
 
 use std::fs::File;
@@ -82,9 +83,11 @@ fn execute_external_app(path: String, app_handle: AppHandle) -> Result<(), Strin
     // stderr is captured rather than inherited: a game that dies immediately (missing
     // shared library, noexec mount, wrong architecture) used to be reported as a
     // successful launch, so users experienced it as "the Hub crashed" with nothing to go on.
-    let mut child = Command::new(&full_path)
-        .current_dir(dir)
-        .stderr(Stdio::piped())
+    let mut command = Command::new(&full_path);
+    command.current_dir(dir).stderr(Stdio::piped());
+    #[cfg(target_os = "linux")]
+    procs::apply_env(&mut command, procs::game_env(&std::env::vars().collect(), &dir.to_string_lossy()));
+    let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to execute the app: {}", e))?;
 
@@ -291,9 +294,9 @@ fn install_panic_hook() {
 const APP_IDENTIFIER: &str = "com.opentaiko.hub";
 
 /// The folder the Hub keeps its working data in (`tmp/`, the shared `Songs/` library,
-/// new instances, logs): the executable's own folder on Windows, the user's Documents
-/// folder elsewhere. Dev builds use their own folder instead (devdata.rs). The page asks
-/// for it through `hub_root` rather than working it out a second way.
+/// new instances, logs): the executable's own folder on Windows, an "OpenTaiko Hub"
+/// folder in Documents elsewhere. Dev builds use their own folder instead (devdata.rs).
+/// The page asks for it through `hub_root` rather than working it out a second way.
 fn hub_root_dir() -> Option<std::path::PathBuf> {
     #[cfg(debug_assertions)]
     {
@@ -308,10 +311,17 @@ fn hub_root_dir() -> Option<std::path::PathBuf> {
     }
     #[cfg(all(not(debug_assertions), not(target_os = "windows")))]
     {
-        // The Documents folder, falling back to the home directory on minimal installs
-        // where XDG_DOCUMENTS_DIR is not configured.
-        dirs::document_dir().or_else(dirs::home_dir)
+        // A folder of its own in Documents, or in the home directory on minimal installs
+        // where XDG_DOCUMENTS_DIR is not configured. Not Documents itself: generic names
+        // such as Songs or tmp there are often the user's own (relocate.rs).
+        old_shared_root().map(|dir| dir.join("OpenTaiko Hub"))
     }
+}
+
+/// Where Linux and macOS kept the Hub's data before it had a folder of its own.
+#[cfg(all(not(debug_assertions), not(target_os = "windows")))]
+fn old_shared_root() -> Option<std::path::PathBuf> {
+    dirs::document_dir().or_else(dirs::home_dir)
 }
 
 /// True when the log plugin will actually be able to write here. Creating the folder is
@@ -441,20 +451,24 @@ fn raise_open_file_limit() -> Option<String> {
 fn main() {
     install_panic_hook();
 
-    // Before anything creates folders in the dev data root (the log folder, below), so
-    // the old ones can still move there
+    // Data moved to a new root folder, before anything creates folders there (the log
+    // folder, below) so the old ones can still move: a dev build's data out of
+    // target/debug, and on Linux and macOS the Hub's folders out of Documents itself.
+    let registry = dirs::config_dir().unwrap_or_default().join(APP_IDENTIFIER).join("instances.json");
     #[cfg(debug_assertions)]
-    let dev_data_report = std::env::current_exe()
+    let relocation_report = std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
-        .map(|old_root| {
-            let registry = dirs::config_dir().unwrap_or_default().join(APP_IDENTIFIER).join("instances.json");
-            devdata::migrate_from(&old_root, &devdata::dev_root(), &registry)
-        })
+        .map(|old_root| devdata::migrate_from(&old_root, &devdata::dev_root(), &registry))
         .unwrap_or_default();
-    #[cfg(not(debug_assertions))]
-    let dev_data_report: Vec<String> = Vec::new();
-    for line in &dev_data_report {
+    #[cfg(all(not(debug_assertions), not(target_os = "windows")))]
+    let relocation_report = match (old_shared_root(), hub_root_dir()) {
+        (Some(old_root), Some(new_root)) => relocate::migrate_documents_layout(&old_root, &new_root, &registry),
+        _ => Vec::new(),
+    };
+    #[cfg(all(not(debug_assertions), target_os = "windows"))]
+    let relocation_report: Vec<String> = { let _ = &registry; Vec::new() };
+    for line in &relocation_report {
         eprintln!("{}", line);
     }
 
@@ -567,7 +581,7 @@ fn main() {
             if let Some(outcome) = &fd_limit_outcome {
                 log::info!("{}", outcome);
             }
-            for line in &dev_data_report {
+            for line in &relocation_report {
                 log::info!("{}", line);
             }
             health::spawn_watcher(ui_health.clone());

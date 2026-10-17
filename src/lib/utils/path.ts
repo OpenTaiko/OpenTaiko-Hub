@@ -1,5 +1,5 @@
 import { appConfigDir, tempDir, join } from '@tauri-apps/api/path';
-import { type } from '@tauri-apps/plugin-os';
+import { type, arch } from '@tauri-apps/plugin-os';
 import { ipc } from '$lib/ipc';
 import type { HubOS } from '$lib/types';
 
@@ -32,6 +32,30 @@ export const GetOS = once(async (): Promise<HubOS> => {
             return "Unsupported";
     }
 });
+
+/** CPU architecture, as game releases and .NET name it. */
+export type HubArch = 'x64' | 'arm64' | 'Unsupported';
+
+export const GetArch = once(async (): Promise<HubArch> => {
+    switch (await arch()) {
+        case 'x86_64':
+            return 'x64';
+        case 'aarch64':
+            return 'arm64';
+        default:
+            return 'Unsupported';
+    }
+});
+
+// What a game build is made for: the release asset suffix ("Linux.x64") and the .NET
+// runtime identifier of an experimental build ("linux-x64"). Picked from the actual OS
+// and CPU: a Mac used to be given a Linux build, and an ARM machine an x64 one, which
+// only failed once launched.
+export const GetBuildTarget = async (): Promise<{ assetSuffix: string; rid: string; label: string }> => {
+    const [os, cpu] = await Promise.all([GetOS(), GetArch()]);
+    const ridOs: Record<HubOS, string> = { Win: 'win', Linux: 'linux', Mac: 'osx', Unsupported: 'unsupported' };
+    return { assetSuffix: `${os}.${cpu}.zip`, rid: `${ridOs[os]}-${cpu}`, label: `${os} ${cpu}` };
+};
 
 export const GetPreferencesPath = async (): Promise<string> => {
     return await appConfigDir();
