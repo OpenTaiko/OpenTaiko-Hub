@@ -60,3 +60,13 @@ debug = "line-tables-only"
 
 [profile.dev.package."*"]
 debug = false
+
+# Smaller shipped binary. Symbols are stripped (a panic still logs its file and line:
+# the panic hook reads those from the panic itself, not from symbols), and link-time
+# optimisation across all crates removes the parts of the dependencies the Hub never
+# calls. Release builds take longer for it. Panics keep unwinding: with "abort", one
+# failing command would take the whole app down instead of failing alone.
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

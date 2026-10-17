@@ -22,7 +22,8 @@ export default defineConfig({
 			// Never watch the Rust build tree: in dev mode the Hub's working data
 			// (downloads, experimental build sources) lives under src-tauri/target,
 			// and watching it crashes the dev server (EBUSY) during builds.
-			ignored: ['**/src-tauri/**'],
+			// dev-hub holds the dev build's instances and songs (devdata.rs), same reason.
+			ignored: ['**/src-tauri/**', '**/dev-hub/**'],
 		},
 	},
 });

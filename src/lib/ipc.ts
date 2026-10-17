@@ -74,6 +74,7 @@ export const ipc = {
     createInstanceDir: (folderName: string) => invoke<string>('create_instance_dir', { folderName }),
     allowBuildDir: (path: string) => invoke<void>('allow_build_dir', { path }),
     openFolder: (path: string) => invoke<void>('open_folder', { path }),
+    hubRoot: () => invoke<string>('hub_root'),
     logDirectory: () => invoke<string | null>('log_directory'),
     uiHeartbeat: () => invoke<void>('ui_heartbeat'),
 

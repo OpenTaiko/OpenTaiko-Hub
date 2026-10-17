@@ -5,6 +5,8 @@ mod library;
 mod assetscan;
 mod binver;
 mod configini;
+#[cfg(debug_assertions)]
+mod devdata;
 mod download;
 mod fsops;
 mod guard;
@@ -288,21 +290,26 @@ fn install_panic_hook() {
 /// tauri.conf.json by a test below.
 const APP_IDENTIFIER: &str = "com.opentaiko.hub";
 
-/// The folder the Hub keeps its working data in, matching `GetRootPath()` in the
-/// frontend: the executable's own folder on Windows, the user's Documents folder
-/// elsewhere. `tmp/` and the shared `Songs/` library already live here.
+/// The folder the Hub keeps its working data in (`tmp/`, the shared `Songs/` library,
+/// new instances, logs): the executable's own folder on Windows, the user's Documents
+/// folder elsewhere. Dev builds use their own folder instead (devdata.rs). The page asks
+/// for it through `hub_root` rather than working it out a second way.
 fn hub_root_dir() -> Option<std::path::PathBuf> {
-    #[cfg(target_os = "windows")]
+    #[cfg(debug_assertions)]
+    {
+        Some(devdata::dev_root())
+    }
+    #[cfg(all(not(debug_assertions), target_os = "windows"))]
     {
         // What Tauri's resourceDir() resolves to on Windows.
         std::env::current_exe()
             .ok()
             .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(all(not(debug_assertions), not(target_os = "windows")))]
     {
-        // documentDir() with the same home-directory fallback the frontend uses, for
-        // minimal installs where XDG_DOCUMENTS_DIR is not configured.
+        // The Documents folder, falling back to the home directory on minimal installs
+        // where XDG_DOCUMENTS_DIR is not configured.
         dirs::document_dir().or_else(dirs::home_dir)
     }
 }
@@ -356,6 +363,13 @@ struct LogDirectory(Option<std::path::PathBuf>);
 #[tauri::command]
 fn log_directory(dir: tauri::State<'_, LogDirectory>) -> Option<String> {
     dir.0.as_ref().map(|d| d.display().to_string())
+}
+
+#[tauri::command]
+fn hub_root() -> Result<String, String> {
+    hub_root_dir()
+        .map(|dir| dir.to_string_lossy().into_owned())
+        .ok_or_else(|| "The Hub folder could not be resolved".to_string())
 }
 
 /// Opens a folder in the system file manager. Only folders are accepted: handing a file
@@ -427,6 +441,23 @@ fn raise_open_file_limit() -> Option<String> {
 fn main() {
     install_panic_hook();
 
+    // Before anything creates folders in the dev data root (the log folder, below), so
+    // the old ones can still move there
+    #[cfg(debug_assertions)]
+    let dev_data_report = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+        .map(|old_root| {
+            let registry = dirs::config_dir().unwrap_or_default().join(APP_IDENTIFIER).join("instances.json");
+            devdata::migrate_from(&old_root, &devdata::dev_root(), &registry)
+        })
+        .unwrap_or_default();
+    #[cfg(not(debug_assertions))]
+    let dev_data_report: Vec<String> = Vec::new();
+    for line in &dev_data_report {
+        eprintln!("{}", line);
+    }
+
     // WebKitGTK 2.42+ renders a blank window on several Linux setups (notably NVIDIA
     // and some Mesa drivers) unless the DMABUF renderer is disabled. Apply the standard
     // workaround by default, while still letting a user override it from the environment.
@@ -479,6 +510,7 @@ fn main() {
             unzip_and_get_first_folder,
             execute_external_app,
             open_folder,
+            hub_root,
             binver::get_game_version,
             scan::scan_songs,
             assetscan::scan_asset_versions,
@@ -535,6 +567,9 @@ fn main() {
             if let Some(outcome) = &fd_limit_outcome {
                 log::info!("{}", outcome);
             }
+            for line in &dev_data_report {
+                log::info!("{}", line);
+            }
             health::spawn_watcher(ui_health.clone());
             guard::init(app.handle());
             std::thread::spawn(guard::sweep_stale_tmp);
@@ -589,18 +624,13 @@ mod tests {
     }
 
     /// The log has to land beside the Hub's other working data (`tmp/`, `Songs/`), which
-    /// is where a user looks for it. On Windows that is the executable's own folder, the
-    /// same place the frontend's GetRootPath() resolves to.
+    /// is where a user looks for it: the Hub root the frontend also uses.
     #[test]
     fn the_log_folder_sits_with_the_hubs_other_data() {
         let dir = super::usable_log_dir().expect("a writable log folder must be found");
         assert!(super::log_file_is_writable(&dir));
         assert_eq!(dir.file_name().unwrap(), "logs");
 
-        #[cfg(target_os = "windows")]
-        {
-            let exe_dir = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
-            assert_eq!(dir, exe_dir.join("logs"));
-        }
+        assert_eq!(dir, super::hub_root_dir().unwrap().join("logs"));
     }
 }

@@ -1,4 +1,4 @@
-import { resourceDir, documentDir, homeDir, appConfigDir, tempDir, join } from '@tauri-apps/api/path';
+import { appConfigDir, tempDir, join } from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
 import { ipc } from '$lib/ipc';
 import type { HubOS } from '$lib/types';
@@ -37,23 +37,9 @@ export const GetPreferencesPath = async (): Promise<string> => {
     return await appConfigDir();
 }
 
-export const GetRootPath = once(async (): Promise<string> => {
-    const _os = await GetOS();
-
-    if (_os === "Win") {
-        return await resourceDir();
-    }
-
-    // Linux / Mac: prefer ~/Documents, but fall back to the home directory on minimal
-    // installs where the XDG user dirs (XDG_DOCUMENTS_DIR) are not configured — there
-    // documentDir() throws, which would otherwise break every path in the app.
-    try {
-        return await documentDir();
-    } catch (error) {
-        console.warn('documentDir() unavailable, falling back to the home directory:', error);
-        return await homeDir();
-    }
-});
+// Decided by the backend (hub_root_dir in main.rs), which also allows the page to use it:
+// the install folder on Windows, Documents elsewhere, and a separate folder in dev builds.
+export const GetRootPath = once((): Promise<string> => ipc.hubRoot());
 
 // Shared Songs library used by every OpenTaiko instance
 export const GetGlobalSongsPath = once(async (): Promise<string> => {
