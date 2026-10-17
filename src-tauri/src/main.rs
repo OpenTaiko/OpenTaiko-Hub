@@ -195,14 +195,23 @@ async fn unzip_and_get_first_folder(
                     ))
                 }
             };
-            let out_path = zip_parent_dir.join(relative);
+            let out_path = zip_parent_dir.join(&relative);
+
+            // The archive's top folder, taken from the first entry that sits in a folder.
+            // Many zip tools write no entries for folders themselves, so waiting for a
+            // folder entry failed on those archives with "No folder found".
+            if first_folder.is_none() {
+                let mut parts = relative.components();
+                if let Some(std::path::Component::Normal(top)) = parts.next() {
+                    if is_dir || parts.next().is_some() {
+                        first_folder = Some(zip_parent_dir.join(top).to_string_lossy().to_string());
+                    }
+                }
+            }
 
             if is_dir {
                 std::fs::create_dir_all(&out_path)
                     .map_err(|err| format!("ERR: Failed to create directory: {}", err))?;
-                if first_folder.is_none() {
-                    first_folder = Some(out_path.to_string_lossy().to_string());
-                }
             } else {
                 if let Some(parent) = out_path.parent() {
                     std::fs::create_dir_all(parent).map_err(|err| {
@@ -522,6 +531,8 @@ fn main() {
             assetscan::scan_asset_versions,
             procs::run_dotnet,
             download::download_file,
+            download::install_files,
+            download::fetch_cached,
             guard::allow_build_dir,
             guard::create_instance_dir,
             fsops::merge_move_dir,

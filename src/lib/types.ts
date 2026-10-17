@@ -20,13 +20,12 @@ export interface ToastContext {
     TriggerError(message: string): void;
     TriggerWarning(message: string): void;
     TriggerSuccess(message: string): void;
-    /** Downloads with retries; resolves to false once every attempt failed. */
+    /** Downloads with retries (in the backend); resolves to false once it gave up. */
     backoffDownload(
         url: string,
         path: string,
         onProgress?: (progress: ProgressPayload) => void,
-        attempts?: number,
-        delayMs?: number
+        attempts?: number
     ): Promise<boolean>;
     wait(ms: number): Promise<void>;
 }

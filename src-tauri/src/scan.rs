@@ -159,7 +159,7 @@ pub(crate) fn extract_title(content: &str, prefix: &str) -> Option<String> {
 
 /// Git blob SHA-1 ("blob <len>\0" + content) so local files can be compared against
 /// the GitHub trees API of the soundtrack repository.
-fn git_blob_sha1(bytes: &[u8]) -> String {
+pub(crate) fn git_blob_sha1(bytes: &[u8]) -> String {
     let mut hasher = Sha1::new();
     hasher.update(format!("blob {}\0", bytes.len()).as_bytes());
     hasher.update(bytes);

@@ -2,12 +2,11 @@
     // Dependencies
     import { onMount, onDestroy } from 'svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir, exists, copyFile, remove, readFile } from '@tauri-apps/plugin-fs';
+    import { mkdir, exists, readFile } from '@tauri-apps/plugin-fs';
     import { OpenFolder, IsPlainRelPath } from '$lib/utils/path';
     import { open, confirm } from '@tauri-apps/plugin-dialog';
     import { getCurrentWebview } from '@tauri-apps/api/webview';
-    import { fetch } from "@tauri-apps/plugin-http";
-    import { download } from '$lib/utils/download';
+    import { installFiles, fetchCached, fetchCachedJson, type InstallEntry } from '$lib/utils/download';
     import { path } from '@tauri-apps/api';
     import { invoke, Channel } from '@tauri-apps/api/core';
     import { getContext } from 'svelte';
@@ -28,7 +27,7 @@
         SoundtrackEntry,
         ToastContext
     } from '$lib/types';
-    const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
+    const { TriggerError, TriggerSuccess } = getContext<ToastContext>('toast');
 
     import { getSQL } from '$lib/utils/sqljs';
 
@@ -36,7 +35,7 @@
     import { get } from 'svelte/store';
     import { localizedTitle, titleSearchTerms } from '$lib/utils/titles';
 
-    import { GetGlobalSongsPath, GetTmpPath } from "../utils/path";
+    import { GetGlobalSongsPath } from "../utils/path";
     import { instances } from "../stores/instances";
 
     // Song management
@@ -96,6 +95,10 @@
     // and used to detect outdated box.def / default.png files
     let remoteShaMap: Map<string, string> | null = null;
     let remoteShaMapFetch: Promise<Map<string, string> | null> | null = null;   // in-flight fetch, shared by downloads that start together
+    // After a failed tree fetch (usually GitHub's hourly API limit), downloads go ahead
+    // without it until this time instead of asking again for every song
+    let remoteShaMapRetryAt = 0;
+    const SHA_MAP_COOLDOWN_MS = 10 * 60 * 1000;
 
     // Songs found inside attached instances that can be moved to the shared library
     let migrationCandidates = $state<MigrationCandidate[]>([]);
@@ -512,8 +515,7 @@
         try {
             const SQL = await getSQL();
 
-            const response = await fetch(hofDbUrl);
-            const buffer = await response.arrayBuffer();
+            const buffer = await fetchCached(hofDbUrl);
             hofDb?.close();
             hofDb = new SQL.Database(new Uint8Array(buffer));
 
@@ -586,10 +588,7 @@
     const updateSoundtrackInfo = async () => {
         catalogFetchFailed = false;
         try {
-            const response = await fetch(soundtrackInfoUrl);
-        if (response.ok) {
-            const text = await response.text();
-            soundtrackInfo = JSON.parse(text) as SoundtrackEntry[];
+            soundtrackInfo = await fetchCachedJson<SoundtrackEntry[]>(soundtrackInfoUrl);
 
             if (navigator.language === "zh-CN") {
                 soundtrackInfo = filter1(soundtrackInfo);
@@ -597,12 +596,9 @@
             else {
                 soundtrackInfo = filter2(soundtrackInfo);
             }
-        } else {
-            // Keep an ARRAY: template #each and .filter/.sort calls expect one
-            soundtrackInfo = [];
-            catalogFetchFailed = true;
-        }
         } catch (error) {
+            console.error('Failed to fetch the soundtrack catalog:', error);
+            // Keep an ARRAY: template #each and .filter/.sort calls expect one
             soundtrackInfo = [];
             catalogFetchFailed = true;
         }
@@ -773,6 +769,8 @@
         }
     };
 
+    const BULK_SONG_CONCURRENCY = 3;
+
     /** Downloads everything a folder is still missing, updates included. */
     const DownloadFolder = async (folder: LibraryFolder) => {
         if (scanning) {
@@ -788,11 +786,21 @@
         try {
             await EnsureRemoteShaMap();
             songCountProgress = 0;
-            for (const SInfo of pending) {
-                songCountProgressBar = 100 * (songCountProgress / pending.length);
-                await DownloadSong(SInfo, currentSongs[SInfo.uniqueId] ?? null, songCountProgress + 1, pending.length);
-                songCountProgress++;
-            }
+            songCountProgressBar = 0;
+            // A few songs at a time (each downloads several files at once in the
+            // backend): one after the other, a whole library took a request round trip
+            // per file in sequence. Kept small so GitHub does not start refusing requests.
+            let next = 0;
+            const worker = async () => {
+                while (next < pending.length) {
+                    const index = next++;
+                    const SInfo = pending[index];
+                    await DownloadSong(SInfo, currentSongs[SInfo.uniqueId] ?? null, index + 1, pending.length);
+                    songCountProgress++;
+                    songCountProgressBar = 100 * (songCountProgress / pending.length);
+                }
+            };
+            await Promise.all(Array.from({ length: Math.min(BULK_SONG_CONCURRENCY, pending.length) }, worker));
             const updated = await RefreshAllGenreMetadata();
             if (updated > 0) TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
         } finally {
@@ -815,22 +823,23 @@
     // files can be compared against their upstream version by git blob SHA
     const EnsureRemoteShaMap = async (): Promise<Map<string, string> | null> => {
         if (remoteShaMap) return remoteShaMap;
+        if (Date.now() < remoteShaMapRetryAt) return null;
         // Downloads started back to back share one request instead of each hitting the
         // GitHub API (rate limited) for the same tree
         if (!remoteShaMapFetch) {
             remoteShaMapFetch = (async () => {
                 try {
-                    const response = await fetch('https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/main?recursive=1');
-                    if (response.ok) {
-                        const data = (await response.json()) as { tree?: { type: string; path: string; sha: string }[] };
-                        remoteShaMap = new Map(
-                            (data.tree ?? [])
-                                .filter((entry) => entry.type === 'blob')
-                                .map((entry): [string, string] => [entry.path, entry.sha])
-                        );
-                    }
+                    const data = await fetchCachedJson<{ tree?: { type: string; path: string; sha: string }[] }>(
+                        'https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/main?recursive=1'
+                    );
+                    remoteShaMap = new Map(
+                        (data.tree ?? [])
+                            .filter((entry) => entry.type === 'blob')
+                            .map((entry): [string, string] => [entry.path, entry.sha])
+                    );
                 } catch (error) {
                     console.error('Failed to fetch the soundtrack repository tree:', error);
+                    remoteShaMapRetryAt = Date.now() + SHA_MAP_COOLDOWN_MS;
                 } finally {
                     remoteShaMapFetch = null;
                 }
@@ -981,26 +990,30 @@
     }
 
     // Downloads box.def / default.png for a genre folder when it is missing or its git
-    // blob SHA differs from the soundtrack repository. Without the remote index the
-    // old behavior is kept (box.def always refreshed, preimage only when missing).
+    // blob SHA differs from the soundtrack repository. Without the remote index, box.def
+    // is refreshed once per session and the preimage only when missing; a file the
+    // repository does not have is simply skipped (the backend reports a 404 as absent
+    // instead of the page probing for it first).
     //
     // Calls are serialized: songs download concurrently, and two songs of the same
-    // genre would otherwise copy the same box.def on top of each other. Once the first
+    // genre would otherwise write the same box.def on top of each other. Once the first
     // one has written it, the next sees the updated local SHA and skips the file.
     let genreMetadataLock: Promise<unknown> = Promise.resolve();
-    const EnsureGenreMetadata = (genrePath: string, tmpFolder: string): Promise<boolean> => {
-        const run = genreMetadataLock.then(() => EnsureGenreMetadataUnlocked(genrePath, tmpFolder));
+    const EnsureGenreMetadata = (genrePath: string): Promise<boolean> => {
+        const run = genreMetadataLock.then(() => EnsureGenreMetadataUnlocked(genrePath));
         genreMetadataLock = run.catch(() => {});
         return run;
     }
 
-    const EnsureGenreMetadataUnlocked = async (genrePath: string, tmpFolder: string): Promise<boolean> => {
+    // Genres whose box.def was already refreshed without the remote index this session
+    const boxDefRefreshedBlind = new Set<string>();
+
+    const EnsureGenreMetadataUnlocked = async (genrePath: string): Promise<boolean> => {
         const baseDirPath = await GetGlobalSongsPath();
         const genreFullPath = await path.join(baseDirPath, genrePath);
         let changed = false;
 
         for (const fileName of ['box.def', 'default.png']) {
-            const destPath = await path.join(genreFullPath, fileName);
             const localGenre = scannedGenres[genrePath];
             const localSha = fileName === 'box.def' ? localGenre?.boxDefSha1 : localGenre?.preimageSha1;
             const remoteSha = remoteShaMap?.get(`${genrePath}/${fileName}`);
@@ -1008,19 +1021,18 @@
             let needsDownload: boolean;
             if (remoteShaMap) {
                 needsDownload = !!remoteSha && localSha !== remoteSha;
+            } else if (fileName === 'box.def') {
+                needsDownload = !boxDefRefreshedBlind.has(genrePath);
+                boxDefRefreshedBlind.add(genrePath);
             } else {
-                needsDownload = fileName === 'box.def' ? true : !(await exists(destPath));
+                needsDownload = !(await exists(await path.join(genreFullPath, fileName)));
             }
             if (!needsDownload) continue;
 
             const _url = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${genrePath}/${fileName}`;
-            const dlPath = await path.join(tmpFolder, fileName);
-            const resourceExists = remoteShaMap ? true : await fetch(_url).then(res => res.ok).catch(() => false);
-            if (!resourceExists) continue;
-
             try {
-                await download(_url, dlPath);
-                await copyFile(dlPath, destPath);
+                const report = await installFiles(genreFullPath, [{ url: _url, relPath: fileName, optional: !remoteSha }]);
+                if (report.downloaded.length === 0) continue;
                 changed = true;
                 if (remoteSha) {
                     scannedGenres = {
@@ -1040,13 +1052,10 @@
 
     const RefreshAllGenreMetadata = async () => {
         if (!remoteShaMap) return 0;
-        const tmpFolder = await GetTmpPath(crypto.randomUUID());
-        await mkdir(tmpFolder, { recursive: true });
         let updated = 0;
         for (const genrePath of Object.keys(scannedGenres)) {
-            if (await EnsureGenreMetadata(genrePath, tmpFolder)) updated++;
+            if (await EnsureGenreMetadata(genrePath)) updated++;
         }
-        try { await remove(tmpFolder, { recursive: true }); } catch {}
         return updated;
     }
 
@@ -1094,77 +1103,40 @@
         const localRelPath = ((currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath).replace(/\\/g, '/');
         const tjaFullPath = await path.join(baseDirPath, localRelPath);
 
-        let fold_exists = await exists(tjaFullPath);
-        if (!fold_exists)
-            await mkdir(tjaFullPath, {recursive: true});
-
-        const chartDownloadFolder = await GetTmpPath(crypto.randomUUID());
-
-        fold_exists = await exists(chartDownloadFolder);
-        if (!fold_exists)
-            await mkdir(chartDownloadFolder, {recursive: true});
-
-        try {
-            let fileNames: string[] = [];
-
-            let totbyts = 0;
-            for (const filePath of songObj.tjaFilesPath) {
-                // forbid non-children paths
-                let localFilePath = (filePath.startsWith(songObj.tjaFolderPath + '\\') || filePath.startsWith(songObj.tjaFolderPath + '/')) ?
-                    filePath.slice(songObj.tjaFolderPath.length + 1)
-                    : filePath.split("\\").pop() ?? filePath;
-
-                const tjaFileUrl = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${filePath}`;
-                const dlPath = await path.join(chartDownloadFolder, localFilePath.replace(/\\/g, '/'));
-
-                // ensure subdirectory exists
-                const dlPathFold = await path.dirname(dlPath);
-                if (!await exists(dlPathFold))
-                    await mkdir(dlPathFold, {recursive: true});
-
-                const success = await backoffDownload(
-                    tjaFileUrl,
-                    dlPath,
-                    (pr) => {
-                        totbyts += pr.progress;
-                        songDLProgress[songObj.uniqueId] = 100 * (totbyts / (songObj.chartSize * 1024 * 1024));
-                        //console.log(songDLProgress);
-                    }
-                );
-
-                // The caller's finally releases the row
-                if (!success) return ;
-
-                fileNames.push(localFilePath);
+        // Files go straight into the song folder: the backend downloads them side by
+        // side and only replaces anything once every file has arrived, so there is no
+        // temporary copy to write and then copy again. A file whose git blob SHA matches
+        // the repository is kept, so updating a chart does not download its audio again.
+        const entries: InstallEntry[] = songObj.tjaFilesPath.map((filePath) => {
+            // forbid non-children paths
+            const localFilePath = (filePath.startsWith(songObj.tjaFolderPath + '\\') || filePath.startsWith(songObj.tjaFolderPath + '/')) ?
+                filePath.slice(songObj.tjaFolderPath.length + 1)
+                : filePath.split("\\").pop() ?? filePath;
+            const repoPath = filePath.replace(/\\/g, '/');
+            return {
+                url: `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${repoPath}`,
+                relPath: localFilePath.replace(/\\/g, '/'),
+                gitSha: remoteShaMap?.get(repoPath) ?? null
             };
+        });
 
-            songDLProgress[songObj.uniqueId] = 0;
-            await Promise.all(fileNames.map(async (fn, idx) => {
-                const strPath = await path.join(chartDownloadFolder, fn.replace(/\\/g, '/'));
-                const destPath = await path.join(tjaFullPath, fn.replace(/\\/g, '/'));
+        let totbyts = 0;
+        try {
+            await installFiles(tjaFullPath, entries, (pr) => {
+                totbyts += pr.progress;
+                songDLProgress[songObj.uniqueId] = 100 * (totbyts / (songObj.chartSize * 1024 * 1024));
+            });
+        } catch (error) {
+            // The caller's finally releases the row
+            console.error(`Download of ${songObj.uniqueId} failed:`, error);
+            TriggerError(get(_)('dl.error.failed_abort'));
+            return;
+        }
 
-                // ensure subdirectory exists
-                const destPathDir = await path.dirname(destPath);
-                if (!await exists(destPathDir))
-                    await mkdir(destPathDir, {recursive: true});
-
-                await copyFile(strPath, destPath);
-                songDLProgress[songObj.uniqueId] = (idx + 1) * (100 / fileNames.length);
-                //console.log(songDLProgress);
-            }));
-
-            // Download / refresh box.def and default.png of every ancestor genre folder
-            const genrePaths = songObj.tjaFolderPath.split('\\').slice(0, -1).map((_, i, arr) => arr.slice(0, i + 1).join('/'));
-
-            for (const genrePath of genrePaths) {
-                const genreFullPath = await path.join(baseDirPath, genrePath);
-                if (!await exists(genreFullPath))
-                    await mkdir(genreFullPath, {recursive: true});
-                await EnsureGenreMetadata(genrePath, chartDownloadFolder);
-            }
-        } finally {
-            // Clean after pooping, including when the download gave up halfway
-            try { await remove(chartDownloadFolder, { recursive: true }); } catch {}
+        // Download / refresh box.def and default.png of every ancestor genre folder
+        const genrePaths = songObj.tjaFolderPath.split('\\').slice(0, -1).map((_, i, arr) => arr.slice(0, i + 1).join('/'));
+        for (const genrePath of genrePaths) {
+            await EnsureGenreMetadata(genrePath);
         }
 
         if (songNb === undefined)
@@ -1192,8 +1164,7 @@
         let db: Database | null = null;
         try {
             const SQL = await getSQL();
-            const response = await fetch(artistsDbUrl);
-            const buffer = await response.arrayBuffer();
+            const buffer = await fetchCached(artistsDbUrl);
             db = new SQL.Database(new Uint8Array(buffer));
 
             const artistsResult = db.exec('SELECT entryId, artist, youtube, soundcloud, spotify, bandcamp, bilibili, other FROM artists');

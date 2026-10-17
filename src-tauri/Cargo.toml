@@ -23,8 +23,8 @@ tauri-plugin-http = "~2.6.0"
 tauri-plugin-opener = "~2.5.5"
 tauri-plugin-os = "~2.3.2"
 zip = "4.2.0"
-# fs and io-util: download.rs streams to disk
-tokio = { version = "1.51.1", features = ["fs", "io-util"] }
+# download.rs: streams to disk (fs, io-util), runs transfers side by side (rt, sync), waits between retries (time)
+tokio = { version = "1.51.1", features = ["fs", "io-util", "rt", "sync", "time"] }
 tauri-plugin-dialog = "~2.7.3"
 pelite = "0.10"
 md-5 = "0.10"

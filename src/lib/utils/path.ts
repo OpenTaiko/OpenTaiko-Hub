@@ -3,7 +3,21 @@ import { type } from '@tauri-apps/plugin-os';
 import { invoke } from '@tauri-apps/api/core';
 import type { HubOS } from '$lib/types';
 
-export const GetOS = async (): Promise<HubOS> => {
+// These folders cannot change while the Hub runs, and each lookup is a call to the
+// backend, so every one is resolved once. A failed lookup is forgotten so the next call
+// tries again.
+const once = <T>(resolve: () => Promise<T>): (() => Promise<T>) => {
+    let pending: Promise<T> | null = null;
+    return () => {
+        pending ??= resolve().catch((error) => {
+            pending = null;
+            throw error;
+        });
+        return pending;
+    };
+};
+
+export const GetOS = once(async (): Promise<HubOS> => {
     const currentPlatform = await type();
     switch (currentPlatform) {
         case "linux":
@@ -17,13 +31,13 @@ export const GetOS = async (): Promise<HubOS> => {
         default:
             return "Unsupported";
     }
-}
+});
 
 export const GetPreferencesPath = async (): Promise<string> => {
     return await appConfigDir();
 }
 
-export const GetRootPath = async (): Promise<string> => {
+export const GetRootPath = once(async (): Promise<string> => {
     const _os = await GetOS();
 
     if (_os === "Win") {
@@ -39,12 +53,12 @@ export const GetRootPath = async (): Promise<string> => {
         console.warn('documentDir() unavailable, falling back to the home directory:', error);
         return await homeDir();
     }
-}
+});
 
 // Shared Songs library used by every OpenTaiko instance
-export const GetGlobalSongsPath = async (): Promise<string> => {
+export const GetGlobalSongsPath = once(async (): Promise<string> => {
     return await join(await GetRootPath(), 'Songs');
-}
+});
 
 export const GetTmpPath = async (subFolder: string | null = null): Promise<string> => {
     const tmp = await join(await GetRootPath(), 'tmp');

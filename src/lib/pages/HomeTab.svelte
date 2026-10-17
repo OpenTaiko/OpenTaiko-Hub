@@ -274,7 +274,18 @@
         }
     };
 
-    const DownloadStable = async () => {
+    // What a release install needs to know, found once the busy flag is held
+    interface ReleaseToInstall {
+        url: string;
+        /** Recorded in version.json. */
+        version: string | null;
+        /** What the instance record becomes once the install succeeded. */
+        patch: Partial<Instance>;
+    }
+
+    // Stable and prerelease installs only differ in which release they read and how the
+    // instance is recorded afterwards, so both go through here.
+    const InstallRelease = async (resolve: () => Promise<ReleaseToInstall>) => {
         if (downloadBusy === true) {
             TriggerError(get(_)('home.error.already_downloading'));
             return;
@@ -289,18 +300,13 @@
         resetBuildOutput();
 
         try {
-            if (!latestRelease) await TryFetchingLatestVersion();
-            const asset = latestRelease?.assets?.find((asset) => asset.name.endsWith(`${optk_OS}.x64.zip`));
-            if (!asset) {
-                throw new Error('Desired asset not found in the latest release');
-            }
-
+            const release = await resolve();
             progress = 0;
 
-            const installed = await DownloadAndInstallZip(asset.browser_download_url, instance.path);
+            const installed = await DownloadAndInstallZip(release.url, instance.path);
             if (installed) {
-                await WriteVersionJson(instance.path, latestVersion);
-                const updated = await updateInstance(instance.id, { channel: 'stable', experimental: null });
+                await WriteVersionJson(instance.path, release.version);
+                const updated = await updateInstance(instance.id, release.patch);
                 await linkGlobalSongs(updated);
                 await refreshInstanceVersion(instance.id);
                 TriggerSuccess(get(_)('home.success.installed'));
@@ -311,45 +317,27 @@
         downloadBusy = false;
     };
 
-    const DownloadPrerelease = async (option: { tag: string; label: string }) => {
-        if (downloadBusy === true) {
-            TriggerError(get(_)('home.error.already_downloading'));
-            return;
+    const DownloadStable = () => InstallRelease(async () => {
+        if (!latestRelease) await TryFetchingLatestVersion();
+        const asset = latestRelease?.assets?.find((asset) => asset.name.endsWith(`${optk_OS}.x64.zip`));
+        if (!asset) {
+            throw new Error('Desired asset not found in the latest release');
         }
-        if (!current) return;
-        // Capture the target so switching instances mid-download cannot retarget it
-        const instance = current;
-        // Claimed before the first await, so a second click cannot start a second install
-        downloadBusy = true;
-        progress = undefined;
-        // A previous experimental build's output must not sit under this download.
-        resetBuildOutput();
+        return { url: asset.browser_download_url, version: latestVersion, patch: { channel: 'stable', experimental: null } };
+    });
 
-        try {
-            const release = await fetchReleaseByTag(option.tag);
-            const asset = release.assets?.find((asset) => asset.name.endsWith(`${optk_OS}.x64.zip`));
-            if (!asset) {
-                throw new Error('Desired asset not found in the prerelease');
-            }
-
-            progress = 0;
-
-            const installed = await DownloadAndInstallZip(asset.browser_download_url, instance.path);
-            if (installed) {
-                await WriteVersionJson(instance.path, option.tag);
-                const updated = await updateInstance(instance.id, {
-                    channel: 'experimental',
-                    experimental: { kind: 'prerelease', tag: option.tag, label: option.label }
-                });
-                await linkGlobalSongs(updated);
-                await refreshInstanceVersion(instance.id);
-                TriggerSuccess(get(_)('home.success.installed'));
-            }
-        } catch (err) {
-            TriggerError(get(_)('home.error.download_failed', { values: { error: String(err) } }));
+    const DownloadPrerelease = (option: { tag: string; label: string }) => InstallRelease(async () => {
+        const release = await fetchReleaseByTag(option.tag);
+        const asset = release.assets?.find((asset) => asset.name.endsWith(`${optk_OS}.x64.zip`));
+        if (!asset) {
+            throw new Error('Desired asset not found in the prerelease');
         }
-        downloadBusy = false;
-    };
+        return {
+            url: asset.browser_download_url,
+            version: option.tag,
+            patch: { channel: 'experimental', experimental: { kind: 'prerelease', tag: option.tag, label: option.label } }
+        };
+    });
 
     // Fetches the experimental branch source at its current head commit, builds it with
     // the .NET SDK and installs the publish output into the instance folder.

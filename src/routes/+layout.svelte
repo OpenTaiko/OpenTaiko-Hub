@@ -47,29 +47,24 @@
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
+    // Retries happen in the backend, with an increasing delay, and only for failures
+    // another attempt can fix: a missing file fails at once instead of ten times over.
+    // They are logged rather than announced, so a flaky connection does not bury the
+    // screen in warnings; the user hears about the download only if it gives up.
     const backoffDownload = async (
         url: string,
         path: string,
         prfunc?: (progress: ProgressPayload) => void,
-        n = 10,
-        t = 1000
+        attempts?: number
     ): Promise<boolean> => {
-        for (let attempt = 1; attempt <= n; attempt++) {
-            try {
-                await download(url, path, prfunc);
-                return true;
-            }
-            catch (error) {
-                if (attempt === n) {
-                    TriggerError(get(_)('dl.error.failed_abort'));
-                    return false;
-                }
-                TriggerWarning(get(_)('dl.warn.failed_retry', { values: { attempt, max: n } }));
-
-                await wait(t);
-            }
+        try {
+            await download(url, path, prfunc, attempts);
+            return true;
+        } catch (error) {
+            console.error(`Download of ${url} failed:`, error);
+            TriggerError(get(_)('dl.error.failed_abort'));
+            return false;
         }
-        return false;
     }
 
     const toastContext: ToastContext = { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, wait };

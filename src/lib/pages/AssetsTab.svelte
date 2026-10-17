@@ -3,8 +3,8 @@
     import { onMount } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
-    import { fetch } from "@tauri-apps/plugin-http";
+    import { mkdir, remove } from '@tauri-apps/plugin-fs';
+    import { installFiles, fetchCachedJson, type InstallEntry } from '$lib/utils/download';
     import { path } from '@tauri-apps/api';
     import { invoke, Channel } from '@tauri-apps/api/core';
     import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, LocalAsset, ToastContext } from '$lib/types';
@@ -68,14 +68,9 @@
 
     const updateAssetsInfo = async () => {
         try {
-            const response = await fetch(assetsInfoUrl);
-            if (response.ok) {
-                const text = await response.text();
-                assetsInfo = JSON.parse(text) as AssetCatalog;
-            } else {
-                assetsInfo = emptyCatalog();
-            }
+            assetsInfo = await fetchCachedJson<AssetCatalog>(assetsInfoUrl);
         } catch (error) {
+            console.error('Failed to fetch the asset catalog:', error);
             assetsInfo = emptyCatalog();
         }
     }
@@ -201,73 +196,25 @@
         const localPath = `${baseDir}/${assetRelpath}`;
         const assetFullPath = await path.join(res, localPath);
 
-        if (!await exists(assetFullPath))
+        // Any failure below clears the progress row, says so, and records nothing: a
+        // half-installed asset must not show as up to date
+        let assetDownloadFolder: string | null = null;
+        try {
             await mkdir(assetFullPath, { recursive: true });
 
-        const assetDownloadFolder = await GetTmpPath(crypto.randomUUID());
+            if (assetType === "Skins") {
+                assetDownloadFolder = await GetTmpPath(crypto.randomUUID());
+                await mkdir(assetDownloadFolder, { recursive: true });
 
-        if (!await exists(assetDownloadFolder))
-            await mkdir(assetDownloadFolder, { recursive: true });
+                // Zip name: spaces → dots, parentheses stripped (matches release asset naming)
+                const zipName = assetRelpath.replace(/[()]/g, '').replace(/ /g, '.') + '.zip';
+                const zipUrl = `https://github.com/OpenTaiko/OpenTaiko-Skins/releases/download/system-assets/${zipName}`;
+                const zipPath = await path.join(assetDownloadFolder, 'skin.zip');
 
-        if (assetType === "Skins") {
-            // Zip name: spaces → dots, parentheses stripped (matches release asset naming)
-            const zipName = assetRelpath.replace(/[()]/g, '').replace(/ /g, '.') + '.zip';
-            const zipUrl = `https://github.com/OpenTaiko/OpenTaiko-Skins/releases/download/system-assets/${zipName}`;
-            const zipPath = await path.join(assetDownloadFolder, 'skin.zip');
-
-            let totbyts = 0;
-            const success = await backoffDownload(
-                zipUrl,
-                zipPath,
-                (pr) => {
-                    totbyts += pr.progress;
-                    assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
-                }
-            );
-
-            if (!success) {
-                // backoffDownload already shows an error toast; show zip-specific guidance on top
-                TriggerError(get(_)('assets.error.zip_not_found'));
-                await remove(assetDownloadFolder, { recursive: true });
-                delete assetDLProgress[assetType][assetRelpath];
-                return;
-            }
-
-            assetDLProgress[assetType][assetRelpath] = 0;
-
-            const extractProgress = new Channel<number>();
-            extractProgress.onmessage = (percent) => assetDLProgress[assetType][assetRelpath] = percent;
-            await invoke('unzip_and_get_first_folder', { zipPath, onProgress: extractProgress });
-
-            // All skin zips are flat (files/folders at zip root), so the extraction folder's
-            // content is moved straight into the skin folder. The move is done natively:
-            // copying a skin's thousands of files one call at a time from here was slow,
-            // and it skipped any file it failed to copy without saying so. The move also
-            // removes the extraction folder.
-            await remove(zipPath);
-            await invoke('merge_move_dir', { src: assetDownloadFolder, dest: assetFullPath });
-
-        } else {
-            // Per-file download for Characters and Puchicharas
-            const subDir = "Global";
-            const assetFpath = (assetObj as CharaInfo).charaFilesPath;
-            const baseDirPath = await path.join(res, baseDir);
-
-            let fileNames: string[] = [];
-            let totbyts = 0;
-
-            for (const filePath of assetFpath) {
-                const localFileName = filePath.replace(/^[^\\]+\\/, '');
-                const assetFileUrl = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/${subDir}/${filePath}`;
-                const dlPath = await path.join(assetDownloadFolder, localFileName.replace(/\\/g, '/'));
-                const fileFold = await path.join(assetDownloadFolder, (filePath.split('\\').length > 2 ? filePath.replace(/^[^\\]+\\/, '').replace(/\\[^\\]+$/, '') : '').replace(/\\/g, '/'));
-
-                if (!await exists(fileFold))
-                    await mkdir(fileFold, { recursive: true });
-
+                let totbyts = 0;
                 const success = await backoffDownload(
-                    assetFileUrl,
-                    dlPath,
+                    zipUrl,
+                    zipPath,
                     (pr) => {
                         totbyts += pr.progress;
                         assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
@@ -275,28 +222,51 @@
                 );
 
                 if (!success) {
-                    await remove(assetDownloadFolder, { recursive: true });
-                    delete assetDLProgress[assetType][assetRelpath];
+                    // backoffDownload already shows an error toast; show zip-specific guidance on top
+                    TriggerError(get(_)('assets.error.zip_not_found'));
                     return;
                 }
 
-                fileNames.push(localFileName);
+                assetDLProgress[assetType][assetRelpath] = 0;
+
+                const extractProgress = new Channel<number>();
+                extractProgress.onmessage = (percent) => assetDLProgress[assetType][assetRelpath] = percent;
+                await invoke('unzip_and_get_first_folder', { zipPath, onProgress: extractProgress });
+
+                // All skin zips are flat (files/folders at zip root), so the extraction folder's
+                // content is moved straight into the skin folder. The move is done natively:
+                // copying a skin's thousands of files one call at a time from here was slow,
+                // and it skipped any file it failed to copy without saying so. The move also
+                // removes the extraction folder.
+                await remove(zipPath);
+                await invoke('merge_move_dir', { src: assetDownloadFolder, dest: assetFullPath });
+            } else {
+                // Characters and Puchicharas are separate files, downloaded straight into
+                // place a few at a time. The first folder of each catalog path is the
+                // repository's own (Characters\ / Puchicharas\) and is dropped.
+                const subDir = "Global";
+                const baseDirPath = await path.join(res, baseDir);
+                const entries: InstallEntry[] = (assetObj as CharaInfo).charaFilesPath.map((filePath) => ({
+                    url: `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/${subDir}/${filePath.replace(/\\/g, '/')}`,
+                    relPath: filePath.replace(/^[^\\]+\\/, '').replace(/\\/g, '/')
+                }));
+
+                let totbyts = 0;
+                await installFiles(baseDirPath, entries, (pr) => {
+                    totbyts += pr.progress;
+                    assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
+                });
             }
-
-            assetDLProgress[assetType][assetRelpath] = 0;
-            await Promise.all(fileNames.map(async (fn, idx) => {
-                const strPath = (await path.join(assetDownloadFolder, fn)).replace(/\\/g, '/');
-                const destPath = (await path.join(baseDirPath, fn)).replace(/\\/g, '/');
-                const fileFold = await path.dirname(destPath);
-
-                if (!await exists(fileFold))
-                    await mkdir(fileFold, { recursive: true });
-
-                await copyFile(strPath, destPath);
-                assetDLProgress[assetType][assetRelpath] = (idx + 1) * (100 / fileNames.length);
-            }));
-
-            await remove(assetDownloadFolder, { recursive: true });
+        } catch (error) {
+            console.error(`Installing ${assetRelpath} failed:`, error);
+            TriggerError(get(_)('dl.error.failed_abort'));
+            return;
+        } finally {
+            delete assetDLProgress[assetType][assetRelpath];
+            // Already gone after a successful move
+            if (assetDownloadFolder) {
+                try { await remove(assetDownloadFolder, { recursive: true }); } catch {}
+            }
         }
 
         if (assetNb === undefined)
@@ -310,8 +280,6 @@
             assetFolderName: assetRelpath,
             assetVersion: assetVersion
         };
-
-        delete assetDLProgress[assetType][assetRelpath];
     }
 
     onMount(async () => {

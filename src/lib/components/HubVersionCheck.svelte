@@ -1,7 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
     import { getVersion } from '@tauri-apps/api/app';
-    import { fetch } from "@tauri-apps/plugin-http";
+    import { fetchCachedJson } from '$lib/utils/download';
     import { openUrl } from '@tauri-apps/plugin-opener';
 
     import { getContext } from 'svelte';
@@ -30,11 +30,7 @@
     const TryFetchingLatestVersion = async () => {
         try {
             latestVersionErrorFound = false;
-            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
-            if (!response.ok) {
-                throw new Error(`HTTP error status: ${response.status}`);
-            }
-            const data = (await response.json()) as { tag_name: string };
+            const data = await fetchCachedJson<{ tag_name: string }>(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
             latestVersion = data.tag_name; // Latest tag version number
 
             if (VersionHub == latestVersion) {
