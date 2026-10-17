@@ -25,6 +25,7 @@
         refreshInstanceVersion,
         linkGlobalSongs
     } from '$lib/stores/instances';
+    import { CleanStaleTmp } from '$lib/utils/path';
 
     // Themes
     const themetarget = document.getElementById('themetarget');
@@ -53,6 +54,8 @@
     ];
 
     onMount(async () => {
+        // Not awaited: nothing at startup depends on it
+        CleanStaleTmp();
         try {
             await loadInstances();
 

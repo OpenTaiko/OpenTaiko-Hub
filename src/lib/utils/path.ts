@@ -1,5 +1,6 @@
 import { resourceDir, documentDir, homeDir, appConfigDir, tempDir, join } from '@tauri-apps/api/path';
 import { type } from '@tauri-apps/plugin-os';
+import { exists, readDir, remove, stat } from '@tauri-apps/plugin-fs';
 import type { HubOS } from '$lib/types';
 
 export const GetOS = async (): Promise<HubOS> => {
@@ -74,6 +75,48 @@ export const GetBuildPath = async (): Promise<string> => {
         console.warn('tempDir() unavailable, building under the Hub folder:', error);
     }
     return preferred;
+}
+
+// A download or build stopped by a crash, a forced quit or a power cut never reaches the
+// cleanup that removes its folder, and one such folder can hold a whole game build or a
+// song archive. Anything older than the longest operation the Hub runs is one of those.
+// Checking the age rather than wiping everything leaves alone a folder that a second Hub
+// window may still be writing to.
+const STALE_TMP_MS = 6 * 60 * 60 * 1000;
+
+const removeStale = async (dir: string, match: (name: string) => boolean): Promise<number> => {
+    if (!(await exists(dir))) return 0;
+    let removed = 0;
+    for (const entry of await readDir(dir)) {
+        if (!match(entry.name)) continue;
+        const full = await join(dir, entry.name);
+        try {
+            const mtime = (await stat(full)).mtime;
+            if (!mtime || Date.now() - mtime.getTime() < STALE_TMP_MS) continue;
+            await remove(full, { recursive: true });
+            removed++;
+        } catch (error) {
+            console.warn(`Could not remove leftover temporary folder ${full}:`, error);
+        }
+    }
+    return removed;
+}
+
+// Names the Hub gives its temporary folders: a UUID, its first 8 digits (GetBuildPath),
+// or `indev-<uuid>` from older versions. On Linux and macOS the tmp folder sits in
+// ~/Documents, where the user may keep a tmp folder of their own, so nothing else is touched.
+const HUB_TMP_NAME = /^(indev-)?[0-9a-f]{8}(-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?$/i;
+
+// Called once at startup, in the background
+export const CleanStaleTmp = async (): Promise<void> => {
+    try {
+        let removed = await removeStale(await GetTmpPath(), (name) => HUB_TMP_NAME.test(name));
+        // Experimental builds fall back to the system temp folder (see GetBuildPath)
+        removed += await removeStale(await tempDir(), (name) => /^otk-[0-9a-f]{8}$/.test(name));
+        if (removed > 0) console.info(`Removed ${removed} leftover temporary folder(s)`);
+    } catch (error) {
+        console.warn('Temporary folder cleanup failed:', error);
+    }
 }
 
 // Pre-0.2 single-instance game folder, adopted as the first instance on upgrade

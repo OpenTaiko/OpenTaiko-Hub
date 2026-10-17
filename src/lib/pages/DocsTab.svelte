@@ -191,7 +191,12 @@ ${SCRIPT_CLOSE}`;
         </div>
     </section>
 {:else if docsUrl !== null}
-    <iframe src={docsUrl} title={$_('docs.title')} class="docs-frame"></iframe>
+    <!-- The docs come from the instance folder and run their own scripts. Without the
+         sandbox they would share the Hub's origin and could call the backend through
+         window.parent; with it they get an opaque origin. Popups stay allowed so
+         external links still open. -->
+    <iframe src={docsUrl} title={$_('docs.title')} class="docs-frame"
+        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe>
 {:else if loading}
     <div class="placeholder animate-pulse w-full h-24"></div>
 {/if}

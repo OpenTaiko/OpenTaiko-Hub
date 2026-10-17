@@ -8,7 +8,7 @@
     // as a new save. Imports are only accepted when the archive is the same version as,
     // or newer than, the instance's current save database.
     import { getContext } from 'svelte';
-    import { readFile, writeFile, exists } from '@tauri-apps/plugin-fs';
+    import { readFile, writeFile, exists, mkdir, copyFile, rename, remove, readDir } from '@tauri-apps/plugin-fs';
     import { save as saveDialog, open as openDialog, confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
     import { path } from '@tauri-apps/api';
     import { _ } from 'svelte-i18n';
@@ -35,6 +35,47 @@
 
 
     const dbPath = (inst: Instance): Promise<string> => path.join(inst.path, DB_NAME);
+
+    // Copies of Saves.db3 taken before each change, in <instance>/SavesBackup
+    const BACKUP_DIR = 'SavesBackup';
+    const KEEP_BACKUPS = 20;
+    const BACKUP_NAME = /^Saves-\d{8}-\d{6}-\d{3}\.db3$/;
+
+    const BackupName = (): string => {
+        const d = new Date();
+        const p = (n: number, w = 2) => String(n).padStart(w, '0');
+        return `Saves-${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}`
+            + `-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${p(d.getMilliseconds(), 3)}.db3`;
+    };
+
+    // Every change to Saves.db3 goes through here. The current file is copied aside first,
+    // and the new content is written next to it and then renamed over it, so a crash or a
+    // full disk mid-write leaves the previous save intact instead of a truncated file.
+    // If the backup cannot be made, nothing is written.
+    const WriteDb = async (inst: Instance, p: string, bytes: Uint8Array) => {
+        const dir = await path.join(inst.path, BACKUP_DIR);
+        await mkdir(dir, { recursive: true });
+        await copyFile(p, await path.join(dir, BackupName()));
+
+        // Names sort by date, so the oldest are at the start
+        const backups = (await readDir(dir)).map((e) => e.name).filter((n) => BACKUP_NAME.test(n)).sort();
+        for (const name of backups.slice(0, Math.max(0, backups.length - KEEP_BACKUPS))) {
+            try {
+                await remove(await path.join(dir, name));
+            } catch (error) {
+                console.warn(`Could not remove old save backup ${name}:`, error);
+            }
+        }
+
+        const tmp = `${p}.tmp`;
+        try {
+            await writeFile(tmp, bytes);
+            await rename(tmp, p);
+        } catch (error) {
+            await remove(tmp).catch(() => {});
+            throw error;
+        }
+    };
 
     // No step of a load may hang forever: a stuck await would leave the tab spinning
     // with nothing to click, so every load is bounded and always ends in a state the
@@ -132,7 +173,7 @@
             const result = await action(db);
             // An action may return { write: false } to leave the file untouched
             const skipWrite = typeof result === 'object' && result !== null && 'write' in result && result.write === false;
-            if (!skipWrite) await writeFile(p, db.export());
+            if (!skipWrite) await WriteDb(inst, p, db.export());
             await Load(inst, true);
             return result;
         } finally {
@@ -227,7 +268,7 @@
             }
 
             const result = importSaveInto(db, portable, entry.saveId, crypto.randomUUID());
-            await writeFile(p, db.export());
+            await WriteDb(inst, p, db.export());
             // Silent reload: refreshes the names without the layout shifting
             await Load(inst, true);
             TriggerSuccess(get(_)('saves.success.imported_into', {
@@ -261,7 +302,7 @@
             db = new SQL.Database(await readFile(p));
             const result = rebindSlot(db, entry.saveId, targetSlot);
             if (result.changed) {
-                await writeFile(p, db.export());
+                await WriteDb(inst, p, db.export());
                 // Reflect the swap on the rows themselves, keeping their order stable
                 saves = saves.map((s) => {
                     if (s.saveId === entry.saveId) return { ...s, slot: targetSlot };

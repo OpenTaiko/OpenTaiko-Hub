@@ -69,7 +69,8 @@
         "height": 700,
         "minWidth": 1130,
         "minHeight": 648,
-        "theme": "Dark"
+        "theme": "Dark",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disk-cache-size=104857600"
       }
     ]
   }

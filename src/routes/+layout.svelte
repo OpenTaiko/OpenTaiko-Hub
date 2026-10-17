@@ -17,6 +17,7 @@
 
     import { GetPreferencesPath } from '$lib/utils/path';
     import { toaster } from '$lib/utils/toaster';
+    import { SafeHtml } from '$lib/utils/sanitize';
     import type { ProgressPayload, ToastContext } from '$lib/types';
 
     interface Props {
@@ -140,8 +141,9 @@ ${event.error?.stack ?? ''}`).catch(() => {});
             <Toast.Message>
                 {#if toast.title}<Toast.Title>{toast.title}</Toast.Title>{/if}
                 <!-- Messages are app translations that carry markup (<br>, <b>), which the
-                     Skeleton v2 toast used to render as HTML -->
-                <Toast.Description>{@html toast.description}</Toast.Description>
+                     Skeleton v2 toast used to render as HTML. Values filled into them
+                     (error text, file names) can come from outside, hence SafeHtml -->
+                <Toast.Description>{@html SafeHtml(toast.description)}</Toast.Description>
             </Toast.Message>
             <Toast.CloseTrigger />
         </Toast>

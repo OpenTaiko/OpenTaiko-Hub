@@ -8,6 +8,7 @@
     import { get } from 'svelte/store';
     import { invoke } from '@tauri-apps/api/core';
     import { openPath } from '@tauri-apps/plugin-opener';
+    import { SafeHtml } from '$lib/utils/sanitize';
 
     let currentInfo = $state(0);
 
@@ -165,9 +166,9 @@
         <hr class="my-3">
 
         {#if currentInfo === 0}
-            {@html changelogContent}
+            {@html SafeHtml(changelogContent)}
         {:else if currentInfo === 1}
-            {@html hubChangelogContent}
+            {@html SafeHtml(hubChangelogContent)}
         {/if}
     </div>
 {/if}
@@ -207,7 +208,7 @@
 <!-- Credits -->
 {#if currentInfo === 4}
     <div class="content">
-        {@html creditsContent}
+        {@html SafeHtml(creditsContent)}
     </div>
 {/if}
 

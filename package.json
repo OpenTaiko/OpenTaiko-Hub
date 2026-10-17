@@ -44,6 +44,7 @@
 		"@tauri-apps/plugin-upload": "~2.4.1",
 		"axios": "^1.15.0",
 		"axios-tauri-http-adapter": "^1.1.2",
+		"dompurify": "^3.4.16",
 		"js-file-downloader": "^1.1.25",
 		"js-md5": "^0.8.3",
 		"jszip": "^3.10.1",

@@ -21,6 +21,14 @@
         ]
       },
       {
+        "identifier": "fs:allow-stat",
+        "allow": [
+          { "path": "**/*" },
+          { "path": "**/.*" },
+          { "path": "**/.*/**" }
+        ]
+      },
+      {
         "identifier": "fs:write-all",
         "allow": [
           { "path": "**/*" },
@@ -30,6 +38,7 @@
       },
       "fs:default",
       "fs:allow-copy-file",
+      "fs:allow-stat",
       "fs:write-all",
       "core:path:default",
       "core:event:allow-listen",

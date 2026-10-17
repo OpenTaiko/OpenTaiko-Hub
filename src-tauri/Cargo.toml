@@ -52,3 +52,13 @@ tempfile = "3"
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = [ "tauri/custom-protocol" ]
+
+# Debug info is most of what makes target/ grow to tens of gigabytes: every dependency
+# gets full symbols and a PDB on Windows, rebuilt into a new copy on every version or
+# feature change. Our own crate keeps line tables, so panics and backtraces still name
+# the file and line; dependencies get none, since nobody steps through Tauri's internals.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
