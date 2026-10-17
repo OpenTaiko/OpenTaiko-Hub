@@ -655,5 +655,33 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "진행 중",
+    "close_title": "작업 진행 중",
+    "close_message": "다운로드 또는 빌드가 진행 중입니다. Hub를 닫으면 중단됩니다.",
+    "close": "닫기",
+    "keep": "열어 두기",
+    "installing_into": "{name}에 설치 중",
+    "install_cancelled": "설치를 취소했습니다",
+    "dotnet_page": ".NET 8 받기",
+    "instance_busy": "이 인스턴스에서 설치가 진행 중입니다"
+  },
+  "toast": {
+    "copy": "세부 정보 복사",
+    "copied": "복사됨"
+  },
+  "errors": {
+    "rate_limited": "GitHub가 현재 연결의 요청을 제한하고 있습니다. 잠시 후 다시 시도하세요.",
+    "not_found": "서버에 파일이 없습니다.",
+    "offline": "서버에 연결할 수 없습니다. 인터넷 연결을 확인하세요.",
+    "disk_full": "디스크가 가득 찼습니다.",
+    "access_denied": "파일 접근이 거부되었습니다. 게임이 실행 중이면 종료한 뒤 다시 시도하세요."
+  },
+  "bulk": {
+    "status": "다운로드 중 {done} / {total} · 남은 용량 {size}",
+    "done": "{total}개 중 {count}개 다운로드 완료",
+    "failed": "{total}개 중 {count}개 다운로드 완료. 실패: {failed}",
+    "cancelled": "취소됨. {total}개 중 {count}개 다운로드 완료"
   }
 }

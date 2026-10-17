@@ -15,6 +15,8 @@
         Scanning?: boolean;
         Found?: number;
         Busy?: boolean;
+        /** Set while a bulk download runs. */
+        Bulk?: { done: number; total: number; mbLeft: number } | null;
         CurrentScope?: Scope;
         Search?: string;
         OnScope?: (scope: Scope) => void;
@@ -22,6 +24,7 @@
         OnReload?: () => void;
         OnOpenLibrary?: () => void;
         OnGetAll?: () => void;
+        OnCancelBulk?: () => void;
     }
 
     let {
@@ -33,13 +36,15 @@
         Scanning = false,
         Found = 0,
         Busy = false,
+        Bulk = null,
         CurrentScope = 'all',
         Search = '',
         OnScope,
         OnSearch,
         OnReload,
         OnOpenLibrary,
-        OnGetAll
+        OnGetAll,
+        OnCancelBulk
     }: Props = $props();
 
     let percent = $derived(Total === 0 ? 0 : Math.round((Installed / Total) * 100));
@@ -84,6 +89,14 @@
         {#if Scanning}
             <i class="fa-solid fa-spinner fa-spin"></i>
             {$_('songs.scan.progress', { values: { count: Found } })}
+        {:else if Bulk}
+            <!-- Counted here rather than per song, and in place: the rows that show each
+                 song's own progress are often inside collapsed folders -->
+            <i class="fa-solid fa-spinner fa-spin"></i>
+            {$_('bulk.status', { values: { done: Bulk.done, total: Bulk.total, size: formatSize(Bulk.mbLeft) } })}
+            <button type="button" class="button-gray button-main cancel" onclick={() => OnCancelBulk?.()}>
+                <i class="fa-solid fa-xmark"></i> {$_('common.cancel')}
+            </button>
         {:else}
             <b class="pct">{percent}%</b>
             {$_('songs.library.summary', { values: { installed: Installed, total: Total } })}
@@ -152,6 +165,7 @@
     .size {opacity: 0.85; font-weight: 400;}
 
     .statusline {font-size: 0.9rem; line-height: 1.5; color: inherit; margin: 0;}
+    .statusline .cancel {margin-left: 0.5rem;}
     .warn {color: light-dark(#a1560a, #ffc46b); font-weight: 700;}
     .pct {font-variant-numeric: tabular-nums; margin-right: 0.2rem; color: inherit;}
 

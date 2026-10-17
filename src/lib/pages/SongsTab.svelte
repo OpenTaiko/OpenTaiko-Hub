@@ -7,6 +7,8 @@
     import { open, confirm } from '@tauri-apps/plugin-dialog';
     import { getCurrentWebview } from '@tauri-apps/api/webview';
     import { installFiles, fetchCached, fetchCachedJson, type InstallEntry } from '$lib/utils/download';
+    import { startJob, isCancelled, type Job } from '$lib/stores/activity';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { path } from '@tauri-apps/api';
     import { invoke, Channel } from '@tauri-apps/api/core';
     import { getContext } from 'svelte';
@@ -27,7 +29,7 @@
         SoundtrackEntry,
         ToastContext
     } from '$lib/types';
-    const { TriggerError, TriggerSuccess } = getContext<ToastContext>('toast');
+    const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
     import { getSQL } from '$lib/utils/sqljs';
 
@@ -88,6 +90,10 @@
     let songCountProgress = 0;
     let songCountProgressBar = $state<number | null>(null);
     let bulkBusy = $state(false);          // a bulk download is running
+    // What the library header shows while a bulk download runs, and how to stop it
+    let bulkStatus = $state<{ done: number; total: number; mbLeft: number } | null>(null);
+    let bulkJob: Job | null = null;
+    let bulkCancelRequested = false;
     let activeSingleDownloads = $state(0);  // single-song downloads currently in flight (they run concurrently)
     let songBusy = $derived(activeSingleDownloads > 0);
 
@@ -783,30 +789,55 @@
         if (pending.length === 0) return;
 
         bulkBusy = true;
+        bulkCancelRequested = false;
+        const job = startJob('songs');
+        bulkJob = job;
+        // Progress lives in the header instead of a toast per song, and the run ends with
+        // a single summary: hundreds of stacked toasts buried the one that mattered
+        let done = 0;
+        let failed = 0;
+        let mbLeft = pending.reduce((sum, song) => sum + (song.chartSize || 0), 0);
+        bulkStatus = { done, total: pending.length, mbLeft };
         try {
             await EnsureRemoteShaMap();
-            songCountProgress = 0;
-            songCountProgressBar = 0;
             // A few songs at a time (each downloads several files at once in the
             // backend): one after the other, a whole library took a request round trip
             // per file in sequence. Kept small so GitHub does not start refusing requests.
             let next = 0;
             const worker = async () => {
-                while (next < pending.length) {
+                while (next < pending.length && !bulkCancelRequested) {
                     const index = next++;
                     const SInfo = pending[index];
-                    await DownloadSong(SInfo, currentSongs[SInfo.uniqueId] ?? null, index + 1, pending.length);
-                    songCountProgress++;
-                    songCountProgressBar = 100 * (songCountProgress / pending.length);
+                    const outcome = await DownloadSong(SInfo, currentSongs[SInfo.uniqueId] ?? null, index + 1, pending.length, job.id);
+                    if (outcome === 'done') done++;
+                    else if (outcome === 'failed') failed++;
+                    mbLeft = Math.max(0, mbLeft - (SInfo.chartSize || 0));
+                    bulkStatus = { done, total: pending.length, mbLeft };
                 }
             };
             await Promise.all(Array.from({ length: Math.min(BULK_SONG_CONCURRENCY, pending.length) }, worker));
+
+            const values = { count: done, total: pending.length, failed };
+            if (bulkCancelRequested) {
+                TriggerWarning(get(_)('bulk.cancelled', { values }));
+                return;
+            }
+            if (failed > 0) TriggerError(get(_)('bulk.failed', { values }));
+            else TriggerSuccess(get(_)('bulk.done', { values }));
+
             const updated = await RefreshAllGenreMetadata();
             if (updated > 0) TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
         } finally {
-            songCountProgressBar = null;
+            job.end();
+            bulkJob = null;
+            bulkStatus = null;
             bulkBusy = false;
         }
+    };
+
+    const CancelBulk = () => {
+        bulkCancelRequested = true;
+        bulkJob?.cancel();
     };
 
     const OpenSongsFolder = async () => {
@@ -1059,12 +1090,16 @@
         return updated;
     }
 
-    const DownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, songNb?: number, songTotal?: number) => {
+    type DownloadOutcome = 'done' | 'failed' | 'cancelled' | 'skipped';
+
+    // songNb is set when a bulk run drives this: the run reports one summary at the end,
+    // so the song itself stays quiet and only returns how it went.
+    const DownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, songNb?: number, songTotal?: number, job?: string): Promise<DownloadOutcome> => {
         // Never write into the library while it is still being scanned, the scan's
         // final result would otherwise clobber this download's bookkeeping.
         if (scanning) {
             TriggerError(get(_)('songs.error.scanning'));
-            return;
+            return 'skipped';
         }
         // songNb is set when the bulk loop drives this, which owns the busy flag itself
         const standalone = songNb === undefined;
@@ -1072,14 +1107,14 @@
             // Single songs run in parallel. Only refuse while a bulk run owns every
             // displayed row, or when this exact song is already in flight (it would
             // write into the same folder twice).
-            if (bulkBusy || songDLProgress[songObj.uniqueId] !== undefined) return;
+            if (bulkBusy || songDLProgress[songObj.uniqueId] !== undefined) return 'skipped';
             activeSingleDownloads++;
         }
         // Claim the row right away (nothing awaited above) so a second click on the
         // same song cannot slip through before the download shows its progress bar
         songDLProgress[songObj.uniqueId] = 0;
         try {
-            await RunDownloadSong(songObj, currentObj, songNb, songTotal);
+            return await RunDownloadSong(songObj, currentObj, songNb !== undefined, job);
         } finally {
             // Also releases the row when the download throws, otherwise the button
             // would stay replaced by a stuck progress bar
@@ -1088,15 +1123,15 @@
         }
     }
 
-    const RunDownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, songNb?: number, songTotal?: number) => {
+    const RunDownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, quiet: boolean, job?: string): Promise<DownloadOutcome> => {
         await EnsureRemoteShaMap();
 
         // Catalog paths decide where files are written, so a malformed one is refused
         // before anything is downloaded
         if (![songObj.tjaFolderPath, ...songObj.tjaFilesPath].every(IsPlainRelPath)) {
             console.error(`Refusing catalog paths of ${songObj.uniqueId}:`, songObj.tjaFolderPath, songObj.tjaFilesPath);
-            TriggerError(get(_)('dl.error.failed_abort'));
-            return;
+            if (!quiet) TriggerError(get(_)('dl.error.failed_abort'));
+            return 'failed';
         }
 
         const baseDirPath = await GetGlobalSongsPath();
@@ -1125,12 +1160,13 @@
             await installFiles(tjaFullPath, entries, (pr) => {
                 totbyts += pr.progress;
                 songDLProgress[songObj.uniqueId] = 100 * (totbyts / (songObj.chartSize * 1024 * 1024));
-            });
+            }, job);
         } catch (error) {
             // The caller's finally releases the row
+            if (isCancelled(error)) return 'cancelled';
             console.error(`Download of ${songObj.uniqueId} failed:`, error);
-            TriggerError(get(_)('dl.error.failed_abort'));
-            return;
+            if (!quiet) TriggerError(`${get(_)('dl.error.failed_abort')}<br>${DescribeError(error)}`, { details: ErrorText(error) });
+            return 'failed';
         }
 
         // Download / refresh box.def and default.png of every ancestor genre folder
@@ -1139,10 +1175,7 @@
             await EnsureGenreMetadata(genrePath);
         }
 
-        if (songNb === undefined)
-            TriggerSuccess(get(_)('songs.success.download_complete'));
-        else
-            TriggerSuccess(get(_)('songs.success.download_nb', { values: { nb: songNb, total: songTotal } }));
+        if (!quiet) TriggerSuccess(get(_)('songs.success.download_complete'));
 
         //crawlSongs();
         currentSongs = {
@@ -1153,6 +1186,7 @@
                 chartRelativePath: (currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath
             }
         };
+        return 'done';
     }
 
     // Artists info
@@ -1280,6 +1314,8 @@
 	Scanning={scanning}
 	Found={scanStats.found}
 	Busy={bulkBusy || songBusy}
+	Bulk={bulkStatus}
+	OnCancelBulk={CancelBulk}
 	CurrentScope={scope}
 	Search={librarySearch}
 	OnScope={(s) => scope = s}

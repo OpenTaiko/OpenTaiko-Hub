@@ -12,14 +12,15 @@ const progressChannel = (onProgress?: (progress: ProgressPayload) => void): Chan
     return channel;
 };
 
-/** Downloads `url` to `path`. */
+/** Downloads `url` to `path`. `job` (see startJob) lets the download be cancelled. */
 export const download = async (
     url: string,
     path: string,
     onProgress?: (progress: ProgressPayload) => void,
-    attempts?: number
+    attempts?: number,
+    job?: string
 ): Promise<void> => {
-    await invoke('download_file', { url, path, attempts, onProgress: progressChannel(onProgress) });
+    await invoke('download_file', { url, path, attempts, job, onProgress: progressChannel(onProgress) });
 };
 
 export interface InstallEntry {
@@ -45,9 +46,10 @@ export interface InstallReport {
 export const installFiles = async (
     destRoot: string,
     entries: InstallEntry[],
-    onProgress?: (progress: ProgressPayload) => void
+    onProgress?: (progress: ProgressPayload) => void,
+    job?: string
 ): Promise<InstallReport> => {
-    return await invoke<InstallReport>('install_files', { destRoot, entries, onProgress: progressChannel(onProgress) });
+    return await invoke<InstallReport>('install_files', { destRoot, entries, job, onProgress: progressChannel(onProgress) });
 };
 
 /**

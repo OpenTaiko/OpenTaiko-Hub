@@ -17,6 +17,8 @@ use tauri::{AppHandle, Manager, Runtime};
 use tauri_plugin_http::reqwest;
 use tokio::io::AsyncWriteExt;
 
+use crate::jobs::{CancelToken, CANCELLED};
+
 /// Hosts a download may start from. Release assets redirect to githubusercontent hosts,
 /// which reqwest follows (https only, see `client`).
 const DOWNLOAD_HOSTS: [&str; 5] = [
@@ -149,6 +151,7 @@ fn part_path(dest: &Path) -> PathBuf {
 async fn fetch_once(
     url: &reqwest::Url,
     part: &Path,
+    cancel: &CancelToken,
     on_total: &mut (dyn FnMut(u64) + Send),
     on_bytes: &mut (dyn FnMut(i64) + Send),
 ) -> Result<u64, Failure> {
@@ -172,6 +175,9 @@ async fn fetch_once(
         .await
         .map_err(|e| Failure::Retry { after: None, message: format!("Download of {label} failed: {e}") })?
     {
+        if cancel.is_cancelled() {
+            return Err(cancelled());
+        }
         file.write_all(&chunk).await.map_err(io_error)?;
         received += chunk.len() as u64;
         on_bytes(chunk.len() as i64);
@@ -186,6 +192,7 @@ async fn fetch_to_part(
     url: &reqwest::Url,
     dest: &Path,
     attempts: u32,
+    cancel: &CancelToken,
     on_total: &mut (dyn FnMut(u64) + Send),
     on_bytes: &mut (dyn FnMut(i64) + Send),
 ) -> Result<PathBuf, Failure> {
@@ -193,12 +200,15 @@ async fn fetch_to_part(
     let attempts = attempts.clamp(1, MAX_ATTEMPTS);
     let mut attempt = 1;
     loop {
+        if cancel.is_cancelled() {
+            return Err(cancelled());
+        }
         let mut counted: i64 = 0;
         let mut count = |n: i64| {
             counted += n;
             on_bytes(n);
         };
-        match fetch_once(url, &part, on_total, &mut count).await {
+        match fetch_once(url, &part, cancel, on_total, &mut count).await {
             Ok(_) => return Ok(part),
             Err(failure) => {
                 // Bytes of a discarded attempt no longer count
@@ -210,7 +220,9 @@ async fn fetch_to_part(
                     Failure::Retry { after, message } if attempt < attempts => {
                         let delay = backoff(attempt, after);
                         log::warn!("{message} (attempt {attempt}/{attempts}), retrying in {} ms", delay.as_millis());
-                        tokio::time::sleep(delay).await;
+                        if !sleep_unless_cancelled(delay, cancel).await {
+                            return Err(cancelled());
+                        }
                         attempt += 1;
                     }
                     other => return Err(other),
@@ -218,6 +230,22 @@ async fn fetch_to_part(
             }
         }
     }
+}
+
+fn cancelled() -> Failure {
+    Failure::Fatal { status: None, message: CANCELLED.to_string() }
+}
+
+/// Waits `delay`, returning early (and false) once the operation is cancelled.
+async fn sleep_unless_cancelled(delay: Duration, cancel: &CancelToken) -> bool {
+    let until = Instant::now() + delay;
+    while Instant::now() < until {
+        if cancel.is_cancelled() {
+            return false;
+        }
+        tokio::time::sleep((until - Instant::now()).min(Duration::from_millis(200))).await;
+    }
+    !cancel.is_cancelled()
 }
 
 fn failure_message(failure: Failure) -> String {
@@ -276,14 +304,16 @@ pub async fn download_file<R: Runtime>(
     url: String,
     path: String,
     attempts: Option<u32>,
+    job: Option<String>,
     on_progress: Channel<ProgressPayload>,
 ) -> Result<(), String> {
     let parsed = parse_url(&url, &DOWNLOAD_HOSTS)?;
+    let cancel = crate::jobs::token(&app, &job);
     let dest = crate::guard::checked(&app, &path)?;
     let progress = Mutex::new(Progress::new(on_progress));
     let mut set_total = |total: u64| progress.lock().unwrap().total = total;
     let mut add = |n: i64| progress.lock().unwrap().add(n);
-    let part = fetch_to_part(&parsed, &dest, attempts.unwrap_or(DEFAULT_ATTEMPTS), &mut set_total, &mut add)
+    let part = fetch_to_part(&parsed, &dest, attempts.unwrap_or(DEFAULT_ATTEMPTS), &cancel, &mut set_total, &mut add)
         .await
         .map_err(failure_message)?;
     tokio::fs::rename(&part, &dest)
@@ -343,9 +373,11 @@ pub async fn install_files<R: Runtime>(
     dest_root: String,
     entries: Vec<InstallEntry>,
     attempts: Option<u32>,
+    job: Option<String>,
     on_progress: Channel<ProgressPayload>,
 ) -> Result<InstallReport, String> {
     let root = crate::guard::checked(&app, &dest_root)?;
+    let cancel = crate::jobs::token(&app, &job);
     tokio::fs::create_dir_all(&root)
         .await
         .map_err(|e| format!("Could not create {}: {e}", root.display()))?;
@@ -366,8 +398,10 @@ pub async fn install_files<R: Runtime>(
         let (url, dest, git_sha, optional) = (url.clone(), dest.clone(), entry.git_sha.clone(), entry.optional);
         let progress = progress.clone();
         let permits = permits.clone();
+        let cancel = cancel.clone();
         tasks.spawn(async move {
             let _permit = permits.acquire_owned().await.map_err(|e| e.to_string())?;
+            cancel.check()?;
             if is_unchanged(&dest, git_sha.as_deref()).await {
                 return Ok((index, Outcome::Unchanged));
             }
@@ -379,7 +413,7 @@ pub async fn install_files<R: Runtime>(
             // Sizes are not added up: callers measure against the size the catalog gives
             let mut ignore_total = |_: u64| {};
             let mut add = |n: i64| progress.lock().unwrap().add(n);
-            match fetch_to_part(&url, &dest, attempts, &mut ignore_total, &mut add).await {
+            match fetch_to_part(&url, &dest, attempts, &cancel, &mut ignore_total, &mut add).await {
                 Ok(part) => Ok((index, Outcome::Downloaded(part))),
                 Err(Failure::Fatal { status: Some(404), .. }) if optional => Ok((index, Outcome::Absent)),
                 Err(failure) => Err(failure_message(failure)),

@@ -655,5 +655,33 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "En curso",
+    "close_title": "Tarea en curso",
+    "close_message": "Hay una descarga o compilación en curso. Cerrar el Hub la detendrá.",
+    "close": "Cerrar",
+    "keep": "Mantener abierto",
+    "installing_into": "Instalando en {name}",
+    "install_cancelled": "Instalación cancelada",
+    "dotnet_page": "Obtener .NET 8",
+    "instance_busy": "Hay una instalación en curso en esta instancia"
+  },
+  "toast": {
+    "copy": "Copiar detalles",
+    "copied": "Copiado"
+  },
+  "errors": {
+    "rate_limited": "GitHub está limitando las solicitudes de tu conexión. Inténtalo más tarde.",
+    "not_found": "El archivo no está en el servidor.",
+    "offline": "No se pudo conectar con el servidor. Comprueba tu conexión a internet.",
+    "disk_full": "El disco está lleno.",
+    "access_denied": "Se denegó el acceso a un archivo. Si el juego está abierto, ciérralo e inténtalo de nuevo."
+  },
+  "bulk": {
+    "status": "Descargando {done} / {total} · faltan {size}",
+    "done": "Descargados {count} de {total}",
+    "failed": "Descargados {count} de {total}. Fallidos: {failed}",
+    "cancelled": "Cancelado. Descargados {count} de {total}"
   }
 }

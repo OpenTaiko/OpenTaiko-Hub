@@ -655,5 +655,33 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "Läuft",
+    "close_title": "Vorgang läuft",
+    "close_message": "Ein Download oder Build läuft noch. Beim Schließen des Hubs wird er abgebrochen.",
+    "close": "Schließen",
+    "keep": "Offen lassen",
+    "installing_into": "Installation in {name}",
+    "install_cancelled": "Installation abgebrochen",
+    "dotnet_page": ".NET 8 herunterladen",
+    "instance_busy": "In dieser Instanz läuft eine Installation"
+  },
+  "toast": {
+    "copy": "Details kopieren",
+    "copied": "Kopiert"
+  },
+  "errors": {
+    "rate_limited": "GitHub begrenzt die Anfragen deiner Verbindung. Versuche es später erneut.",
+    "not_found": "Die Datei fehlt auf dem Server.",
+    "offline": "Server nicht erreichbar. Prüfe deine Internetverbindung.",
+    "disk_full": "Der Datenträger ist voll.",
+    "access_denied": "Der Zugriff auf eine Datei wurde verweigert. Falls das Spiel läuft, schließe es und versuche es erneut."
+  },
+  "bulk": {
+    "status": "Download {done} / {total} · noch {size}",
+    "done": "{count} von {total} heruntergeladen",
+    "failed": "{count} von {total} heruntergeladen. Fehlgeschlagen: {failed}",
+    "cancelled": "Abgebrochen. {count} von {total} heruntergeladen"
   }
 }

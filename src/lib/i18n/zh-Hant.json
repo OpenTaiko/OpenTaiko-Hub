@@ -655,5 +655,33 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "進行中",
+    "close_title": "仍在進行",
+    "close_message": "下載或建置仍在進行。關閉 Hub 會使其中斷。",
+    "close": "關閉",
+    "keep": "保持開啟",
+    "installing_into": "正在安裝到 {name}",
+    "install_cancelled": "安裝已取消",
+    "dotnet_page": "取得 .NET 8",
+    "instance_busy": "此實例正在進行安裝"
+  },
+  "toast": {
+    "copy": "複製詳細資訊",
+    "copied": "已複製"
+  },
+  "errors": {
+    "rate_limited": "GitHub 正在限制來自你網路的請求。請稍後再試。",
+    "not_found": "伺服器上缺少該檔案。",
+    "offline": "無法連線到伺服器。請檢查網路連線。",
+    "disk_full": "磁碟已滿。",
+    "access_denied": "檔案存取遭拒。如果遊戲正在執行，請關閉後再試。"
+  },
+  "bulk": {
+    "status": "正在下載 {done} / {total} · 剩餘 {size}",
+    "done": "已下載 {count} / {total}",
+    "failed": "已下載 {count} / {total}。失敗：{failed}",
+    "cancelled": "已取消。已下載 {count} / {total}"
   }
 }

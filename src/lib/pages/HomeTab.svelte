@@ -11,9 +11,12 @@
     import { get } from 'svelte/store';
 
     import type { BuildOption, GitHubRelease, HubOS, IndevBuildInfo, Instance, ToastContext } from '$lib/types';
-    const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
+    const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
     import { GetOS, GetTmpPath, GetBuildPath } from "$lib/utils/path";
+    import { startJob, isCancelled, type Job } from "$lib/stores/activity";
+    import { DescribeError, ErrorText } from "$lib/utils/errors";
+    import { openUrl } from '@tauri-apps/plugin-opener';
     import { isVersionAtLeast } from "$lib/utils/versions";
     import {
         repoOwner,
@@ -59,8 +62,14 @@
     let versionLoadedFor: string | null = null;       // bookkeeping only, never rendered
     let indevLatestSha = $state<string | null>(null);
 
-    // Download / build state
+    // Download / build state. One install runs at a time, Hub-wide; busyInstance says
+    // which instance it writes into, so the progress is shown under that instance only.
     let downloadBusy = $state(false);
+    let busyInstance = $state<Instance | null>(null);
+    let busyJob: Job | null = null;
+    // False once the install starts writing into the instance folder: stopping halfway
+    // through that would leave a mix of two builds
+    let cancellable = $state(false);
     // undefined renders an indeterminate bar
     let progress = $state<number | undefined>(0);
     // Bytes received and the current rate, shown when the server sends no size and a
@@ -233,7 +242,7 @@
     };
 
     // Downloads a release zip and merges its content into the instance folder.
-    const DownloadAndInstallZip = async (url: string, instancePath: string): Promise<boolean> => {
+    const DownloadAndInstallZip = async (url: string, instancePath: string, job: Job): Promise<boolean> => {
         const tmpDir = await GetTmpPath(crypto.randomUUID());
         await mkdir(tmpDir, { recursive: true });
         const zipPath = await path.join(tmpDir, 'OpenTaiko.zip');
@@ -247,7 +256,9 @@
                     // restarts the transfer, and a sum kept across attempts would count
                     // the re-downloaded bytes twice and drive the bar past 100%.
                     progress = pr.total ? 100 * (pr.progressTotal / pr.total) : undefined;
-                }
+                },
+                undefined,
+                job.id
             );
             if (!success) {
                 return false;
@@ -258,10 +269,11 @@
 
             const extractProgress = new Channel<number>();
             extractProgress.onmessage = (percent) => progress = percent;
-            const sourceFolder = await invoke<string>('unzip_and_get_first_folder', { zipPath, onProgress: extractProgress });
+            const sourceFolder = await invoke<string>('unzip_and_get_first_folder', { zipPath, job: job.id, onProgress: extractProgress });
 
             TriggerSuccess(get(_)('home.success.installing'));
             progress = undefined;
+            cancellable = false;
 
             await remove(zipPath);
             // Songs live in the shared library, so never install a build's own copies
@@ -283,27 +295,59 @@
         patch: Partial<Instance>;
     }
 
-    // Stable and prerelease installs only differ in which release they read and how the
-    // instance is recorded afterwards, so both go through here.
-    const InstallRelease = async (resolve: () => Promise<ReleaseToInstall>) => {
+    // Claims the Hub-wide install slot for `instance`. Returns null when it is taken.
+    const BeginInstall = (instance: Instance): Job | null => {
         if (downloadBusy === true) {
             TriggerError(get(_)('home.error.already_downloading'));
-            return;
+            return null;
         }
-        if (!current) return;
-        // Capture the target so switching instances mid-download cannot retarget it
-        const instance = current;
         // Claimed before the first await, so a second click cannot start a second install
         downloadBusy = true;
+        busyInstance = instance;
+        busyJob = startJob('home', instance.id);
+        cancellable = true;
         progress = undefined;
         // A previous experimental build's output must not sit under this download.
         resetBuildOutput();
+        return busyJob;
+    };
+
+    const EndInstall = () => {
+        busyJob?.end();
+        busyJob = null;
+        busyInstance = null;
+        cancellable = false;
+        downloadBusy = false;
+    };
+
+    const CancelInstall = () => {
+        if (cancellable) busyJob?.cancel();
+    };
+
+    // A failed install says why in plain words when the cause is known, and keeps the raw
+    // error for the copy button; a cancelled one is not an error at all
+    const ReportInstallError = (key: string, err: unknown) => {
+        if (isCancelled(err)) {
+            TriggerWarning(get(_)('jobs.install_cancelled'));
+            return;
+        }
+        TriggerError(get(_)(key, { values: { error: DescribeError(err) } }), { details: ErrorText(err) });
+    };
+
+    // Stable and prerelease installs only differ in which release they read and how the
+    // instance is recorded afterwards, so both go through here.
+    const InstallRelease = async (resolve: () => Promise<ReleaseToInstall>) => {
+        if (!current) return;
+        // Capture the target so switching instances mid-download cannot retarget it
+        const instance = current;
+        const job = BeginInstall(instance);
+        if (!job) return;
 
         try {
             const release = await resolve();
             progress = 0;
 
-            const installed = await DownloadAndInstallZip(release.url, instance.path);
+            const installed = await DownloadAndInstallZip(release.url, instance.path, job);
             if (installed) {
                 await WriteVersionJson(instance.path, release.version);
                 const updated = await updateInstance(instance.id, release.patch);
@@ -312,9 +356,10 @@
                 TriggerSuccess(get(_)('home.success.installed'));
             }
         } catch (err) {
-            TriggerError(get(_)('home.error.download_failed', { values: { error: String(err) } }));
+            ReportInstallError('home.error.download_failed', err);
+        } finally {
+            EndInstall();
         }
-        downloadBusy = false;
     };
 
     const DownloadStable = () => InstallRelease(async () => {
@@ -342,16 +387,11 @@
     // Fetches the experimental branch source at its current head commit, builds it with
     // the .NET SDK and installs the publish output into the instance folder.
     const DownloadIndev = async (option: { branch?: string; label?: string }) => {
-        if (downloadBusy === true) {
-            TriggerError(get(_)('home.error.already_downloading'));
-            return;
-        }
         if (!current) return;
         // Capture the target so switching instances mid-download cannot retarget it
         const instance = current;
-
-        downloadBusy = true;
-        resetBuildOutput();
+        const job = BeginInstall(instance);
+        if (!job) return;
         let tmpDir: string | null = null;
 
         // MSBuild emits output far faster than the UI can paint it. Rebuilding a
@@ -388,13 +428,20 @@
                 sdkExitCode = await invoke<number>('run_dotnet', {
                     args: ['--list-sdks'],
                     cwd: null,
+                    job: job.id,
                     onOutput: sdkChannel
                 });
-            } catch {
+            } catch (error) {
+                if (isCancelled(error)) throw error;
                 sdkExitCode = -1;
             }
             if (sdkExitCode !== 0 || !sdkLines.some((line) => line.trim().startsWith('8.'))) {
-                TriggerError(get(_)('home.experimental.requires_dotnet'));
+                TriggerError(get(_)('home.experimental.requires_dotnet'), {
+                    action: {
+                        label: get(_)('jobs.dotnet_page'),
+                        run: () => { openUrl('https://dotnet.microsoft.com/download/dotnet/8.0').catch(() => {}); }
+                    }
+                });
                 return;
             }
 
@@ -427,7 +474,8 @@
                     transferRate = pr.transferSpeed;
                     progress = pr.total ? 100 * (pr.progressTotal / pr.total) : undefined;
                 },
-                3
+                3,
+                job.id
             );
             if (!success) {
                 throw new Error('Source download failed');
@@ -438,7 +486,7 @@
             progress = 0;
             const extractProgress = new Channel<number>();
             extractProgress.onmessage = (percent) => progress = percent;
-            const extracted = await invoke<string>('unzip_and_get_first_folder', { zipPath: srcZip, onProgress: extractProgress });
+            const extracted = await invoke<string>('unzip_and_get_first_folder', { zipPath: srcZip, job: job.id, onProgress: extractProgress });
             await remove(srcZip);
             // The archive unpacks into `OpenTaiko-<40 character commit>`. Every character
             // of that name counts against the Windows path limit for the whole build, so
@@ -469,6 +517,7 @@
             const exitCode = await invoke<number>('run_dotnet', {
                 args: ['publish', 'OpenTaiko/OpenTaiko.csproj', '--configuration', 'Release', '--self-contained', '-p:PublishSingleFile=true', '--runtime', rid, '--output', publishDir, `-p:OutDir=${outDir}`],
                 cwd: srcFolder,
+                job: job.id,
                 onOutput: logChannel
             });
             flushBuildLog();
@@ -478,6 +527,7 @@
 
             // 6. Install the publish output (and local docs when the branch ships them)
             buildStage = 'install';
+            cancellable = false;
             // A local publish carries the repository's whole Songs tree; drop those
             // charts so the instance uses only the shared library
             await invoke('strip_song_content', { songsDir: await path.join(publishDir, 'Songs') });
@@ -509,7 +559,7 @@
             // record of why it failed. It lives in component state that the next run
             // clears, so write it to the log file first: console.error is mirrored there
             // by the root layout. Without this the user is left with an exit code.
-            if (buildLog.length > 0) {
+            if (buildLog.length > 0 && !isCancelled(err)) {
                 buildFailed = true;
                 console.error(
                     `Experimental build failed (${String(err)}). Last ${buildLog.length} lines of build output:\n`
@@ -519,8 +569,7 @@
             // The stage that threw decides the wording, and buildStage is not cleared
             // until the finally below. An install that fails after a good build is not a
             // build failure, and saying so would send the user to the wrong output.
-            const key = buildStage === 'build' ? 'home.error.build_failed' : 'home.error.download_failed';
-            TriggerError(get(_)(key, { values: { error: String(err) } }));
+            ReportInstallError(buildStage === 'build' ? 'home.error.build_failed' : 'home.error.download_failed', err);
         } finally {
             // No-op on the paths above that already flushed; it is here so no timer can
             // outlive the run and write into the log of the next one.
@@ -528,7 +577,7 @@
             if (tmpDir) {
                 try { await remove(tmpDir, { recursive: true }); } catch {}
             }
-            downloadBusy = false;
+            EndInstall();
             buildStage = null;
         }
     };
@@ -642,7 +691,7 @@
                     <span class="nowrap"><b>{$_('home.label.current_version')}</b></span>
                     {#if versionLoading}
                         <div class="placeholder animate-pulse flex-1"></div>
-                    {:else if downloadBusy === true}
+                    {:else if downloadBusy === true && busyInstance?.id === current.id}
                         <div class="progressbar">
                             {#if buildStage}
                                 <p class="text-sm mb-1">
@@ -654,6 +703,9 @@
                             {/if}
                             <ProgressBar value={progress} max={100} />
                         </div>
+                        {#if cancellable}
+                            <button type="button" onclick={CancelInstall} class="button-gray button-main"><i class="fa-solid fa-xmark"></i> {$_('common.cancel')}</button>
+                        {/if}
                     {:else}
                         {#if currentVersion}
                             <span>
@@ -692,6 +744,10 @@
                             <button type="button" onclick={LaunchOpenTaiko} class="button-blue button-main"><i class="fa-solid fa-rocket"></i> {$_('home.button.launch')}</button>
                             <button type="button" onclick={DownloadStable} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
                         {/if}
+                        {#if downloadBusy && busyInstance}
+                            <!-- The install runs for another instance; say where its progress is -->
+                            <span class="opacity-70 text-sm"><i class="fa-solid fa-spinner fa-spin"></i> {$_('jobs.installing_into', { values: { name: busyInstance.name } })}</span>
+                        {/if}
                     {/if}
                 </div>
             </div>
@@ -726,7 +782,7 @@
                 </div>
             </div>
 
-            {#if (downloadBusy || buildFailed) && buildLog.length > 0}
+            {#if ((downloadBusy && busyInstance?.id === current.id) || buildFailed) && buildLog.length > 0}
                 <div class="p-4">
                     <pre class="build-log" bind:this={buildLogElement}>{buildLog.join('\n')}</pre>
                 </div>

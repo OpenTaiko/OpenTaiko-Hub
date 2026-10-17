@@ -84,8 +84,10 @@ pub async fn run_dotnet(
     app: tauri::AppHandle,
     args: Vec<String>,
     cwd: Option<String>,
+    job: Option<String>,
     on_output: Channel<Vec<String>>,
 ) -> Result<i32, String> {
+    let cancel = crate::jobs::token(&app, &job);
     if !allowed_dotnet_args(&args) {
         return Err(format!("Refusing to run dotnet {}", args.join(" ")));
     }
@@ -154,9 +156,23 @@ pub async fn run_dotnet(
             })
         });
 
-        let status = child
-            .wait()
-            .map_err(|e| format!("Failed to wait for {}: {}", program, e))?;
+        // Polled rather than waited on, so a cancelled build can be stopped
+        let status = loop {
+            if let Some(status) = child
+                .try_wait()
+                .map_err(|e| format!("Failed to wait for {}: {}", program, e))?
+            {
+                break status;
+            }
+            if cancel.is_cancelled() {
+                let _ = child.kill();
+                let _ = child.wait();
+                // The output readers are not waited for: a compiler process the build
+                // started can keep the pipe open after dotnet itself is gone
+                return Err(crate::jobs::CANCELLED.to_string());
+            }
+            std::thread::sleep(Duration::from_millis(200));
+        };
         for reader in readers {
             let _ = reader.join();
         }

@@ -655,5 +655,33 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "Bezig",
+    "close_title": "Nog bezig",
+    "close_message": "Er loopt nog een download of build. Als je de Hub sluit, stopt die.",
+    "close": "Sluiten",
+    "keep": "Open laten",
+    "installing_into": "Installeren in {name}",
+    "install_cancelled": "Installatie geannuleerd",
+    "dotnet_page": ".NET 8 downloaden",
+    "instance_busy": "Er loopt een installatie in deze instantie"
+  },
+  "toast": {
+    "copy": "Details kopiëren",
+    "copied": "Gekopieerd"
+  },
+  "errors": {
+    "rate_limited": "GitHub beperkt de verzoeken van je verbinding. Probeer het later opnieuw.",
+    "not_found": "Het bestand ontbreekt op de server.",
+    "offline": "Kan de server niet bereiken. Controleer je internetverbinding.",
+    "disk_full": "De schijf is vol.",
+    "access_denied": "Toegang tot een bestand geweigerd. Als het spel draait, sluit het en probeer het opnieuw."
+  },
+  "bulk": {
+    "status": "Downloaden {done} / {total} · nog {size}",
+    "done": "{count} van {total} gedownload",
+    "failed": "{count} van {total} gedownload. Mislukt: {failed}",
+    "cancelled": "Geannuleerd. {count} van {total} gedownload"
   }
 }

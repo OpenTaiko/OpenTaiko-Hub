@@ -9,6 +9,7 @@ mod download;
 mod fsops;
 mod guard;
 mod health;
+mod jobs;
 mod migrate;
 mod procs;
 mod scan;
@@ -154,11 +155,13 @@ fn execute_external_app(path: String, app_handle: AppHandle) -> Result<(), Strin
 #[tauri::command]
 async fn unzip_and_get_first_folder(
     zip_path: String,
+    job: Option<String>,
     on_progress: tauri::ipc::Channel<f64>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
     // The archive is extracted next to itself
     guard::checked(&app_handle, &zip_path)?;
+    let cancel = jobs::token(&app_handle, &job);
     let zip_path_clone = zip_path.clone();
 
     task::spawn_blocking(move || {
@@ -178,6 +181,7 @@ async fn unzip_and_get_first_folder(
         let mut first_folder: Option<String> = None;
 
         for i in 0..archive.len() {
+            cancel.check()?;
             let mut file = archive
                 .by_index(i)
                 .map_err(|err| format!("ERR: Failed to read file in archive: {}", err))?;
@@ -535,6 +539,9 @@ fn main() {
             download::fetch_cached,
             guard::allow_build_dir,
             guard::create_instance_dir,
+            jobs::begin_job,
+            jobs::cancel_job,
+            jobs::end_job,
             fsops::merge_move_dir,
             migrate::plan_migration,
             migrate::paths_are_same_dir,
@@ -556,6 +563,14 @@ fn main() {
         ])
         .manage(ui_health.clone())
         .manage(LogDirectory(log_dir.clone()))
+        .manage(jobs::Jobs::default())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if !jobs::allow_close(window) {
+                    api.prevent_close();
+                }
+            }
+        })
         .setup(move |app| {
             // Everything here runs after the plugin installed the global logger, so
             // anything recorded before startup is reported from this point instead.

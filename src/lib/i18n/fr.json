@@ -655,5 +655,33 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "En cours",
+    "close_title": "Opération en cours",
+    "close_message": "Un téléchargement ou une compilation est en cours. Fermer le Hub l'arrêtera.",
+    "close": "Fermer",
+    "keep": "Laisser ouvert",
+    "installing_into": "Installation dans {name}",
+    "install_cancelled": "Installation annulée",
+    "dotnet_page": "Obtenir .NET 8",
+    "instance_busy": "Une installation est en cours dans cette instance"
+  },
+  "toast": {
+    "copy": "Copier les détails",
+    "copied": "Copié"
+  },
+  "errors": {
+    "rate_limited": "GitHub limite les requêtes de votre connexion. Réessayez plus tard.",
+    "not_found": "Le fichier est introuvable sur le serveur.",
+    "offline": "Impossible de joindre le serveur. Vérifiez votre connexion internet.",
+    "disk_full": "Le disque est plein.",
+    "access_denied": "L'accès à un fichier a été refusé. Si le jeu est lancé, fermez-le et réessayez."
+  },
+  "bulk": {
+    "status": "Téléchargement {done} / {total} · {size} restants",
+    "done": "{count} sur {total} téléchargés",
+    "failed": "{count} sur {total} téléchargés. Échecs : {failed}",
+    "cancelled": "Annulé. {count} sur {total} téléchargés"
   }
 }

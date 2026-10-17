@@ -655,5 +655,33 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "処理中",
+    "close_title": "処理中です",
+    "close_message": "ダウンロードまたはビルドが実行中です。Hubを閉じると中断されます。",
+    "close": "閉じる",
+    "keep": "閉じない",
+    "installing_into": "{name} にインストール中",
+    "install_cancelled": "インストールを中止しました",
+    "dotnet_page": ".NET 8 を入手",
+    "instance_busy": "このインスタンスでインストールが実行中です"
+  },
+  "toast": {
+    "copy": "詳細をコピー",
+    "copied": "コピーしました"
+  },
+  "errors": {
+    "rate_limited": "GitHubへのリクエストが制限されています。しばらくしてから再試行してください。",
+    "not_found": "サーバー上にファイルが見つかりません。",
+    "offline": "サーバーに接続できません。インターネット接続を確認してください。",
+    "disk_full": "ディスクの空き容量がありません。",
+    "access_denied": "ファイルへのアクセスが拒否されました。ゲームが起動中の場合は終了してから再試行してください。"
+  },
+  "bulk": {
+    "status": "ダウンロード中 {done} / {total} · 残り {size}",
+    "done": "{total} 件中 {count} 件をダウンロードしました",
+    "failed": "{total} 件中 {count} 件をダウンロードしました。失敗: {failed}",
+    "cancelled": "中止しました。{total} 件中 {count} 件をダウンロード済み"
   }
 }

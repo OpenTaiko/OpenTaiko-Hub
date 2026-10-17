@@ -15,9 +15,17 @@ export interface ProgressPayload {
     transferSpeed: number;
 }
 
+export interface ErrorToastOptions {
+    /** Technical text for a bug report; copied by the toast's button. Defaults to the message. */
+    details?: string;
+    /** An extra button, such as opening a download page. */
+    action?: { label: string; run: () => void };
+}
+
 /** Provided by the root layout through `getContext('toast')`. */
 export interface ToastContext {
-    TriggerError(message: string): void;
+    /** Stays until dismissed, with a button copying `details` (the raw error) for a report. */
+    TriggerError(message: string, options?: ErrorToastOptions): void;
     TriggerWarning(message: string): void;
     TriggerSuccess(message: string): void;
     /** Downloads with retries (in the backend); resolves to false once it gave up. */
@@ -25,7 +33,9 @@ export interface ToastContext {
         url: string,
         path: string,
         onProgress?: (progress: ProgressPayload) => void,
-        attempts?: number
+        attempts?: number,
+        /** See startJob. A cancelled download throws instead of resolving to false. */
+        job?: string
     ): Promise<boolean>;
     wait(ms: number): Promise<void>;
 }

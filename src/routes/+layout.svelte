@@ -18,7 +18,9 @@
     import { GetPreferencesPath } from '$lib/utils/path';
     import { toaster } from '$lib/utils/toaster';
     import { SafeHtml } from '$lib/utils/sanitize';
-    import type { ProgressPayload, ToastContext } from '$lib/types';
+    import { isCancelled } from '$lib/stores/activity';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
+    import type { ErrorToastOptions, ProgressPayload, ToastContext } from '$lib/types';
 
     interface Props {
         children?: Snippet;
@@ -28,9 +30,40 @@
 
     setupI18n();
 
-    const TriggerError = (msg: string) => {
-        console.error(msg);
-        toaster.error({ description: msg, duration: 4000 });
+    // Errors stay until dismissed: they often carry what to do next, and a report needs
+    // their text, which used to vanish after four seconds. The copy button takes the raw
+    // details when the message is a friendlier rewording of them.
+    const TriggerError = (msg: string, options: ErrorToastOptions = {}) => {
+        console.error(options.details ? `${msg} (${options.details})` : msg);
+        toaster.error({
+            description: msg,
+            duration: Infinity,
+            meta: { details: options.details ?? PlainText(msg), action: options.action }
+        });
+    };
+
+    // Toast messages carry markup (<br>, <b>), which is not wanted in copied text
+    const PlainText = (html: string): string => {
+        const element = document.createElement('div');
+        element.innerHTML = SafeHtml(html.replace(/<br\s*\/?>/gi, '\n'));
+        return element.textContent ?? html;
+    };
+
+    let copiedToast = $state<string | null>(null);
+    const CopyDetails = async (toastId: string, text: string) => {
+        try {
+            await navigator.clipboard.writeText(text);
+        } catch {
+            // Older webviews: fall back to a selection copy
+            const area = document.createElement('textarea');
+            area.value = text;
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand('copy');
+            area.remove();
+        }
+        copiedToast = toastId;
+        setTimeout(() => { if (copiedToast === toastId) copiedToast = null; }, 1500);
     };
 
     const TriggerWarning = (msg: string) => {
@@ -55,14 +88,17 @@
         url: string,
         path: string,
         prfunc?: (progress: ProgressPayload) => void,
-        attempts?: number
+        attempts?: number,
+        job?: string
     ): Promise<boolean> => {
         try {
-            await download(url, path, prfunc, attempts);
+            await download(url, path, prfunc, attempts, job);
             return true;
         } catch (error) {
+            // A cancellation is the caller's to report
+            if (isCancelled(error)) throw error;
             console.error(`Download of ${url} failed:`, error);
-            TriggerError(get(_)('dl.error.failed_abort'));
+            TriggerError(`${get(_)('dl.error.failed_abort')}<br>${DescribeError(error)}`, { details: `${url}: ${ErrorText(error)}` });
             return false;
         }
     }
@@ -139,6 +175,17 @@ ${event.error?.stack ?? ''}`).catch(() => {});
                      Skeleton v2 toast used to render as HTML. Values filled into them
                      (error text, file names) can come from outside, hence SafeHtml -->
                 <Toast.Description>{@html SafeHtml(toast.description)}</Toast.Description>
+                {#if toast.type === 'error'}
+                    <div class="toast-actions">
+                        {#if toast.meta?.action}
+                            <button type="button" class="button-blue button-main" onclick={() => toast.meta?.action.run()}>{toast.meta.action.label}</button>
+                        {/if}
+                        <button type="button" class="button-gray button-main" onclick={() => CopyDetails(toast.id ?? '', toast.meta?.details ?? '')}>
+                            <i class="fa-regular {copiedToast === toast.id ? 'fa-circle-check' : 'fa-copy'}"></i>
+                            {copiedToast === toast.id ? $_('toast.copied') : $_('toast.copy')}
+                        </button>
+                    </div>
+                {/if}
             </Toast.Message>
             <Toast.CloseTrigger />
         </Toast>
@@ -147,3 +194,11 @@ ${event.error?.stack ?? ''}`).catch(() => {});
 {#if !$isLoading}
 {@render children?.()}
 {/if}
+
+<style>
+    .toast-actions {
+        display: flex;
+        gap: 0.5rem;
+        margin-top: 0.5rem;
+    }
+</style>

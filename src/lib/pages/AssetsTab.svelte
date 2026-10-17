@@ -5,12 +5,14 @@
     import ProgressBar from '$lib/components/ProgressBar.svelte';
     import { mkdir, remove } from '@tauri-apps/plugin-fs';
     import { installFiles, fetchCachedJson, type InstallEntry } from '$lib/utils/download';
+    import { startJob, isCancelled, type Job } from '$lib/stores/activity';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { path } from '@tauri-apps/api';
     import { invoke, Channel } from '@tauri-apps/api/core';
     import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, LocalAsset, ToastContext } from '$lib/types';
 
     import { getContext } from 'svelte';
-    const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
+    const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
     import { GetTmpPath, IsPlainRelPath } from "$lib/utils/path";
     import { activeInstance, instanceVersions } from "$lib/stores/instances";
@@ -64,14 +66,22 @@
         "Characters":null,
         "Puchicharas":null
     });
+    // Running bulk downloads, per asset type, so each can be cancelled
+    const bulkJobs: Partial<Record<AssetType, Job>> = {};
+    const bulkCancelRequested: Partial<Record<AssetType, boolean>> = {};
+    // Set when the catalog could not be loaded: an empty table would otherwise read as
+    // "everything is up to date"
+    let catalogFetchFailed = $state(false);
 
 
     const updateAssetsInfo = async () => {
+        catalogFetchFailed = false;
         try {
             assetsInfo = await fetchCachedJson<AssetCatalog>(assetsInfoUrl);
         } catch (error) {
             console.error('Failed to fetch the asset catalog:', error);
             assetsInfo = emptyCatalog();
+            catalogFetchFailed = true;
         }
     }
 
@@ -150,32 +160,66 @@
             return ;
         }
 
-        assetCountProgress[assetType] = 0;
-        for (const Aif of AInfo) {
-            const assetRelpath = Field(Aif, assetPrefix, 'Folder');
-
-            assetCountProgressBar[assetType] = 100 * (assetCountProgress[assetType] / assetCount);
-
-            console.log(`Downloading ${assetType} ${assetCountProgress[assetType] + 1} out of ${assetCount}...`);
-            console.log(Aif);
-
-            const curObj = currentAssets[assetType][assetRelpath] ?? null;
-
-            await DownloadAsset(Aif, curObj, assetType, assetCountProgress[assetType] + 1, assetCount);
-            assetCountProgress[assetType]++;
-        }
-        assetCountProgressBar[assetType] = null
-    }
-
-    const DownloadAsset = async (assetObj: AssetInfo, currentObj: LocalAsset | null, assetType: AssetType, assetNb?: number, assetTotal?: number) => {
         const instance = get(activeInstance);
         if (!instance) return;
+        const job = startJob('home', instance.id);
+        bulkJobs[assetType] = job;
+        bulkCancelRequested[assetType] = false;
+        // One summary at the end instead of a toast per asset
+        let done = 0;
+        let failed = 0;
+        assetCountProgress[assetType] = 0;
+        assetCountProgressBar[assetType] = 0;
+        try {
+            for (const Aif of AInfo) {
+                if (bulkCancelRequested[assetType]) break;
+                const assetRelpath = Field(Aif, assetPrefix, 'Folder');
+                const curObj = currentAssets[assetType][assetRelpath] ?? null;
+
+                const outcome = await DownloadAsset(Aif, curObj, assetType, assetCountProgress[assetType] + 1, assetCount, job);
+                if (outcome === 'done') done++;
+                else if (outcome === 'failed') failed++;
+                assetCountProgress[assetType]++;
+                assetCountProgressBar[assetType] = 100 * (assetCountProgress[assetType] / assetCount);
+            }
+            const values = { count: done, total: assetCount, failed };
+            if (bulkCancelRequested[assetType]) TriggerWarning(get(_)('bulk.cancelled', { values }));
+            else if (failed > 0) TriggerError(get(_)('bulk.failed', { values }));
+            else TriggerSuccess(get(_)('bulk.done', { values }));
+        } finally {
+            job.end();
+            delete bulkJobs[assetType];
+            assetCountProgressBar[assetType] = null;
+        }
+    }
+
+    const CancelBulk = (assetType: AssetType) => {
+        bulkCancelRequested[assetType] = true;
+        bulkJobs[assetType]?.cancel();
+    };
+
+    type DownloadOutcome = 'done' | 'failed' | 'cancelled' | 'skipped';
+
+    // A bulk run passes its job and reports a summary itself, so the asset stays quiet.
+    // A single asset gets a job of its own, so it shows as running and can be noticed
+    // before the window is closed on it.
+    const DownloadAsset = async (assetObj: AssetInfo, currentObj: LocalAsset | null, assetType: AssetType, assetNb?: number, assetTotal?: number, bulkJob?: Job): Promise<DownloadOutcome> => {
+        const instance = get(activeInstance);
+        if (!instance) return 'skipped';
         if (instance.channel === 'experimental') {
             TriggerError(get(_)('assets.experimental.blocked_text'));
-            return;
+            return 'skipped';
         }
-        const res = instance.path;
+        const quiet = bulkJob !== undefined;
+        const job = bulkJob ?? startJob('home', instance.id);
+        try {
+            return await InstallAsset(instance.path, assetObj, assetType, quiet, job);
+        } finally {
+            if (!bulkJob) job.end();
+        }
+    }
 
+    const InstallAsset = async (res: string, assetObj: AssetInfo, assetType: AssetType, quiet: boolean, job: Job): Promise<DownloadOutcome> => {
         const baseDir = assetBaseDirs[assetType];
         const assetPrefix = AssetPrefix(assetType);
         const assetRelpath = Field(assetObj, assetPrefix, 'Folder');
@@ -187,8 +231,8 @@
         const catalogPaths = assetType === 'Skins' ? [assetRelpath] : [assetRelpath, ...(assetObj as CharaInfo).charaFilesPath];
         if (!catalogPaths.every(IsPlainRelPath)) {
             console.error(`Refusing catalog paths of ${assetRelpath}:`, catalogPaths);
-            TriggerError(get(_)('dl.error.failed_abort'));
-            return;
+            if (!quiet) TriggerError(get(_)('dl.error.failed_abort'));
+            return 'failed';
         }
 
         assetDLProgress[assetType][assetRelpath] = 0;
@@ -218,20 +262,22 @@
                     (pr) => {
                         totbyts += pr.progress;
                         assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
-                    }
+                    },
+                    undefined,
+                    job.id
                 );
 
                 if (!success) {
                     // backoffDownload already shows an error toast; show zip-specific guidance on top
-                    TriggerError(get(_)('assets.error.zip_not_found'));
-                    return;
+                    if (!quiet) TriggerError(get(_)('assets.error.zip_not_found'));
+                    return 'failed';
                 }
 
                 assetDLProgress[assetType][assetRelpath] = 0;
 
                 const extractProgress = new Channel<number>();
                 extractProgress.onmessage = (percent) => assetDLProgress[assetType][assetRelpath] = percent;
-                await invoke('unzip_and_get_first_folder', { zipPath, onProgress: extractProgress });
+                await invoke('unzip_and_get_first_folder', { zipPath, job: job.id, onProgress: extractProgress });
 
                 // All skin zips are flat (files/folders at zip root), so the extraction folder's
                 // content is moved straight into the skin folder. The move is done natively:
@@ -255,12 +301,13 @@
                 await installFiles(baseDirPath, entries, (pr) => {
                     totbyts += pr.progress;
                     assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
-                });
+                }, job.id);
             }
         } catch (error) {
+            if (isCancelled(error)) return 'cancelled';
             console.error(`Installing ${assetRelpath} failed:`, error);
-            TriggerError(get(_)('dl.error.failed_abort'));
-            return;
+            if (!quiet) TriggerError(`${get(_)('dl.error.failed_abort')}<br>${DescribeError(error)}`, { details: ErrorText(error) });
+            return 'failed';
         } finally {
             delete assetDLProgress[assetType][assetRelpath];
             // Already gone after a successful move
@@ -269,17 +316,13 @@
             }
         }
 
-        if (assetNb === undefined)
-            TriggerSuccess(get(_)('assets.success.download_complete'));
-        else {
-            const translatedType = get(_)(`assets.type.${assetType.toLowerCase()}`);
-            TriggerSuccess(get(_)('assets.success.download_nb', { values: { type: translatedType, nb: assetNb, total: assetTotal } }));
-        }
+        if (!quiet) TriggerSuccess(get(_)('assets.success.download_complete'));
 
         currentAssets[assetType][assetRelpath] = {
             assetFolderName: assetRelpath,
             assetVersion: assetVersion
         };
+        return 'done';
     }
 
     onMount(async () => {
@@ -325,6 +368,15 @@
 	</Tabs.List>
 </Tabs>
 {/if}
+{#if catalogFetchFailed}
+<aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
+	<i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+	<span class="flex-1"><b>{$_('common.fetch_error')}</b></span>
+	<button type="button" class="button-red button-main" onclick={updateAssetsInfo}>
+		<i class="fa-solid fa-rotate"></i> {$_('common.retry')}
+	</button>
+</aside>
+{/if}
 <div class="table-wrap">
 	<table class="table table-hover">
 		<thead>
@@ -344,7 +396,10 @@
 				<th></th>
 				<th>
 					{#if assetCountProgressBar[AssetTabType(currentAsset)] !== null}
-					<ProgressBar value={assetCountProgressBar[AssetTabType(currentAsset)]} max={100} />
+					<div class="flex items-center gap-2">
+						<ProgressBar value={assetCountProgressBar[AssetTabType(currentAsset)]} max={100} />
+						<button type="button" onclick={() => CancelBulk(AssetTabType(currentAsset))} class="button-gray button-main" title={$_('common.cancel')} aria-label={$_('common.cancel')}><i class="fa-solid fa-xmark"></i></button>
+					</div>
 					{:else}
 					<button type="button" onclick={() => DownloadDisplayedAssets(AssetTabType(currentAsset))} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('assets.button.bulk_download')}</button>
 					{/if}

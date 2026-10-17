@@ -4,6 +4,7 @@
     import { get } from 'svelte/store';
     import { open } from '@tauri-apps/plugin-dialog';
     import { OpenFolder as OpenFolderPath } from '$lib/utils/path';
+    import { busyInstanceIds } from '$lib/stores/activity';
 
     import {
         instances,
@@ -72,6 +73,8 @@
     };
 
     const DoDetach = async (inst: Instance) => {
+        // An install still writing into the folder would lose track of its instance
+        if (get(busyInstanceIds).has(inst.id)) return;
         await detachInstance(inst.id);
         TriggerSuccess(get(_)('instances.success.detached', { values: { name: inst.name } }));
     };
@@ -128,7 +131,7 @@
                             <button class="button-blue button-main" title={$_('instances.open_folder')} onclick={() => OpenFolder(inst)}>
                                 <i class="fa-solid fa-folder-open"></i>
                             </button>
-                            <button class="button-red button-main" title={$_('instances.detach')} onclick={() => DoDetach(inst)}>
+                            <button class="button-red button-main disabled:opacity-50" title={$busyInstanceIds.has(inst.id) ? $_('jobs.instance_busy') : $_('instances.detach')} disabled={$busyInstanceIds.has(inst.id)} onclick={() => DoDetach(inst)}>
                                 <i class="fa-solid fa-link-slash"></i>
                             </button>
                         </td>

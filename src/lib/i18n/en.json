@@ -655,5 +655,33 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "Working",
+    "close_title": "Still working",
+    "close_message": "A download or build is still running. Closing the Hub stops it.",
+    "close": "Close",
+    "keep": "Keep open",
+    "installing_into": "Installing into {name}",
+    "install_cancelled": "Install cancelled",
+    "dotnet_page": "Get .NET 8",
+    "instance_busy": "An install is running in this instance"
+  },
+  "toast": {
+    "copy": "Copy details",
+    "copied": "Copied"
+  },
+  "errors": {
+    "rate_limited": "GitHub is limiting requests from your connection. Try again later.",
+    "not_found": "The file is missing on the server.",
+    "offline": "Could not reach the server. Check your internet connection.",
+    "disk_full": "The disk is full.",
+    "access_denied": "Access to a file was refused. If the game is running, close it and try again."
+  },
+  "bulk": {
+    "status": "Downloading {done} / {total} · {size} left",
+    "done": "Downloaded {count} of {total}",
+    "failed": "Downloaded {count} of {total}. Failed: {failed}",
+    "cancelled": "Cancelled. Downloaded {count} of {total}"
   }
 }

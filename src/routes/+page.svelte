@@ -25,6 +25,7 @@
         refreshInstanceVersion,
         linkGlobalSongs
     } from '$lib/stores/instances';
+    import { busyAreas, type ActivityArea } from '$lib/stores/activity';
 
     // Themes
     const themetarget = document.getElementById('themetarget');
@@ -35,6 +36,10 @@
         label: string;
         tooltip: string;
     }
+
+    // Tiles whose page runs work in the background (installs, bulk downloads) show a
+    // spinner, so leaving the page does not make that work look finished
+    const tileArea: Partial<Record<number, ActivityArea>> = { 0: 'home', 1: 'songs' };
 
     // Navigation (tile ids are stable: ThemesTab compares against 7)
     let currentTile = $state(0);
@@ -85,7 +90,12 @@
                             data-active={currentTile === tile.value ? '' : undefined}
                             onclick={() => currentTile = tile.value}
                         >
-                            <i class={tile.icon}></i>
+                            <span class="tile-icon">
+                                <i class={tile.icon}></i>
+                                {#if tileArea[tile.value] && $busyAreas.has(tileArea[tile.value]!)}
+                                    <i class="fa-solid fa-spinner fa-spin tile-busy" aria-label={$_('jobs.busy')}></i>
+                                {/if}
+                            </span>
                             <Navigation.TriggerText>{$_(tile.label)}</Navigation.TriggerText>
                         </Navigation.Trigger>
                     {/each}
@@ -157,4 +167,6 @@
 <style>
     /* Main CSS */
     main {overflow-y: auto;}
+    .tile-icon {position: relative; display: inline-block;}
+    .tile-busy {position: absolute; top: -0.4rem; right: -0.9rem; font-size: 0.7rem;}
 </style>
