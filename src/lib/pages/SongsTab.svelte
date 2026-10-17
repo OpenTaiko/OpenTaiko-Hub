@@ -534,12 +534,8 @@
                 }
                 hofMap = ranks;
             }
-
-            // Patch soundtrackInfo with chartHoFRanks derived from the DB
-            soundtrackInfo = soundtrackInfo.map(s => ({
-                ...s,
-                chartHoFRanks: hofMap[s.uniqueId] ?? {}
-            }));
+            // Ranks are read from hofMap directly. Copying them into every catalog entry
+            // made the whole library tree rebuild once more for nothing.
         } catch (e) {
             console.error('Failed to load HoF data:', e);
         }

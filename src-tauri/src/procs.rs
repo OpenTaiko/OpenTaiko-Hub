@@ -3,6 +3,8 @@
 // frontend so build progress can be displayed live.
 use std::io::{BufRead, BufReader};
 use std::process::{Command, Stdio};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
+use std::time::{Duration, Instant};
 use tauri::ipc::Channel;
 
 // Desktop-launched Linux apps inherit a minimal PATH that usually omits the common
@@ -35,6 +37,39 @@ fn augmented_tool_path(base_path: &str, home: Option<&str>) -> String {
     dirs.join(":")
 }
 
+/// How often collected output lines are sent to the page.
+const OUTPUT_INTERVAL: Duration = Duration::from_millis(100);
+/// A batch is sent early once it holds this many lines.
+const OUTPUT_BATCH_MAX: usize = 500;
+
+/// Collects lines from `rx` and hands them to `send` in batches: every `interval`, or as
+/// soon as `max` lines are waiting. Returns once every sender is gone and the last lines
+/// were sent, so a quiet stretch still delivers what arrived before it.
+fn batch_lines(rx: Receiver<String>, interval: Duration, max: usize, mut send: impl FnMut(Vec<String>)) {
+    let mut batch: Vec<String> = Vec::new();
+    let mut last_sent = Instant::now();
+    loop {
+        let wait = interval.saturating_sub(last_sent.elapsed());
+        let closed = match rx.recv_timeout(wait) {
+            Ok(line) => {
+                batch.push(line);
+                false
+            }
+            Err(RecvTimeoutError::Timeout) => false,
+            Err(RecvTimeoutError::Disconnected) => true,
+        };
+        if !batch.is_empty() && (closed || batch.len() >= max || last_sent.elapsed() >= interval) {
+            send(std::mem::take(&mut batch));
+            last_sent = Instant::now();
+        } else if last_sent.elapsed() >= interval {
+            last_sent = Instant::now();
+        }
+        if closed {
+            return;
+        }
+    }
+}
+
 /// The only commands the page may run: listing the installed SDKs, and publishing the
 /// game from source.
 fn allowed_dotnet_args(args: &[String]) -> bool {
@@ -49,7 +84,7 @@ pub async fn run_dotnet(
     app: tauri::AppHandle,
     args: Vec<String>,
     cwd: Option<String>,
-    on_output: Channel<String>,
+    on_output: Channel<Vec<String>>,
 ) -> Result<i32, String> {
     if !allowed_dotnet_args(&args) {
         return Err(format!("Refusing to run dotnet {}", args.join(" ")));
@@ -90,36 +125,84 @@ pub async fn run_dotnet(
             .spawn()
             .map_err(|e| format!("Failed to start {}: {}", program, e))?;
 
-        let stdout_thread = child.stdout.take().map(|stream| {
-            let channel = on_output.clone();
+        // Both streams feed one batcher, which sends what arrived every
+        // OUTPUT_INTERVAL. Each channel message is a script evaluation in the page, and
+        // MSBuild prints thousands of lines, so one message per line kept the window busy
+        // for the whole build. The batcher ends once both streams have closed.
+        let (tx, rx) = mpsc::channel::<String>();
+        let readers: Vec<_> = [
+            child.stdout.take().map(|s| Box::new(s) as Box<dyn std::io::Read + Send>),
+            child.stderr.take().map(|s| Box::new(s) as Box<dyn std::io::Read + Send>),
+        ]
+        .into_iter()
+        .flatten()
+        .map(|stream| {
+            let tx = tx.clone();
             std::thread::spawn(move || {
                 for line in BufReader::new(stream).lines().map_while(Result::ok) {
-                    let _ = channel.send(line);
+                    if tx.send(line).is_err() {
+                        break;
+                    }
                 }
             })
-        });
-        let stderr_thread = child.stderr.take().map(|stream| {
-            let channel = on_output.clone();
-            std::thread::spawn(move || {
-                for line in BufReader::new(stream).lines().map_while(Result::ok) {
-                    let _ = channel.send(line);
-                }
+        })
+        .collect();
+        drop(tx);
+        let batcher = std::thread::spawn(move || {
+            batch_lines(rx, OUTPUT_INTERVAL, OUTPUT_BATCH_MAX, |lines| {
+                let _ = on_output.send(lines);
             })
         });
 
         let status = child
             .wait()
             .map_err(|e| format!("Failed to wait for {}: {}", program, e))?;
-        if let Some(t) = stdout_thread {
-            let _ = t.join();
+        for reader in readers {
+            let _ = reader.join();
         }
-        if let Some(t) = stderr_thread {
-            let _ = t.join();
-        }
+        let _ = batcher.join();
         Ok(status.code().unwrap_or(-1))
     })
     .await
     .map_err(|e| format!("Task failed: {e}"))?
+}
+
+#[cfg(test)]
+mod batch_tests {
+    use super::batch_lines;
+    use std::sync::mpsc;
+    use std::time::Duration;
+
+    #[test]
+    fn lines_arrive_in_order_in_few_batches() {
+        let (tx, rx) = mpsc::channel();
+        for i in 0..1000 {
+            tx.send(i.to_string()).unwrap();
+        }
+        drop(tx);
+        let mut batches: Vec<Vec<String>> = Vec::new();
+        batch_lines(rx, Duration::from_secs(60), 300, |b| batches.push(b));
+        // Capped at 300 per batch, and the remainder is sent when the senders close
+        assert_eq!(batches.iter().map(Vec::len).collect::<Vec<_>>(), vec![300, 300, 300, 100]);
+        let all: Vec<String> = batches.concat();
+        assert_eq!(all, (0..1000).map(|i| i.to_string()).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn a_line_before_a_quiet_stretch_is_sent_without_waiting_for_more() {
+        let (tx, rx) = mpsc::channel();
+        let handle = std::thread::spawn(move || {
+            let mut batches = Vec::new();
+            batch_lines(rx, Duration::from_millis(20), 500, |b| batches.push(b));
+            batches
+        });
+        tx.send("first".to_string()).unwrap();
+        std::thread::sleep(Duration::from_millis(200));
+        tx.send("second".to_string()).unwrap();
+        drop(tx);
+        let batches = handle.join().unwrap();
+        assert_eq!(batches, vec![vec!["first".to_string()], vec!["second".to_string()]]);
+    }
 }
 
 #[cfg(test)]

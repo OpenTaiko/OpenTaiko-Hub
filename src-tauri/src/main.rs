@@ -154,6 +154,7 @@ fn execute_external_app(path: String, app_handle: AppHandle) -> Result<(), Strin
 #[tauri::command]
 async fn unzip_and_get_first_folder(
     zip_path: String,
+    on_progress: tauri::ipc::Channel<f64>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
     // The archive is extracted next to itself
@@ -166,8 +167,9 @@ async fn unzip_and_get_first_folder(
         let mut archive = ZipArchive::new(BufReader::new(file))
             .map_err(|err| format!("ERR: Failed to read zip archive: {}", err))?;
 
-        let total_files = archive.len();
+        let total_files = archive.len().max(1);
         let mut extracted_files = 0;
+        let mut last_percent = usize::MAX;
 
         let zip_parent_dir = Path::new(&zip_path_clone)
             .parent()
@@ -221,12 +223,15 @@ async fn unzip_and_get_first_folder(
                 }
             }
 
-            // Update progress after each file is extracted
+            // Progress goes to this call's own channel, and only when the whole percentage
+            // changes: an archive holds thousands of files, and a message per file was a
+            // script evaluation per file in the page.
             extracted_files += 1;
-            let progress = (extracted_files as f64 / total_files as f64) * 100.0;
-            app_handle
-                .emit("extract-progress", progress)
-                .map_err(|err| format!("ERR: Failed to emit progress: {}", err))?;
+            let percent = extracted_files * 100 / total_files;
+            if percent != last_percent {
+                last_percent = percent;
+                let _ = on_progress.send(percent as f64);
+            }
         }
 
         first_folder.ok_or_else(|| "ERR: No folder found in the ZIP archive".to_string())

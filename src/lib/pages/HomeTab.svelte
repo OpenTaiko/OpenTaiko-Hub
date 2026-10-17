@@ -256,15 +256,9 @@
             TriggerSuccess(get(_)('home.success.unzipping'));
             progress = undefined;
 
-            const unlisten = await listen<number>('extract-progress', (event) => {
-                progress = event.payload;
-            });
-            let sourceFolder: string;
-            try {
-                sourceFolder = await invoke<string>('unzip_and_get_first_folder', { zipPath });
-            } finally {
-                unlisten();
-            }
+            const extractProgress = new Channel<number>();
+            extractProgress.onmessage = (percent) => progress = percent;
+            const sourceFolder = await invoke<string>('unzip_and_get_first_folder', { zipPath, onProgress: extractProgress });
 
             TriggerSuccess(get(_)('home.success.installing'));
             progress = undefined;
@@ -288,6 +282,11 @@
         if (!current) return;
         // Capture the target so switching instances mid-download cannot retarget it
         const instance = current;
+        // Claimed before the first await, so a second click cannot start a second install
+        downloadBusy = true;
+        progress = undefined;
+        // A previous experimental build's output must not sit under this download.
+        resetBuildOutput();
 
         try {
             if (!latestRelease) await TryFetchingLatestVersion();
@@ -297,9 +296,6 @@
             }
 
             progress = 0;
-            downloadBusy = true;
-            // A previous experimental build's output must not sit under this download.
-            resetBuildOutput();
 
             const installed = await DownloadAndInstallZip(asset.browser_download_url, instance.path);
             if (installed) {
@@ -323,6 +319,11 @@
         if (!current) return;
         // Capture the target so switching instances mid-download cannot retarget it
         const instance = current;
+        // Claimed before the first await, so a second click cannot start a second install
+        downloadBusy = true;
+        progress = undefined;
+        // A previous experimental build's output must not sit under this download.
+        resetBuildOutput();
 
         try {
             const release = await fetchReleaseByTag(option.tag);
@@ -332,9 +333,6 @@
             }
 
             progress = 0;
-            downloadBusy = true;
-            // A previous experimental build's output must not sit under this download.
-            resetBuildOutput();
 
             const installed = await DownloadAndInstallZip(asset.browser_download_url, instance.path);
             if (installed) {
@@ -394,8 +392,9 @@
             buildStage = 'check_sdk';
             progress = undefined;
             const sdkLines: string[] = [];
-            const sdkChannel = new Channel<string>();
-            sdkChannel.onmessage = (line) => sdkLines.push(line);
+            // Output arrives in batches of lines
+            const sdkChannel = new Channel<string[]>();
+            sdkChannel.onmessage = (lines) => sdkLines.push(...lines);
             let sdkExitCode = -1;
             try {
                 sdkExitCode = await invoke<number>('run_dotnet', {
@@ -449,15 +448,9 @@
             // 4. Extract
             buildStage = 'extract';
             progress = 0;
-            const unlisten = await listen<number>('extract-progress', (event) => {
-                progress = event.payload;
-            });
-            let extracted: string;
-            try {
-                extracted = await invoke<string>('unzip_and_get_first_folder', { zipPath: srcZip });
-            } finally {
-                unlisten();
-            }
+            const extractProgress = new Channel<number>();
+            extractProgress.onmessage = (percent) => progress = percent;
+            const extracted = await invoke<string>('unzip_and_get_first_folder', { zipPath: srcZip, onProgress: extractProgress });
             await remove(srcZip);
             // The archive unpacks into `OpenTaiko-<40 character commit>`. Every character
             // of that name counts against the Windows path limit for the whole build, so
@@ -469,9 +462,9 @@
             buildStage = 'build';
             progress = undefined;
             const rid = optk_OS === 'Win' ? 'win-x64' : 'linux-x64';
-            const logChannel = new Channel<string>();
-            logChannel.onmessage = (line) => {
-                pending.push(line);
+            const logChannel = new Channel<string[]>();
+            logChannel.onmessage = (lines) => {
+                pending.push(...lines);
                 // Bounded in case the flush is throttled while the window is hidden.
                 if (pending.length > BUILD_LOG_LINES * 2) {
                     pending = pending.slice(-BUILD_LOG_LINES);

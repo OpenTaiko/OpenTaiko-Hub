@@ -3,36 +3,12 @@
     import { onMount } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
+    import { mkdir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
     import { fetch } from "@tauri-apps/plugin-http";
     import { path } from '@tauri-apps/api';
-    import { invoke } from '@tauri-apps/api/core';
-    import { listen } from '@tauri-apps/api/event';
+    import { invoke, Channel } from '@tauri-apps/api/core';
     import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, LocalAsset, ToastContext } from '$lib/types';
 
-    const copyAllFilesRecursive = async (src: string, dst: string): Promise<void> => {
-        let files;
-        try {
-            files = await readDir(src);
-        } catch (error) {
-            console.error(`Error reading directory ${src}:`, error);
-            return;
-        }
-        for (const file of files) {
-            const srcPath = `${src}/${file.name}`;
-            const dstPath = `${dst}/${file.name}`;
-            try {
-                if (file.isDirectory) {
-                    await mkdir(dstPath, { recursive: true });
-                    await copyAllFilesRecursive(srcPath, dstPath);
-                } else {
-                    await copyFile(srcPath, dstPath);
-                }
-            } catch (error) {
-                console.error(`Error copying ${srcPath} → ${dstPath}:`, error);
-            }
-        }
-    }
     import { getContext } from 'svelte';
     const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
 
@@ -259,24 +235,17 @@
 
             assetDLProgress[assetType][assetRelpath] = 0;
 
-            let extracting = true;
-            const capturedRelpath = assetRelpath;
-            const capturedType = assetType;
-            const unlisten = await listen<number>('extract-progress', (event) => {
-                if (!extracting) return;
-                assetDLProgress[capturedType][capturedRelpath] = event.payload;
-            });
+            const extractProgress = new Channel<number>();
+            extractProgress.onmessage = (percent) => assetDLProgress[assetType][assetRelpath] = percent;
+            await invoke('unzip_and_get_first_folder', { zipPath, onProgress: extractProgress });
 
-            await invoke('unzip_and_get_first_folder', { zipPath });
-            extracting = false;
-            unlisten();
-
-            // All skin zips are flat (files/folders at zip root), so copy directly
-            // from the extraction folder into the skin destination.
+            // All skin zips are flat (files/folders at zip root), so the extraction folder's
+            // content is moved straight into the skin folder. The move is done natively:
+            // copying a skin's thousands of files one call at a time from here was slow,
+            // and it skipped any file it failed to copy without saying so. The move also
+            // removes the extraction folder.
             await remove(zipPath);
-            await copyAllFilesRecursive(assetDownloadFolder.replace(/\\/g, '/'), assetFullPath);
-
-            await remove(assetDownloadFolder, { recursive: true });
+            await invoke('merge_move_dir', { src: assetDownloadFolder, dest: assetFullPath });
 
         } else {
             // Per-file download for Characters and Puchicharas
