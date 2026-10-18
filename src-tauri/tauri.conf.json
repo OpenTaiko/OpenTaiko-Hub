@@ -57,9 +57,14 @@
     },
   "app": {
     "security": {
-      "csp": null
+      "csp": {
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      },
+      "dangerousDisableAssetCspModification": ["script-src", "style-src"]
     },
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "windows": [
       {
         "title": "OpenTaiko Hub",

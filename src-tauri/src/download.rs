@@ -225,6 +225,7 @@ async fn fetch_once(
 async fn fetch_to_part(
     url: &reqwest::Url,
     dest: &Path,
+    git_sha: Option<&str>,
     attempts: u32,
     cancel: &CancelToken,
     on_total: &mut (dyn FnMut(u64) + Send),
@@ -242,8 +243,12 @@ async fn fetch_to_part(
             counted += n;
             on_bytes(n);
         };
-        match fetch_once(url, &part, cancel, on_total, &mut count).await {
-            Ok(_) => return Ok(part),
+        let fetched = match fetch_once(url, &part, cancel, on_total, &mut count).await {
+            Ok(_) => verify(&part, git_sha, url).await,
+            Err(failure) => Err(failure),
+        };
+        match fetched {
+            Ok(()) => return Ok(part),
             Err(failure) => {
                 // Bytes of a discarded attempt no longer count
                 if counted != 0 {
@@ -263,6 +268,20 @@ async fn fetch_to_part(
                 }
             }
         }
+    }
+}
+
+/// A file whose git blob hash is known is checked before it replaces anything: one cut
+/// short or altered on the way is downloaded again rather than installed.
+async fn verify(part: &Path, git_sha: Option<&str>, url: &reqwest::Url) -> Result<(), Failure> {
+    let Some(sha) = git_sha else { return Ok(()) };
+    let bytes = tokio::fs::read(part)
+        .await
+        .map_err(|e| Failure::Fatal { status: None, message: format!("Could not read {}: {e}", part.display()) })?;
+    if crate::scan::git_blob_sha1(&bytes).eq_ignore_ascii_case(sha) {
+        Ok(())
+    } else {
+        Err(Failure::Retry { after: None, message: format!("Download of {url} does not match the expected file") })
     }
 }
 
@@ -347,7 +366,7 @@ pub async fn download_file<R: Runtime>(
     let progress = Mutex::new(Progress::new(on_progress));
     let mut set_total = |total: u64| progress.lock().unwrap().total = total;
     let mut add = |n: i64| progress.lock().unwrap().add(n);
-    let part = fetch_to_part(&parsed, &dest, attempts.unwrap_or(DEFAULT_ATTEMPTS), &cancel, &mut set_total, &mut add)
+    let part = fetch_to_part(&parsed, &dest, None, attempts.unwrap_or(DEFAULT_ATTEMPTS), &cancel, &mut set_total, &mut add)
         .await
         .map_err(failure_message)?;
     tokio::fs::rename(&part, &dest)
@@ -447,7 +466,7 @@ pub async fn install_files<R: Runtime>(
             // Sizes are not added up: callers measure against the size the catalog gives
             let mut ignore_total = |_: u64| {};
             let mut add = |n: i64| progress.lock().unwrap().add(n);
-            match fetch_to_part(&url, &dest, attempts, &cancel, &mut ignore_total, &mut add).await {
+            match fetch_to_part(&url, &dest, git_sha.as_deref(), attempts, &cancel, &mut ignore_total, &mut add).await {
                 Ok(part) => Ok((index, Outcome::Downloaded(part))),
                 Err(Failure::Fatal { status: Some(404), .. }) if optional => Ok((index, Outcome::Absent)),
                 Err(failure) => Err(failure_message(failure)),

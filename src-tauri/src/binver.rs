@@ -74,7 +74,8 @@ fn version_from_file(path: &std::path::Path) -> Option<String> {
 }
 
 #[tauri::command]
-pub async fn get_game_version(instance_dir: String) -> Result<Option<String>, String> {
+pub async fn get_game_version(app: tauri::AppHandle, instance_dir: String) -> Result<Option<String>, String> {
+    crate::guard::checked(&app, &instance_dir)?;
     tokio::task::spawn_blocking(move || {
         let dir = std::path::PathBuf::from(&instance_dir);
         for candidate in ["OpenTaiko.exe", "OpenTaiko.dll", "OpenTaiko"] {

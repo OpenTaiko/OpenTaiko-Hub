@@ -198,14 +198,20 @@ fn build_plan(src: &Path, dest: &Path) -> MigrationPlan {
 /// Lets the frontend ask the same question the guards ask, instead of comparing
 /// lowercased strings, which cannot see through a symlink.
 #[tauri::command]
-pub async fn paths_are_same_dir(a: String, b: String) -> bool {
+pub async fn paths_are_same_dir(app: tauri::AppHandle, a: String, b: String) -> bool {
+    // Answering for folders outside the scope would tell the page which exist
+    if crate::guard::checked(&app, &a).is_err() || crate::guard::checked(&app, &b).is_err() {
+        return false;
+    }
     tokio::task::spawn_blocking(move || is_same_dir(&PathBuf::from(&a), &PathBuf::from(&b)))
         .await
         .unwrap_or(false)
 }
 
 #[tauri::command]
-pub async fn plan_migration(src_songs: String, dest_songs: String) -> Result<MigrationPlan, String> {
+pub async fn plan_migration(app: tauri::AppHandle, src_songs: String, dest_songs: String) -> Result<MigrationPlan, String> {
+    crate::guard::checked(&app, &src_songs)?;
+    crate::guard::checked(&app, &dest_songs)?;
     tokio::task::spawn_blocking(move || build_plan(&PathBuf::from(&src_songs), &PathBuf::from(&dest_songs)))
         .await
         .map_err(|e| format!("Task failed: {e}"))
@@ -490,9 +496,16 @@ fn count_files(dir: &Path) -> usize {
 /// folders) untouched.
 #[tauri::command]
 pub async fn find_duplicate_song_folders(
+    app: tauri::AppHandle,
     instance_songs: String,
     global_songs: String,
 ) -> Result<Vec<DuplicateFolder>, String> {
+    crate::guard::checked(&app, &instance_songs)?;
+    crate::guard::checked(&app, &global_songs)?;
+    find_duplicates_in(instance_songs, global_songs).await
+}
+
+async fn find_duplicates_in(instance_songs: String, global_songs: String) -> Result<Vec<DuplicateFolder>, String> {
     tokio::task::spawn_blocking(move || {
         let src = PathBuf::from(&instance_songs);
         let dest = PathBuf::from(&global_songs);
@@ -946,7 +959,7 @@ mod tests {
         let dest_s = dest.to_str().unwrap();
         let found = tokio::runtime::Runtime::new()
             .unwrap()
-            .block_on(find_duplicate_song_folders(src_s.into(), dest_s.into()))
+            .block_on(find_duplicates_in(src_s.into(), dest_s.into()))
             .unwrap();
         let names: Vec<&str> = found.iter().map(|f| f.rel_path.as_str()).collect();
         assert_eq!(names, vec!["01 Chapter I", "S1 Dan-i Dojo"]);

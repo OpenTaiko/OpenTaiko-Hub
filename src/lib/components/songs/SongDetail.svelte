@@ -8,6 +8,7 @@
     import { _ } from 'svelte-i18n';
     import AudioPlayer from '$lib/components/AudioPlayer.svelte';
     import { FormatLevel } from '$lib/utils/levels';
+    import { SafeUrl } from '$lib/utils/sanitize';
     import { ALL_COURSES, formatSize } from '$lib/utils/library';
     import type { LibraryEntry } from '$lib/utils/library';
     import type { ArtistLinks, CourseName, SongArtists, SoundtrackEntry } from '$lib/types';
@@ -188,8 +189,9 @@
                         <span class="who">{artist.artist}</span>
                         <span class="links">
                             {#each LINKS as link (link.key)}
-                                {#if artist[link.key]}
-                                    <a href={artist[link.key]} target="_blank" rel="noreferrer" title={link.label || $_('songs.detail.website')}>
+                                {@const url = SafeUrl(artist[link.key])}
+                                {#if url}
+                                    <a href={url} target="_blank" rel="noreferrer" title={link.label || $_('songs.detail.website')}>
                                         <i class={link.icon}></i>
                                     </a>
                                 {/if}

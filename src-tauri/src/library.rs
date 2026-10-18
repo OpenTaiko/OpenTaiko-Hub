@@ -43,7 +43,13 @@ pub(crate) fn resolve_inside(base: &Path, rel: &str) -> Result<PathBuf, String> 
         }
     }
     let base = base.canonicalize().map_err(|e| format!("The songs folder is unreachable: {}", e))?;
-    Ok(base.join(rel_path))
+    let joined = base.join(rel_path);
+    // The components only show that the path stays inside on paper: a symbolic link or a
+    // junction inside the library leads wherever it points
+    if !crate::guard::resolve_existing(&joined).starts_with(&base) {
+        return Err(format!("Refusing a path that leads out of the library: {}", rel));
+    }
+    Ok(joined)
 }
 
 /// `resolve_inside` for a path that names something in `base`, for every command that
@@ -135,8 +141,9 @@ fn directive(text: &str, key: &str) -> Option<String> {
 }
 
 #[tauri::command]
-pub async fn read_box_def(base: String, rel_path: String) -> Result<BoxDef, String> {
+pub async fn read_box_def(app: tauri::AppHandle, base: String, rel_path: String) -> Result<BoxDef, String> {
     blocking(move || {
+        crate::guard::checked(&app, &base)?;
         let dir = resolve_inside(Path::new(&base), &rel_path)?;
         if !dir.is_dir() {
             return Ok(BoxDef { folder_exists: false, file_exists: false, text: String::new(), title: None });
@@ -248,7 +255,8 @@ pub async fn set_folder_jacket(app: tauri::AppHandle, base: String, rel_path: St
             return Err("That folder is not on disk yet".into());
         }
 
-        let src = PathBuf::from(&source);
+        // Picked in a dialog or dropped onto the window, which allows it
+        let src = crate::guard::checked(&app, &source)?;
         let ext = src
             .extension()
             .map(|e| e.to_string_lossy().to_ascii_lowercase())
@@ -344,8 +352,9 @@ fn any_with_ext(dir: &Path, exts: &[&str]) -> Option<String> {
 /// .tja header is consulted first because it is what the game itself reads; a folder
 /// whose header names nothing usable falls back to the one image or audio file present.
 #[tauri::command]
-pub async fn read_song_media(base: String, rel_path: String) -> Result<SongMedia, String> {
+pub async fn read_song_media(app: tauri::AppHandle, base: String, rel_path: String) -> Result<SongMedia, String> {
     blocking(move || {
+        crate::guard::checked(&app, &base)?;
         let dir = resolve_inside(Path::new(&base), &rel_path)?;
         if !dir.is_dir() {
             return Ok(SongMedia { preimage: None, audio: None });
@@ -403,7 +412,7 @@ pub async fn set_song_preimage(app: tauri::AppHandle, base: String, rel_path: St
             return Err("That chart is not on disk".into());
         }
 
-        let src = PathBuf::from(&source);
+        let src = crate::guard::checked(&app, &source)?;
         let ext = src.extension().map(|e| e.to_string_lossy().to_ascii_lowercase()).unwrap_or_default();
         let ext = if ext == "jpeg" { "jpg".to_string() } else { ext };
         if !JACKET_EXTS.contains(&ext.as_str()) {
@@ -637,7 +646,8 @@ pub async fn import_chart_archives(
 
         let mut report = ImportReport { charts: Vec::new(), rejected: Vec::new() };
         for archive in archives {
-            let path = PathBuf::from(&archive);
+            // Picked in a dialog or dropped onto the window, which allows it
+            let path = crate::guard::checked(&app, &archive)?;
             if path.extension().map(|e| !e.eq_ignore_ascii_case("zip")).unwrap_or(true) {
                 report.rejected.push(
                     path.file_name().map(|n| n.to_string_lossy().to_string()).unwrap_or(archive.clone()),
@@ -674,6 +684,41 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         assert!(resolve_inside(tmp.path(), "../escape").is_err());
         assert!(resolve_inside(tmp.path(), "ok/inside").is_ok());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_link_out_of_the_library_is_not_followed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (library, outside) = (tmp.path().join("Songs"), tmp.path().join("outside"));
+        fs::create_dir_all(&library).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        std::os::unix::fs::symlink(&outside, library.join("link")).unwrap();
+        assert!(resolve_inside(&library, "link/box.def").is_err());
+        assert!(resolve_entry_inside(&library, "link").is_err());
+        assert!(resolve_inside(&library, "real/box.def").is_ok());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn a_junction_out_of_the_library_is_not_followed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (library, outside) = (tmp.path().join("Songs"), tmp.path().join("outside"));
+        fs::create_dir_all(&library).unwrap();
+        fs::create_dir_all(&outside).unwrap();
+        // A junction needs no privilege, unlike a directory symlink
+        let made = std::process::Command::new("cmd")
+            .args(["/C", "mklink", "/J"])
+            .arg(library.join("link"))
+            .arg(&outside)
+            .output()
+            .is_ok_and(|o| o.status.success());
+        if !made {
+            return;
+        }
+        assert!(resolve_inside(&library, "link\\box.def").is_err());
+        assert!(resolve_entry_inside(&library, "link").is_err());
+        assert!(resolve_inside(&library, "real\\box.def").is_ok());
     }
 
     #[test]

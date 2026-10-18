@@ -446,7 +446,8 @@ mod tests {
 }
 
 #[tauri::command]
-pub async fn scan_songs(base_dir: String, on_event: Channel<ScanEvent>) -> Result<ScanResult, String> {
+pub async fn scan_songs(app: tauri::AppHandle, base_dir: String, on_event: Channel<ScanEvent>) -> Result<ScanResult, String> {
+    crate::guard::checked(&app, &base_dir)?;
     tokio::task::spawn_blocking(move || {
         let base = PathBuf::from(&base_dir);
         if !base.is_dir() {

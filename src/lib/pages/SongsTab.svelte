@@ -10,6 +10,7 @@
     import ProgressBar from '$lib/components/ProgressBar.svelte';
     import { mkdir, exists, readFile } from '@tauri-apps/plugin-fs';
     import { OpenFolder, IsPlainRelPath } from '$lib/utils/path';
+    import { SafeUrl } from '$lib/utils/sanitize';
     import { open, confirm } from '@tauri-apps/plugin-dialog';
     import { getCurrentWebview } from '@tauri-apps/api/webview';
     import { installFiles } from '$lib/utils/download';
@@ -1210,8 +1211,8 @@
                         <td>{s.badCount}</td>
                         <td>{s.listPoints?.toLocaleString($locale ?? undefined)}</td>
                         <td>
-                            {#if s.videoLink}
-                                <a href={s.videoLink} target="_blank" class="underline">{$_('hof.video_link')} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                            {#if SafeUrl(s.videoLink)}
+                                <a href={SafeUrl(s.videoLink)} target="_blank" rel="noreferrer" class="underline">{$_('hof.video_link')} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                             {:else}—{/if}
                         </td>
                     </tr>
