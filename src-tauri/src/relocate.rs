@@ -39,7 +39,7 @@ pub(crate) fn strip_root<'a>(path: &'a str, root: &str) -> Option<&'a str> {
     (head.eq_ignore_ascii_case(root) && (rest.is_empty() || rest.starts_with(['\\', '/']))).then_some(rest)
 }
 
-#[cfg_attr(target_os = "windows", allow(dead_code))]
+#[cfg_attr(any(debug_assertions, target_os = "windows"), allow(dead_code))]
 fn registered_paths(registry: &Path) -> Vec<PathBuf> {
     let Ok(text) = std::fs::read_to_string(registry) else { return Vec::new() };
     let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else { return Vec::new() };
@@ -51,7 +51,7 @@ fn registered_paths(registry: &Path) -> Vec<PathBuf> {
 
 /// True when a .tja sits within a few levels: an OpenTaiko library, not some other
 /// folder that happens to be called Songs.
-#[cfg_attr(target_os = "windows", allow(dead_code))]
+#[cfg_attr(any(debug_assertions, target_os = "windows"), allow(dead_code))]
 fn holds_charts(dir: &Path, depth: u32) -> bool {
     let Ok(entries) = std::fs::read_dir(dir) else { return false };
     entries.flatten().any(|entry| {
@@ -64,7 +64,7 @@ fn holds_charts(dir: &Path, depth: u32) -> bool {
     })
 }
 
-#[cfg_attr(target_os = "windows", allow(dead_code))]
+#[cfg_attr(any(debug_assertions, target_os = "windows"), allow(dead_code))]
 fn is_instance_name(name: &str) -> bool {
     name == "OpenTaiko" || name.starts_with("OpenTaiko-")
 }
@@ -73,8 +73,9 @@ fn is_instance_name(name: &str) -> bool {
 /// into `new_root`. Only what is certainly the Hub's moves: registered instances it
 /// created there, a Songs folder that holds charts (only where the Hub has run, which
 /// the registry shows), and Hub 0.1's game folder. Nothing is moved twice: a destination
-/// that exists is left alone. Returns what happened, for the log.
-#[cfg_attr(target_os = "windows", allow(dead_code))]
+/// that exists is left alone. Returns what happened, for the log. Only Linux and macOS
+/// release builds call it, hence the dead-code allowances here for every other build.
+#[cfg_attr(any(debug_assertions, target_os = "windows"), allow(dead_code))]
 pub fn migrate_documents_layout(old_root: &Path, new_root: &Path, registry: &Path) -> Vec<String> {
     let mut report = Vec::new();
     if crate::migrate::is_same_dir(old_root, new_root) {

@@ -94,7 +94,7 @@ fn songs_entry(instance_dir: &Path, songs: &str) -> Option<String> {
 /// Replaces the TJAPath entry naming `old` with `new`, however the entry was written.
 /// Used when the library folder moves (relocate.rs). Returns whether anything changed;
 /// an instance without a Config.ini, or one not naming `old`, is left alone.
-#[cfg_attr(target_os = "windows", allow(dead_code))]
+#[cfg_attr(any(debug_assertions, target_os = "windows"), allow(dead_code))]
 pub(crate) fn repoint_songs_entry(instance_dir: &Path, old: &Path, new: &Path) -> Result<bool, String> {
     let ini_path = instance_dir.join("Config.ini");
     if !ini_path.is_file() {
