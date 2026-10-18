@@ -423,7 +423,7 @@
             sdkChannel.onmessage = (lines) => sdkLines.push(...lines);
             let sdkExitCode = -1;
             try {
-                sdkExitCode = await ipc.runDotnet(['--list-sdks'], null, sdkChannel, job.id);
+                sdkExitCode = await ipc.listDotnetSdks(sdkChannel, job.id);
             } catch (error) {
                 if (isCancelled(error)) throw error;
                 sdkExitCode = -1;
@@ -502,19 +502,10 @@
                 }
                 if (flushTimer === null) flushTimer = setTimeout(flushBuildLog, 100);
             };
-            // Same command as the game's build scripts, except for where the output goes.
-            // By default the game's files are copied to
-            // OpenTaiko\bin\Release\net8.0\<rid>\publish, 45 characters deeper than the
-            // source they came from, which alone pushes the skin folders past the Windows
-            // path limit. Both output folders sit directly in the build folder instead.
+            // The backend decides the command (procs.rs), and puts the game in `p` beside
+            // the source folder
             const publishDir = await path.join(tmpDir, 'p');
-            const outDir = await path.join(tmpDir, 'b') + path.sep();
-            const exitCode = await ipc.runDotnet(
-                ['publish', 'OpenTaiko/OpenTaiko.csproj', '--configuration', 'Release', '--self-contained', '-p:PublishSingleFile=true', '--runtime', rid, '--output', publishDir, `-p:OutDir=${outDir}`],
-                srcFolder,
-                logChannel,
-                job.id
-            );
+            const exitCode = await ipc.publishGame(srcFolder, rid, logChannel, job.id);
             flushBuildLog();
             if (exitCode !== 0) {
                 throw new Error(`dotnet publish exited with code ${exitCode}`);
@@ -586,8 +577,7 @@
         if (!current || launching) return;
         launching = true;
         try {
-            const appPath = await path.join(current.path, "OpenTaiko");
-            await ipc.executeExternalApp(appPath);
+            await ipc.launchGame(current.path);
             setTimeout(() => launching = false, LAUNCH_SETTLE_MS);
         } catch (error) {
             launching = false;

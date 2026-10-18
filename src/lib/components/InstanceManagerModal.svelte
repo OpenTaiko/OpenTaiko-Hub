@@ -2,7 +2,7 @@
     import { getContext } from 'svelte';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
-    import { open } from '@tauri-apps/plugin-dialog';
+    import { ipc } from '$lib/ipc';
     import { OpenFolder as OpenFolderPath } from '$lib/utils/path';
     import Modal from '$lib/components/Modal.svelte';
     import { busyInstanceIds } from '$lib/stores/activity';
@@ -43,9 +43,9 @@
 
     const DoAttach = async () => {
         try {
-            // recursive: the dialog grants the Hub access to the picked folder, and an
-            // instance is worked on all the way down
-            const dir = await open({ directory: true, recursive: true, multiple: false, title: get(_)('instances.attach') });
+            // The backend shows the dialog and records the folder as an instance; the page
+            // naming a folder itself would let it open any folder to itself
+            const dir = await ipc.attachInstanceDir(get(_)('instances.attach'));
             if (!dir) return;
             const instance = await attachInstance(dir);
             await refreshInstanceVersion(instance.id);

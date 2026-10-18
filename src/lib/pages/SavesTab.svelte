@@ -8,8 +8,9 @@
     // as a new save. Imports are only accepted when the archive is the same version as,
     // or newer than, the instance's current save database.
     import { getContext } from 'svelte';
-    import { readFile, writeFile, exists, mkdir, copyFile, rename, remove, readDir } from '@tauri-apps/plugin-fs';
-    import { save as saveDialog, open as openDialog, confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
+    import { readFile, exists } from '@tauri-apps/plugin-fs';
+    import { open as openDialog, confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
+    import { ipc } from '$lib/ipc';
     import { path } from '@tauri-apps/api';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -36,11 +37,7 @@
 
     const dbPath = (inst: Instance): Promise<string> => path.join(inst.path, DB_NAME);
 
-    // Copies of Saves.db3 taken before each change, in <instance>/SavesBackup
-    const BACKUP_DIR = 'SavesBackup';
-    const KEEP_BACKUPS = 20;
-    const BACKUP_NAME = /^Saves-\d{8}-\d{6}-\d{3}\.db3$/;
-
+    // Name of the copy of Saves.db3 taken before a change, in <instance>/SavesBackup
     const BackupName = (): string => {
         const d = new Date();
         const p = (n: number, w = 2) => String(n).padStart(w, '0');
@@ -48,33 +45,12 @@
             + `-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}-${p(d.getMilliseconds(), 3)}.db3`;
     };
 
-    // Every change to Saves.db3 goes through here. The current file is copied aside first,
-    // and the new content is written next to it and then renamed over it, so a crash or a
-    // full disk mid-write leaves the previous save intact instead of a truncated file.
-    // If the backup cannot be made, nothing is written.
-    const WriteDb = async (inst: Instance, p: string, bytes: Uint8Array) => {
-        const dir = await path.join(inst.path, BACKUP_DIR);
-        await mkdir(dir, { recursive: true });
-        await copyFile(p, await path.join(dir, BackupName()));
-
-        // Names sort by date, so the oldest are at the start
-        const backups = (await readDir(dir)).map((e) => e.name).filter((n) => BACKUP_NAME.test(n)).sort();
-        for (const name of backups.slice(0, Math.max(0, backups.length - KEEP_BACKUPS))) {
-            try {
-                await remove(await path.join(dir, name));
-            } catch (error) {
-                console.warn(`Could not remove old save backup ${name}:`, error);
-            }
-        }
-
-        const tmp = `${p}.tmp`;
-        try {
-            await writeFile(tmp, bytes);
-            await rename(tmp, p);
-        } catch (error) {
-            await remove(tmp).catch(() => {});
-            throw error;
-        }
+    // Every change to Saves.db3 goes through here. The backend copies the current file
+    // aside first and keeps the newest 20 copies, then writes the new content next to it
+    // and renames it over, so a crash or a full disk mid-write leaves the previous save
+    // intact instead of a truncated file. If the backup cannot be made, nothing is written.
+    const WriteDb = async (inst: Instance, bytes: Uint8Array) => {
+        await ipc.writeSaves(inst.path, BackupName(), bytes);
     };
 
     // No step of a load may hang forever: a stuck await would leave the tab spinning
@@ -136,13 +112,10 @@
             db = new SQL.Database(await readFile(p));
             const portable = exportSave(db, entry.saveId);
             const suggested = `OpenTaiko-${entry.name}.optksave`.replace(/[\\/:*?"<>|]/g, '_');
-            const dest = await saveDialog({
-                defaultPath: suggested,
-                filters: [{ name: get(_)('files.optk_save'), extensions: ['optksave'] }]
-            });
-            if (!dest) return;
             busy = true;
-            await writeFile(dest, new TextEncoder().encode(JSON.stringify(portable)));
+            // The backend asks where to save and writes the file there
+            const dest = await ipc.exportSave(suggested, get(_)('files.optk_save'), JSON.stringify(portable));
+            if (!dest) return;
             TriggerSuccess(get(_)('saves.success.export', { values: { name: entry.name } }));
         } catch (error) {
             TriggerError(get(_)('saves.error.export', { values: { error: String(error) } }));
@@ -173,7 +146,7 @@
             const result = await action(db);
             // An action may return { write: false } to leave the file untouched
             const skipWrite = typeof result === 'object' && result !== null && 'write' in result && result.write === false;
-            if (!skipWrite) await WriteDb(inst, p, db.export());
+            if (!skipWrite) await WriteDb(inst, db.export());
             await Load(inst, true);
             return result;
         } finally {
@@ -268,7 +241,7 @@
             }
 
             const result = importSaveInto(db, portable, entry.saveId, crypto.randomUUID());
-            await WriteDb(inst, p, db.export());
+            await WriteDb(inst, db.export());
             // Silent reload: refreshes the names without the layout shifting
             await Load(inst, true);
             TriggerSuccess(get(_)('saves.success.imported_into', {
@@ -302,7 +275,7 @@
             db = new SQL.Database(await readFile(p));
             const result = rebindSlot(db, entry.saveId, targetSlot);
             if (result.changed) {
-                await WriteDb(inst, p, db.export());
+                await WriteDb(inst, db.export());
                 // Reflect the swap on the rows themselves, keeping their order stable
                 saves = saves.map((s) => {
                     if (s.saveId === entry.saveId) return { ...s, slot: targetSlot };

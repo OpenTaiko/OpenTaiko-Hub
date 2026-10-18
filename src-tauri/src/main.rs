@@ -16,6 +16,7 @@ mod migrate;
 mod procs;
 mod relocate;
 mod scan;
+mod writes;
 
 use std::fs::File;
 use std::io::{BufReader, Read};
@@ -48,14 +49,12 @@ struct GameExit {
 /// the Hub manages, so this command cannot be used to start anything else.
 const GAME_BINARY: &str = "OpenTaiko";
 
-/// Launches the game of an instance. `path` is `<instance>/OpenTaiko`; the extension is
-/// added here on Windows.
+/// Launches the game of an instance. Only the game binary of one of the Hub's instances
+/// starts: a path to launch used to be accepted from anywhere the page could write,
+/// including the Hub's temporary folder.
 #[tauri::command]
-fn execute_external_app(path: String, app_handle: AppHandle) -> Result<(), String> {
-    let path = guard::checked(&app_handle, &path)?;
-    if path.file_name().and_then(|n| n.to_str()) != Some(GAME_BINARY) {
-        return Err(format!("Refusing to launch {}", path.display()));
-    }
+fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String> {
+    let path = guard::instance_dir(&app_handle, &instance_dir)?.join(GAME_BINARY);
     let full_path = if cfg!(windows) {
         path.with_extension("exe").to_string_lossy().into_owned()
     } else {
@@ -455,19 +454,21 @@ fn main() {
     // folder, below) so the old ones can still move: a dev build's data out of
     // target/debug, and on Linux and macOS the Hub's folders out of Documents itself.
     let registry = dirs::config_dir().unwrap_or_default().join(APP_IDENTIFIER).join("instances.json");
+    // Where Tauri's app_local_data_dir puts it (guard.rs)
+    let roots = dirs::data_local_dir().unwrap_or_default().join(APP_IDENTIFIER).join(guard::INSTANCE_ROOTS);
     #[cfg(debug_assertions)]
     let relocation_report = std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
-        .map(|old_root| devdata::migrate_from(&old_root, &devdata::dev_root(), &registry))
+        .map(|old_root| devdata::migrate_from(&old_root, &devdata::dev_root(), &registry, &roots))
         .unwrap_or_default();
     #[cfg(all(not(debug_assertions), not(target_os = "windows")))]
     let relocation_report = match (old_shared_root(), hub_root_dir()) {
-        (Some(old_root), Some(new_root)) => relocate::migrate_documents_layout(&old_root, &new_root, &registry),
+        (Some(old_root), Some(new_root)) => relocate::migrate_documents_layout(&old_root, &new_root, &registry, &roots),
         _ => Vec::new(),
     };
     #[cfg(all(not(debug_assertions), target_os = "windows"))]
-    let relocation_report: Vec<String> = { let _ = &registry; Vec::new() };
+    let relocation_report: Vec<String> = { let _ = (&registry, &roots); Vec::new() };
     for line in &relocation_report {
         eprintln!("{}", line);
     }
@@ -522,18 +523,24 @@ fn main() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             unzip_and_get_first_folder,
-            execute_external_app,
+            launch_game,
             open_folder,
             hub_root,
             binver::get_game_version,
             scan::scan_songs,
             assetscan::scan_asset_versions,
-            procs::run_dotnet,
+            procs::list_dotnet_sdks,
+            procs::publish_game,
             download::download_file,
             download::install_files,
             download::fetch_cached,
             guard::allow_build_dir,
             guard::create_instance_dir,
+            guard::attach_instance_dir,
+            writes::write_settings_file,
+            writes::write_version_json,
+            writes::write_saves,
+            writes::export_save,
             jobs::begin_job,
             jobs::cancel_job,
             jobs::end_job,

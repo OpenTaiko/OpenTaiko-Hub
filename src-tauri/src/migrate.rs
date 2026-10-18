@@ -17,7 +17,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use crate::fsops::{collect_song_dirs, copy_dir_recursive};
-use crate::library::resolve_inside;
+use crate::library::resolve_entry_inside;
 use crate::scan::{decode_text, extract_title, parse_unique_id};
 use md5::{Digest, Md5};
 
@@ -256,8 +256,8 @@ fn apply_plan(src: &Path, dest: &Path, decisions: &[MigrationDecision]) -> Resul
     for decision in decisions {
         // Relative paths come from the page: each must stay inside its Songs folder, since
         // the folders they name get deleted or replaced
-        let src_dir = resolve_inside(src, &decision.src_rel_path)?;
-        let dest_dir = resolve_inside(dest, &decision.src_rel_path)?;
+        let src_dir = resolve_entry_inside(src, &decision.src_rel_path)?;
+        let dest_dir = resolve_entry_inside(dest, &decision.src_rel_path)?;
         if !src_dir.is_dir() {
             continue;
         }
@@ -269,7 +269,7 @@ fn apply_plan(src: &Path, dest: &Path, decisions: &[MigrationDecision]) -> Resul
             MigrationAction::UseInstance => {
                 // Drop the conflicting global song, which may sit at a different rel path
                 if let Some(dest_rel) = &decision.dest_rel_path {
-                    let global = resolve_inside(dest, dest_rel)?;
+                    let global = resolve_entry_inside(dest, dest_rel)?;
                     if global != dest_dir {
                         remove_path(&global)?;
                     }
@@ -555,8 +555,13 @@ async fn remove_duplicates_in(
         }
         let mut removed = 0;
         for rel in rel_paths {
-            // Plain child names only: never traverse out of the Songs folder
-            if rel.is_empty() || rel.contains('/') || rel.contains('\\') || rel.contains("..") {
+            // Plain child names only: never traverse out of the Songs folder, and never "."
+            // (the Songs folder itself, which is chart-less after stripping)
+            let mut parts = Path::new(&rel).components();
+            if !matches!((parts.next(), parts.next()), (Some(std::path::Component::Normal(_)), None))
+                || rel.contains('/')
+                || rel.contains('\\')
+            {
                 continue;
             }
             let path = src.join(&rel);
@@ -967,5 +972,42 @@ mod tests {
         assert!(src.join("X1 Favorite/box.def").is_file(), "game boxes must be kept");
         assert!(src.join("L3 Downloaded Songs/box.def").is_file());
         assert!(src.join("L2 Custom Charts/Mine/mine.tja").is_file());
+    }
+
+    #[test]
+    fn the_songs_folder_itself_is_never_a_duplicate() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("inst/Songs");
+        let dest = tmp.path().join("global/Songs");
+        // A stripped instance library holds no chart, and the shared one does
+        write(&src.join("X1 Favorite/box.def"), "#TITLE:Fav");
+        write(&dest.join("Pop/Song/song.tja"), "TITLE:S\n");
+
+        let removed = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(remove_duplicates_in(
+                src.to_str().unwrap().into(),
+                dest.to_str().unwrap().into(),
+                vec![".".into(), "".into()],
+            ))
+            .unwrap();
+        assert_eq!(removed, 0);
+        assert!(src.join("X1 Favorite/box.def").is_file());
+    }
+
+    #[test]
+    fn a_migration_never_names_a_whole_songs_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("inst/Songs");
+        let dest = tmp.path().join("global/Songs");
+        write(&src.join("Mine/mine.tja"), "TITLE:Mine\n");
+        write(&dest.join("Pop/Song/song.tja"), "TITLE:S\n");
+        let decision = MigrationDecision {
+            src_rel_path: "Mine".into(),
+            action: MigrationAction::UseInstance,
+            dest_rel_path: Some(".".into()),
+        };
+        assert!(apply_plan(&src, &dest, &[decision]).is_err());
+        assert!(dest.join("Pop/Song/song.tja").is_file(), "the shared library must survive");
     }
 }

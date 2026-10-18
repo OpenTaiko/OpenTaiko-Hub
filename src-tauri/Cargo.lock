@@ -14,6 +14,7 @@ dependencies = [
  "md-5",
  "memchr",
  "pelite",
+ "percent-encoding",
  "serde",
  "serde_json",
  "sha1",

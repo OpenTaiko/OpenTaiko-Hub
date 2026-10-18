@@ -36,6 +36,8 @@ log = "0.4"
 tauri-plugin-log = "~2.9.2"
 # Resolves the log folder the same way Tauri does, so logging cannot abort startup.
 dirs = "6"
+# writes.rs: the instance folder of a save write arrives as a percent-encoded header
+percent-encoding = "2"
 
 # Linux-only: raising RLIMIT_NOFILE needs libc. Keep this target-scoped so Windows and
 # macOS builds neither fetch nor compile it.

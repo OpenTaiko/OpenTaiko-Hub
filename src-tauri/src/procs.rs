@@ -3,6 +3,7 @@
 // frontend so build progress can be displayed live.
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader};
+use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::time::{Duration, Instant};
@@ -136,36 +137,74 @@ fn batch_lines(rx: Receiver<String>, interval: Duration, max: usize, mut send: i
     }
 }
 
-/// The only commands the page may run: listing the installed SDKs, and publishing the
-/// game from source.
-fn allowed_dotnet_args(args: &[String]) -> bool {
-    matches!(args.first().map(String::as_str), Some("--list-sdks") if args.len() == 1)
-        || args.first().map(String::as_str) == Some("publish")
+/// Runtimes the game can be built for.
+const RUNTIMES: [&str; 6] = ["win-x64", "win-arm64", "linux-x64", "linux-arm64", "osx-x64", "osx-arm64"];
+
+/// The publish command, the same as the game's build scripts except for where the output
+/// goes. By default the files are copied to OpenTaiko\bin\Release\net8.0\<rid>\publish,
+/// 45 characters deeper than the source they came from, which alone pushed the skin
+/// folders past the Windows path limit, so both output folders sit directly in the build
+/// folder: `p` for the published game, `b` for the intermediate output.
+///
+/// Built here rather than taken from the page: dotnet runs whatever a project, a logger
+/// or an imported props file says, so the page used to be able to run anything through
+/// the arguments alone. No MSBuild node is left behind to serve later builds.
+fn publish_args(build_dir: &Path, rid: &str) -> Vec<String> {
+    vec![
+        "publish".into(),
+        "OpenTaiko/OpenTaiko.csproj".into(),
+        "--configuration".into(),
+        "Release".into(),
+        "--self-contained".into(),
+        "-p:PublishSingleFile=true".into(),
+        "--runtime".into(),
+        rid.into(),
+        "--output".into(),
+        build_dir.join("p").to_string_lossy().into_owned(),
+        format!("-p:OutDir={}{}", build_dir.join("b").display(), std::path::MAIN_SEPARATOR),
+        "-nodeReuse:false".into(),
+    ]
 }
 
-/// Runs `dotnet` and streams its output. The program is fixed: this used to accept any
-/// program and arguments, which made it a way to start anything from the page.
+/// Lists the installed .NET SDKs, one per line, as `dotnet --list-sdks` prints them.
 #[tauri::command]
-pub async fn run_dotnet(
+pub async fn list_dotnet_sdks(
     app: tauri::AppHandle,
-    args: Vec<String>,
-    cwd: Option<String>,
     job: Option<String>,
     on_output: Channel<Vec<String>>,
 ) -> Result<i32, String> {
     let cancel = crate::jobs::token(&app, &job);
-    if !allowed_dotnet_args(&args) {
-        return Err(format!("Refusing to run dotnet {}", args.join(" ")));
+    run_dotnet(vec!["--list-sdks".into()], None, cancel, on_output).await
+}
+
+/// Builds the game from source for `rid`. `src_dir` is the `s` folder of a build folder
+/// the Hub created and extracted the downloaded source into; the published game lands in
+/// `p` beside it. Returns dotnet's exit code.
+#[tauri::command]
+pub async fn publish_game(
+    app: tauri::AppHandle,
+    src_dir: String,
+    rid: String,
+    job: Option<String>,
+    on_output: Channel<Vec<String>>,
+) -> Result<i32, String> {
+    let cancel = crate::jobs::token(&app, &job);
+    if !RUNTIMES.contains(&rid.as_str()) {
+        return Err(format!("Refusing to build for {}", rid));
     }
-    // A publish builds whatever project sits in its folder, so it must be one the Hub
-    // downloaded into its own build folder
-    match &cwd {
-        Some(dir) => {
-            crate::guard::checked(&app, dir)?;
-        }
-        None if args[0] == "publish" => return Err("A build needs its source folder".into()),
-        None => {}
-    }
+    let src = crate::guard::build_source_dir(&app, &src_dir)?;
+    let build_dir = src.parent().ok_or("The build folder could not be resolved")?.to_path_buf();
+    run_dotnet(publish_args(&build_dir, &rid), Some(src), cancel, on_output).await
+}
+
+/// Runs `dotnet` and streams its output. Only the two commands above call it: this used
+/// to accept any program and arguments, which made it a way to start anything from the page.
+async fn run_dotnet(
+    args: Vec<String>,
+    cwd: Option<PathBuf>,
+    cancel: crate::jobs::CancelToken,
+    on_output: Channel<Vec<String>>,
+) -> Result<i32, String> {
     let program = "dotnet".to_string();
     tokio::task::spawn_blocking(move || {
         let mut cmd = Command::new(&program);
@@ -352,20 +391,24 @@ mod batch_tests {
 
 #[cfg(test)]
 mod arg_tests {
-    use super::allowed_dotnet_args;
+    use super::{publish_args, RUNTIMES};
+    use std::path::Path;
 
-    fn args(list: &[&str]) -> Vec<String> {
-        list.iter().map(|s| s.to_string()).collect()
+    #[test]
+    fn the_publish_writes_only_into_its_build_folder() {
+        let build = Path::new("/hub/tmp/1a2b3c4d");
+        let args = publish_args(build, "linux-x64");
+        assert_eq!(&args[..2], ["publish", "OpenTaiko/OpenTaiko.csproj"]);
+        assert!(args.windows(2).any(|w| w[0] == "--runtime" && w[1] == "linux-x64"));
+        assert!(args.windows(2).any(|w| w[0] == "--output" && Path::new(&w[1]) == build.join("p")));
+        assert!(args.iter().any(|a| a.starts_with("-p:OutDir=") && a.contains("1a2b3c4d")));
+        assert!(args.contains(&"-nodeReuse:false".to_string()));
     }
 
     #[test]
-    fn only_the_sdk_listing_and_a_publish_are_allowed() {
-        assert!(allowed_dotnet_args(&args(&["--list-sdks"])));
-        assert!(allowed_dotnet_args(&args(&["publish", "OpenTaiko/OpenTaiko.csproj"])));
-        assert!(!allowed_dotnet_args(&args(&["--list-sdks", "extra"])));
-        assert!(!allowed_dotnet_args(&args(&["run"])));
-        assert!(!allowed_dotnet_args(&args(&["exec", "payload.dll"])));
-        assert!(!allowed_dotnet_args(&[]));
+    fn only_known_runtimes_are_built() {
+        assert!(RUNTIMES.contains(&"win-x64") && RUNTIMES.contains(&"osx-arm64"));
+        assert!(!RUNTIMES.contains(&"linux-Unsupported"));
     }
 }
 

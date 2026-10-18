@@ -1,6 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
+    import { readTextFile, mkdir } from '@tauri-apps/plugin-fs';
+    import { ipc } from '$lib/ipc';
 
     import { getContext } from 'svelte';
     import type { ToastContext } from '$lib/types';
@@ -66,7 +67,7 @@
         } catch {
             // File missing on first run — silently use default and write it
             currentTheme = DEFAULT_THEME;
-            try { await writeTextFile(themeFilePath, JSON.stringify({ theme: currentTheme })); } catch {}
+            try { await ipc.writeSettingsFile('theme.json', JSON.stringify({ theme: currentTheme })); } catch {}
         }
         applyTheme(currentTheme);
     }
@@ -76,10 +77,7 @@
         // Picking the theme already in use is not a mistake worth a warning
         if (getAppliedTheme() == themevalue) return;
 
-        const prefsDir = await GetPreferencesPath();
-        await mkdir(prefsDir, { recursive: true });
-        const theme_settings = await path.join(prefsDir, 'theme.json');
-        await writeTextFile(theme_settings, JSON.stringify({ theme: themevalue }));
+        await ipc.writeSettingsFile('theme.json', JSON.stringify({ theme: themevalue }));
 
         currentTheme = themevalue;
         applyTheme(themevalue);
@@ -99,7 +97,7 @@
         } catch {
             // File missing on first run — silently use default and write it
             currentThemeMode = DEFAULT_MODE;
-            try { await writeTextFile(modeFilePath, JSON.stringify({ thememode: currentThemeMode })); } catch {}
+            try { await ipc.writeSettingsFile('thememode.json', JSON.stringify({ thememode: currentThemeMode })); } catch {}
         }
 
         applyMode(currentThemeMode);
@@ -107,10 +105,7 @@
 
     const ThemeModeChanger = async (mode: string) => {
         currentThemeMode = mode === 'light' ? 'light' : 'dark';
-        const prefsDir = await GetPreferencesPath();
-        await mkdir(prefsDir, { recursive: true });
-        const thememode_settings = await path.join(prefsDir, 'thememode.json');
-        await writeTextFile(thememode_settings, JSON.stringify({ thememode: mode }));
+        await ipc.writeSettingsFile('thememode.json', JSON.stringify({ thememode: mode }));
 
         applyMode(mode);
     }
@@ -118,10 +113,7 @@
     // Language persistence
     const SaveLocale = async (selectedLocale: string | null | undefined) => {
         try {
-            const prefsDir = await GetPreferencesPath();
-            await mkdir(prefsDir, { recursive: true });
-            const langFilePath = await path.join(prefsDir, 'language.json');
-            await writeTextFile(langFilePath, JSON.stringify({ locale: selectedLocale }));
+            await ipc.writeSettingsFile('language.json', JSON.stringify({ locale: selectedLocale }));
         } catch (err) {
             console.error('Failed to save locale:', err);
         }

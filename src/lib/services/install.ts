@@ -1,6 +1,6 @@
 // Installing a game build into an instance folder. The Home page drives this and shows
 // its progress through the hooks; the steps themselves live here.
-import { mkdir, remove, exists, writeTextFile } from '@tauri-apps/plugin-fs';
+import { mkdir, remove, exists } from '@tauri-apps/plugin-fs';
 import { path } from '@tauri-apps/api';
 import { Channel } from '@tauri-apps/api/core';
 import { ipc } from '$lib/ipc';
@@ -30,7 +30,7 @@ export const IsInstallComplete = async (instancePath: string, os: HubOS): Promis
 /** version.json, read by pre-0.2 Hub versions. Best-effort. */
 export const WriteVersionJson = async (instancePath: string, version: string | null, os: HubOS): Promise<void> => {
     try {
-        await writeTextFile(await path.join(instancePath, 'version.json'), JSON.stringify({ version, build: os }));
+        await ipc.writeVersionJson(instancePath, version, os);
     } catch (error) {
         console.error('Failed to write version.json:', error);
     }

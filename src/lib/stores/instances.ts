@@ -2,7 +2,7 @@
 // See `Instance` in $lib/types for the record shape; channel === null means no build
 // has been installed into the folder yet.
 import { writable, derived, get } from 'svelte/store';
-import { readTextFile, writeTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
+import { readTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
 import { join, basename } from '@tauri-apps/api/path';
 import { ipc } from '$lib/ipc';
 import { GetPreferencesPath, GetGlobalSongsPath, GetLegacyInstancePath } from '../utils/path';
@@ -11,7 +11,7 @@ import { toaster } from '$lib/utils/toaster';
 import { _ } from 'svelte-i18n';
 import type { Instance, InstanceRegistry } from '$lib/types';
 
-const REGISTRY_FILE = 'instances.json';
+const REGISTRY_FILE = 'instances.json' as const;
 
 // Only the 0.6.0.x series keeps its Favorite / Recent / Search boxes as box.def folders
 // inside the instance's own Songs folder, so only those instances need that folder in
@@ -39,15 +39,15 @@ const normalizePath = (p: string | null | undefined): string => {
     return isWindowsPath ? normalized.toLowerCase() : normalized;
 };
 
+// Written by the backend, which replaces the file in one step: a crash mid-write used to
+// leave a truncated list that the next start took for no list at all
 const persist = async (): Promise<void> => {
-    const prefsDir = await GetPreferencesPath();
-    await mkdir(prefsDir, { recursive: true });
     const data: InstanceRegistry = {
         version: 1,
         activeId: get(activeInstanceId),
         instances: get(instances)
     };
-    await writeTextFile(await registryPath(), JSON.stringify(data, null, 2));
+    await ipc.writeSettingsFile(REGISTRY_FILE, JSON.stringify(data, null, 2));
 };
 
 export interface ResolveInstancesInput {

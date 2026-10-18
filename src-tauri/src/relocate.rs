@@ -25,9 +25,25 @@ pub(crate) fn rewrite_registry(registry: &Path, map: impl Fn(&str) -> Option<Str
     }
     if changed > 0 {
         let pretty = serde_json::to_string_pretty(&json).map_err(|e| e.to_string())?;
-        std::fs::write(registry, pretty).map_err(|e| e.to_string())?;
+        crate::writes::write_atomic(registry, pretty.as_bytes())?;
     }
     Ok(changed)
+}
+
+/// Rewrites the instance list and the Hub's own list of instance folders (see guard.rs)
+/// through the same `map`, for the log.
+pub(crate) fn rewrite_registries(
+    registries: [&Path; 2],
+    map: impl Fn(&str) -> Option<String>,
+    report: &mut Vec<String>,
+) {
+    for registry in registries {
+        match rewrite_registry(registry, &map) {
+            Ok(0) => {}
+            Ok(n) => report.push(format!("Updated {} instance path(s) in {}", n, registry.display())),
+            Err(e) => report.push(format!("Could not update {}: {}", registry.display(), e)),
+        }
+    }
 }
 
 /// What follows `root` in `path`, separator included, when `path` is inside `root`.
@@ -76,7 +92,7 @@ fn is_instance_name(name: &str) -> bool {
 /// that exists is left alone. Returns what happened, for the log. Only Linux and macOS
 /// release builds call it, hence the dead-code allowances here for every other build.
 #[cfg_attr(any(debug_assertions, target_os = "windows"), allow(dead_code))]
-pub fn migrate_documents_layout(old_root: &Path, new_root: &Path, registry: &Path) -> Vec<String> {
+pub fn migrate_documents_layout(old_root: &Path, new_root: &Path, registry: &Path, roots: &Path) -> Vec<String> {
     let mut report = Vec::new();
     if crate::migrate::is_same_dir(old_root, new_root) {
         return report;
@@ -136,11 +152,7 @@ pub fn migrate_documents_layout(old_root: &Path, new_root: &Path, registry: &Pat
             .find(|(from, _)| crate::migrate::is_same_dir(Path::new(path), from) || Path::new(path) == from.as_path())
             .map(|(_, to)| to.to_string_lossy().into_owned())
     };
-    match rewrite_registry(registry, renamed) {
-        Ok(0) => {}
-        Ok(n) => report.push(format!("Updated {} instance path(s) in {}", n, registry.display())),
-        Err(e) => report.push(format!("Could not update {}: {}", registry.display(), e)),
-    }
+    rewrite_registries([registry, roots], renamed, &mut report);
 
     // Each instance's Config.ini named the old library folder
     if moved.iter().any(|(from, _)| from == &old_songs) {
@@ -184,22 +196,27 @@ mod tests {
         let elsewhere = docs.join("Games").join("OpenTaiko");
         fs::create_dir_all(&elsewhere).unwrap();
         let registry = registry_with(tmp.path(), &[instance.clone(), elsewhere.clone()]);
+        let roots = tmp.path().join("roots").join("instance-roots.json");
+        fs::create_dir_all(roots.parent().unwrap()).unwrap();
+        fs::copy(&registry, &roots).unwrap();
 
-        let report = migrate_documents_layout(&docs, &hub, &registry);
+        let report = migrate_documents_layout(&docs, &hub, &registry, &roots);
         assert!(!report.is_empty());
 
         assert!(hub.join("Songs/01 Pop/Song/song.tja").is_file());
         assert!(hub.join("OpenTaiko-1234").is_dir());
         assert!(docs.join("Photos").is_dir() && elsewhere.is_dir());
 
+        // Both lists follow the moved instance
         let paths = registered_paths(&registry);
-        assert_eq!(paths, vec![hub.join("OpenTaiko-1234"), elsewhere]);
+        assert_eq!(paths, vec![hub.join("OpenTaiko-1234"), elsewhere.clone()]);
+        assert_eq!(registered_paths(&roots), vec![hub.join("OpenTaiko-1234"), elsewhere]);
 
         let ini = fs::read_to_string(hub.join("OpenTaiko-1234/Config.ini")).unwrap();
         assert!(ini.contains(&format!("TJAPath=Songs{sep};{}{sep}", hub.join("Songs").display())), "{ini}");
 
         // Nothing left to move on the next start
-        assert!(migrate_documents_layout(&docs, &hub, &registry).is_empty());
+        assert!(migrate_documents_layout(&docs, &hub, &registry, &roots).is_empty());
     }
 
     #[test]
@@ -209,7 +226,7 @@ mod tests {
         fs::create_dir_all(docs.join("Songs/Albums")).unwrap();
         fs::write(docs.join("Songs/Albums/track.mp3"), "").unwrap();
         let registry = registry_with(tmp.path(), &[]);
-        assert!(migrate_documents_layout(&docs, &docs.join("OpenTaiko Hub"), &registry).is_empty());
+        assert!(migrate_documents_layout(&docs, &docs.join("OpenTaiko Hub"), &registry, &tmp.path().join("absent.json")).is_empty());
         assert!(docs.join("Songs/Albums/track.mp3").is_file());
     }
 
@@ -219,7 +236,8 @@ mod tests {
         let docs = tmp.path().join("Documents");
         fs::create_dir_all(docs.join("Songs/A")).unwrap();
         fs::write(docs.join("Songs/A/a.tja"), "").unwrap();
-        assert!(migrate_documents_layout(&docs, &docs.join("OpenTaiko Hub"), &tmp.path().join("absent.json")).is_empty());
+        let absent = tmp.path().join("absent.json");
+        assert!(migrate_documents_layout(&docs, &docs.join("OpenTaiko Hub"), &absent, &absent).is_empty());
         assert!(docs.join("Songs/A/a.tja").is_file());
     }
 
@@ -230,12 +248,13 @@ mod tests {
         fs::create_dir_all(docs.join("OpenTaiko")).unwrap();
         fs::write(docs.join("OpenTaiko/version.json"), r#"{"version":"0.5.4"}"#).unwrap();
         let hub = docs.join("OpenTaiko Hub");
-        migrate_documents_layout(&docs, &hub, &tmp.path().join("absent.json"));
+        let absent = tmp.path().join("absent.json");
+        migrate_documents_layout(&docs, &hub, &absent, &absent);
         assert!(hub.join("OpenTaiko/version.json").is_file());
 
         let other = tmp.path().join("Other");
         fs::create_dir_all(other.join("OpenTaiko/.git")).unwrap();
-        assert!(migrate_documents_layout(&other, &other.join("OpenTaiko Hub"), &tmp.path().join("absent.json")).is_empty());
+        assert!(migrate_documents_layout(&other, &other.join("OpenTaiko Hub"), &absent, &absent).is_empty());
         assert!(other.join("OpenTaiko/.git").is_dir());
     }
 

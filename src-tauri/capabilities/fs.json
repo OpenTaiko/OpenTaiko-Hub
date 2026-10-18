@@ -1,6 +1,6 @@
 {
     "identifier": "fs",
-    "description": "File access with no path granted here: guard.rs adds the Hub's folders and the registered instances at startup, and the dialog plugin adds what the user picks. Rust commands check paths against the same scope.",
+    "description": "Reading, creating folders and deleting, with no path granted here: guard.rs adds the Hub's folders and its instances at startup, and the dialog plugin adds what the user picks. The page cannot write, copy or rename files: whatever it put in an instance or a build folder, the game or the compiler could run, so every file it saves goes through a command in writes.rs. Rust commands check paths against the same scope.",
     "local": true,
     "windows": ["main"],
     "permissions": [
@@ -10,11 +10,7 @@
       "fs:allow-read-file",
       "fs:allow-read-text-file",
       "fs:allow-mkdir",
-      "fs:allow-write-file",
-      "fs:allow-write-text-file",
-      "fs:allow-copy-file",
       "fs:allow-remove",
-      "fs:allow-rename",
       "core:path:default",
       "core:event:allow-listen",
       "core:event:allow-unlisten"

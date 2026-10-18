@@ -22,10 +22,11 @@ fn is_hub_data(name: &str) -> bool {
 }
 
 /// Moves the data a dev build left next to its executable (from before dev_root existed)
-/// into `new_root`, and points the instance registry at the new place. Once moved, there
-/// is nothing left to move, so this does nothing on later starts. A folder that already
-/// exists at the destination is left where it is. Returns what happened, for the log.
-pub fn migrate_from(old_root: &Path, new_root: &Path, registry: &Path) -> Vec<String> {
+/// into `new_root`, and points the instance registry and the Hub's own list of instance
+/// folders at the new place. Once moved, there is nothing left to move, so this does
+/// nothing on later starts. A folder that already exists at the destination is left where
+/// it is. Returns what happened, for the log.
+pub fn migrate_from(old_root: &Path, new_root: &Path, registry: &Path, roots: &Path) -> Vec<String> {
     let mut report = Vec::new();
     if crate::migrate::is_same_dir(old_root, new_root) {
         return report;
@@ -59,11 +60,7 @@ pub fn migrate_from(old_root: &Path, new_root: &Path, registry: &Path) -> Vec<St
         // Every registry path under the old root moves with it
         let (old, new) = (old_root.to_string_lossy().into_owned(), new_root.to_string_lossy().into_owned());
         let moved_path = |path: &str| crate::relocate::strip_root(path, &old).map(|rest| format!("{new}{rest}"));
-        match crate::relocate::rewrite_registry(registry, moved_path) {
-            Ok(0) => {}
-            Ok(n) => report.push(format!("Updated {} instance path(s) in {}", n, registry.display())),
-            Err(e) => report.push(format!("Could not update {}: {}", registry.display(), e)),
-        }
+        crate::relocate::rewrite_registries([registry, roots], moved_path, &mut report);
     }
     report
 }
@@ -95,7 +92,8 @@ mod tests {
         });
         fs::write(&registry, json.to_string()).unwrap();
 
-        let report = migrate_from(&old, &new, &registry);
+        let absent = tmp.path().join("absent.json");
+        let report = migrate_from(&old, &new, &registry, &absent);
         assert!(!report.is_empty());
 
         // Hub data moved, build output and resources stayed
@@ -113,7 +111,7 @@ mod tests {
         assert_eq!(updated["activeId"], "a");
 
         // Nothing left to do on the next start
-        assert!(migrate_from(&old, &new, &registry).is_empty());
+        assert!(migrate_from(&old, &new, &registry, &absent).is_empty());
     }
 
     #[test]
@@ -123,7 +121,8 @@ mod tests {
         let new = tmp.path().join("new");
         fs::create_dir_all(old.join("Songs/A")).unwrap();
         fs::create_dir_all(new.join("Songs/B")).unwrap();
-        migrate_from(&old, &new, &tmp.path().join("absent.json"));
+        let absent = tmp.path().join("absent.json");
+        migrate_from(&old, &new, &absent, &absent);
         assert!(old.join("Songs/A").is_dir());
         assert!(new.join("Songs/B").is_dir());
         assert!(!new.join("Songs/A").exists());

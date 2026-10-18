@@ -110,6 +110,11 @@ pub fn merge_move_dir_sync(src: &str, dest: &str) -> Result<(), String> {
     if !src_path.is_dir() {
         return Err(format!("Source folder not found: {}", src));
     }
+    // A destination inside the source would be walked into as it is filled, until the
+    // stack overflowed and took the whole Hub down
+    if crate::guard::resolve_existing(&dest_path).starts_with(crate::guard::resolve_existing(&src_path)) {
+        return Err(format!("Refusing to move {} into itself", src));
+    }
     std::fs::create_dir_all(&dest_path)
         .map_err(|e| format!("Failed to create {}: {}", dest_path.display(), e))?;
     for entry in std::fs::read_dir(&src_path)
@@ -148,5 +153,18 @@ mod tests {
         assert_eq!(fs::read_to_string(dest.join("sub/b.txt")).unwrap(), "new-b");
         assert_eq!(fs::read_to_string(dest.join("sub/keep.txt")).unwrap(), "keep");
         assert!(!src.exists(), "source should be gone after the move");
+    }
+
+    #[test]
+    fn a_folder_is_never_moved_into_itself() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("src");
+        write(&src.join("a.txt"), "a");
+        for dest in [src.clone(), src.join("sub"), src.join("sub").join("deeper")] {
+            assert!(merge_move_dir_sync(src.to_str().unwrap(), dest.to_str().unwrap()).is_err());
+        }
+        assert_eq!(fs::read_to_string(src.join("a.txt")).unwrap(), "a");
+        // A sibling that merely starts with the same letters is fine
+        merge_move_dir_sync(src.to_str().unwrap(), tmp.path().join("src2").to_str().unwrap()).unwrap();
     }
 }

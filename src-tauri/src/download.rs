@@ -19,18 +19,23 @@ use tokio::io::AsyncWriteExt;
 
 use crate::jobs::{CancelToken, CANCELLED};
 
-/// Hosts a download may start from. Release assets redirect to githubusercontent hosts,
-/// which reqwest follows (https only, see `client`).
-const DOWNLOAD_HOSTS: [&str; 5] = [
-    "github.com",
-    "codeload.github.com",
-    "raw.githubusercontent.com",
-    "objects.githubusercontent.com",
-    "opentaiko.github.io",
-];
+/// Hosts a download may start from. Release assets redirect to ASSET_HOSTS, which reqwest
+/// follows (see `client`).
+const DOWNLOAD_HOSTS: [&str; 4] = ["github.com", "codeload.github.com", "raw.githubusercontent.com", "opentaiko.github.io"];
 
 /// Hosts `fetch_cached` reads from.
 const READ_HOSTS: [&str; 3] = ["api.github.com", "raw.githubusercontent.com", "opentaiko.github.io"];
+
+/// Where GitHub sends the download of a release asset.
+const ASSET_HOSTS: [&str; 2] = ["objects.githubusercontent.com", "release-assets.githubusercontent.com"];
+
+/// Hosts that serve every GitHub account's repositories, the account being the first part
+/// of the path. A download from one of them must come from OWNERS: anyone can publish a
+/// file there, and what the Hub downloads is installed into games it then runs.
+const GITHUB_HOSTS: [&str; 3] = ["github.com", "codeload.github.com", "raw.githubusercontent.com"];
+
+/// The OpenTaiko organisation, and the account game builds are published from (builds.ts).
+const OWNERS: [&str; 2] = ["opentaiko", "0aubsq"];
 
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -60,12 +65,36 @@ fn host_allowed(url: &reqwest::Url, hosts: &[&str]) -> bool {
     url.scheme() == "https" && url.host_str().is_some_and(|h| hosts.contains(&h))
 }
 
+fn owner_allowed(url: &reqwest::Url) -> bool {
+    let on_github = url.host_str().is_some_and(|h| GITHUB_HOSTS.contains(&h));
+    !on_github
+        || url
+            .path_segments()
+            .and_then(|mut parts| parts.next())
+            .is_some_and(|owner| OWNERS.contains(&owner.to_ascii_lowercase().as_str()))
+}
+
+/// Where a request may be sent on to: anywhere a download or a read may start, under the
+/// same account rule, or where GitHub serves release assets from.
+fn redirect_allowed(url: &reqwest::Url) -> bool {
+    [&DOWNLOAD_HOSTS[..], &READ_HOSTS[..], &ASSET_HOSTS[..]].iter().any(|hosts| host_allowed(url, hosts)) && owner_allowed(url)
+}
+
 fn parse_url(url: &str, hosts: &[&str]) -> Result<reqwest::Url, String> {
     let parsed = reqwest::Url::parse(url).map_err(|e| format!("Invalid URL {url}: {e}"))?;
     if host_allowed(&parsed, hosts) {
         Ok(parsed)
     } else {
         Err(format!("Refusing to download from {url}"))
+    }
+}
+
+fn parse_download_url(url: &str) -> Result<reqwest::Url, String> {
+    let parsed = parse_url(url, &DOWNLOAD_HOSTS)?;
+    if owner_allowed(&parsed) {
+        Ok(parsed)
+    } else {
+        Err(format!("Refusing to download from {url}: not an OpenTaiko repository"))
     }
 }
 
@@ -79,7 +108,8 @@ fn client() -> Result<&'static reqwest::Client, String> {
     let client = reqwest::Client::builder()
         .user_agent(concat!("OpenTaiko-Hub/", env!("CARGO_PKG_VERSION")))
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
-            if attempt.previous().len() >= 10 || attempt.url().scheme() != "https" {
+            // A stopped redirect comes back as the 3xx response, refused in fetch_once
+            if attempt.previous().len() >= 10 || !redirect_allowed(attempt.url()) {
                 attempt.stop()
             } else {
                 attempt.follow()
@@ -162,6 +192,10 @@ async fn fetch_once(
         .send()
         .await
         .map_err(|e| Failure::Retry { after: None, message: format!("Download of {label} failed: {e}") })?;
+    if response.status().is_redirection() {
+        let to = response.headers().get(reqwest::header::LOCATION).and_then(|v| v.to_str().ok()).unwrap_or("?");
+        return Err(Failure::Fatal { status: None, message: format!("Download of {label} was sent to {to}, which is refused") });
+    }
     if !response.status().is_success() {
         return Err(status_failure(label, &response));
     }
@@ -307,7 +341,7 @@ pub async fn download_file<R: Runtime>(
     job: Option<String>,
     on_progress: Channel<ProgressPayload>,
 ) -> Result<(), String> {
-    let parsed = parse_url(&url, &DOWNLOAD_HOSTS)?;
+    let parsed = parse_download_url(&url)?;
     let cancel = crate::jobs::token(&app, &job);
     let dest = crate::guard::checked(&app, &path)?;
     let progress = Mutex::new(Progress::new(on_progress));
@@ -385,8 +419,8 @@ pub async fn install_files<R: Runtime>(
     // Everything is validated before the first request
     let mut jobs = Vec::with_capacity(entries.len());
     for entry in entries {
-        let url = parse_url(&entry.url, &DOWNLOAD_HOSTS)?;
-        let dest = crate::library::resolve_inside(&root, &entry.rel_path)?;
+        let url = parse_download_url(&entry.url)?;
+        let dest = crate::library::resolve_entry_inside(&root, &entry.rel_path)?;
         jobs.push((entry, url, dest));
     }
 
@@ -558,6 +592,32 @@ mod tests {
         // The API is read through fetch_cached, never downloaded to disk
         assert!(!ok("https://api.github.com/repos/x/y"));
         assert!(host_allowed(&reqwest::Url::parse("https://api.github.com/repos/x/y").unwrap(), &READ_HOSTS));
+    }
+
+    #[test]
+    fn downloads_come_only_from_opentaiko_repositories() {
+        let ok = |u: &str| parse_download_url(u).is_ok();
+        assert!(ok("https://github.com/OpenTaiko/OpenTaiko-Skins/releases/download/system-assets/a.zip"));
+        assert!(ok("https://codeload.github.com/0AuBSQ/OpenTaiko/zip/abc"));
+        assert!(ok("https://raw.githubusercontent.com/opentaiko/OpenTaiko-Soundtrack/main/x.tja"));
+        assert!(ok("https://opentaiko.github.io/hof.db3"));
+        assert!(!ok("https://raw.githubusercontent.com/someone/payload/main/OpenTaiko.exe"));
+        assert!(!ok("https://github.com/someone/OpenTaiko/releases/download/v1/a.zip"));
+        assert!(!ok("https://codeload.github.com/OpenTaikoFork/OpenTaiko/zip/abc"));
+        // Signed asset links name no account, so they are only followed as redirects
+        assert!(!ok("https://objects.githubusercontent.com/github-production-release-asset/1"));
+    }
+
+    #[test]
+    fn redirects_stay_with_github_and_the_same_accounts() {
+        let ok = |u: &str| redirect_allowed(&reqwest::Url::parse(u).unwrap());
+        assert!(ok("https://release-assets.githubusercontent.com/github-production-release-asset/1"));
+        assert!(ok("https://objects.githubusercontent.com/github-production-release-asset/1"));
+        assert!(ok("https://api.github.com/repositories/1/releases/latest"));
+        assert!(ok("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest"));
+        assert!(!ok("https://github.com/someone/OpenTaiko/releases/latest"));
+        assert!(!ok("https://example.com/a.zip"));
+        assert!(!ok("http://objects.githubusercontent.com/a"));
     }
 
     #[test]

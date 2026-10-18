@@ -46,6 +46,16 @@ pub(crate) fn resolve_inside(base: &Path, rel: &str) -> Result<PathBuf, String> 
     Ok(base.join(rel_path))
 }
 
+/// `resolve_inside` for a path that names something in `base`, for every command that
+/// deletes, moves or replaces what the path names. "" and "." resolve to `base` itself,
+/// and deleting that deleted the whole library.
+pub(crate) fn resolve_entry_inside(base: &Path, rel: &str) -> Result<PathBuf, String> {
+    if !Path::new(rel).components().any(|part| matches!(part, Component::Normal(_))) {
+        return Err(format!("Refusing a path that names the whole folder: {:?}", rel));
+    }
+    resolve_inside(base, rel)
+}
+
 /// Names a user types, or that come out of an archive, become one safe path segment.
 pub(crate) fn sanitize_name(raw: &str) -> String {
     let cleaned: String = raw
@@ -211,10 +221,7 @@ pub async fn create_genre_folder(app: tauri::AppHandle, base: String, parent_rel
 pub async fn delete_library_entry(app: tauri::AppHandle, base: String, rel_path: String) -> Result<(), String> {
     blocking(move || {
         crate::guard::checked(&app, &base)?;
-        if rel_path.trim().is_empty() {
-            return Err("Refusing to delete the whole songs folder".into());
-        }
-        let dir = resolve_inside(Path::new(&base), &rel_path)?;
+        let dir = resolve_entry_inside(Path::new(&base), &rel_path)?;
         if !dir.exists() {
             return Ok(());
         }
@@ -667,6 +674,18 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         assert!(resolve_inside(tmp.path(), "../escape").is_err());
         assert!(resolve_inside(tmp.path(), "ok/inside").is_ok());
+    }
+
+    #[test]
+    fn the_folder_itself_is_never_an_entry_in_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        for rel in ["", ".", "./", "./.", " "] {
+            let refused = resolve_entry_inside(tmp.path(), rel).is_err();
+            // A blank name is a real (if odd) folder name; the others are the folder itself
+            assert_eq!(refused, rel != " ", "{rel:?}");
+        }
+        assert!(resolve_entry_inside(tmp.path(), "./Pop").is_ok());
+        assert!(resolve_entry_inside(tmp.path(), "../x").is_err());
     }
 
     #[test]

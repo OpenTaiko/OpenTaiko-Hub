@@ -67,11 +67,13 @@ export interface ClosePrompt {
 
 export const ipc = {
     // Game instances (main.rs, binver.rs, configini.rs, guard.rs)
-    executeExternalApp: (path: string) => invoke<void>('execute_external_app', { path }),
+    launchGame: (instanceDir: string) => invoke<void>('launch_game', { instanceDir }),
     getGameVersion: (instanceDir: string) => invoke<string | null>('get_game_version', { instanceDir }),
     ensureConfigTjapath: (instanceDir: string, globalSongsPath: string, includeLocal: boolean) =>
         invoke<string>('ensure_config_tjapath', { instanceDir, globalSongsPath, includeLocal }),
     createInstanceDir: (folderName: string) => invoke<string>('create_instance_dir', { folderName }),
+    /** Shows the folder dialog itself; null when it was closed without a choice. */
+    attachInstanceDir: (title: string) => invoke<string | null>('attach_instance_dir', { title }),
     allowBuildDir: (path: string) => invoke<void>('allow_build_dir', { path }),
     openFolder: (path: string) => invoke<void>('open_folder', { path }),
     hubRoot: () => invoke<string>('hub_root'),
@@ -82,8 +84,22 @@ export const ipc = {
     unzip: (zipPath: string, onProgress: Channel<number>, job?: string) =>
         invoke<string>('unzip_and_get_first_folder', { zipPath, job, onProgress }),
     mergeMoveDir: (src: string, dest: string) => invoke<void>('merge_move_dir', { src, dest }),
-    runDotnet: (args: string[], cwd: string | null, onOutput: Channel<string[]>, job?: string) =>
-        invoke<number>('run_dotnet', { args, cwd, job, onOutput }),
+    listDotnetSdks: (onOutput: Channel<string[]>, job?: string) => invoke<number>('list_dotnet_sdks', { job, onOutput }),
+    /** Builds the game in `srcDir` (the `s` folder of a build folder) into `p` beside it. */
+    publishGame: (srcDir: string, rid: string, onOutput: Channel<string[]>, job?: string) =>
+        invoke<number>('publish_game', { srcDir, rid, job, onOutput }),
+
+    // Writing files (writes.rs): the page has no permission to write files itself
+    writeSettingsFile: (name: 'instances.json' | 'theme.json' | 'thememode.json' | 'language.json', contents: string) =>
+        invoke<void>('write_settings_file', { name, contents }),
+    writeVersionJson: (instanceDir: string, version: string | null, build: string) =>
+        invoke<void>('write_version_json', { instanceDir, version, build }),
+    /** Replaces the instance's Saves.db3, after copying it to SavesBackup/<backupName>. */
+    writeSaves: (instanceDir: string, backupName: string, bytes: Uint8Array) =>
+        invoke<void>('write_saves', bytes, { headers: { instance: encodeURIComponent(instanceDir), backup: backupName } }),
+    /** Shows the save dialog itself; the chosen path, or null when it was closed. */
+    exportSave: (fileName: string, filterName: string, contents: string) =>
+        invoke<string | null>('export_save', { fileName, filterName, contents }),
 
     // Network (download.rs)
     downloadFile: (url: string, path: string, onProgress: Channel<ProgressPayload>, attempts?: number, job?: string) =>
