@@ -681,7 +681,8 @@
 
 <!-- Overview (bottom padding keeps content scrollable above the fixed Hub-version footer) -->
 <div class="pb-24" style:display={homeSubTab === 0 ? null : 'none'}>
-    <img src={optkLogoUrl} alt="OpenTaiko" class="mx-auto" />
+    <!-- The file is twice this height, for high-DPI screens -->
+    <img src={optkLogoUrl} alt="OpenTaiko" class="mx-auto h-32 w-auto" />
 
     <section class="card w-full">
         {#if !current}
