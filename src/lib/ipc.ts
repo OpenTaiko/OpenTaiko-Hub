@@ -112,6 +112,8 @@ export const ipc = {
     beginJob: (job: string, prompt: ClosePrompt) => invoke<void>('begin_job', { job, prompt }),
     cancelJob: (job: string) => invoke<void>('cancel_job', { job }),
     endJob: (job: string) => invoke<void>('end_job', { job }),
+    /** Once when the page loads: cancels what an earlier page left running. */
+    resetJobs: () => invoke<void>('reset_jobs'),
 
     // Song library (scan.rs, library.rs)
     scanSongs: (baseDir: string, onEvent: Channel<ScanProgressEvent>) => invoke<ScanResult>('scan_songs', { baseDir, onEvent }),

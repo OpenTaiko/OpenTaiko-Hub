@@ -26,6 +26,12 @@
         linkGlobalSongs
     } from '$lib/stores/instances';
     import { busyAreas, type ActivityArea } from '$lib/stores/activity';
+    import { ipc } from '$lib/ipc';
+
+    // Operations a previous load of the page started (a reload, a crashed renderer) have
+    // nobody left to show or end them. Here rather than in onMount, which runs after the
+    // tabs mounted and may already have started one of their own.
+    ipc.resetJobs().catch((error) => console.warn('Could not reset operations:', error));
 
     // Themes
     const themetarget = document.getElementById('themetarget');

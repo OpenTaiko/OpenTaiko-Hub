@@ -703,6 +703,9 @@
         let failed = 0;
         let mbLeft = pending.reduce((sum, song) => sum + (song.chartSize || 0), 0);
         bulkStatus = { done, total: pending.length, mbLeft };
+        // Genre folders of the downloaded songs, whose box.def and art are refreshed once at
+        // the end rather than after each song
+        const genres = new Set<string>();
         try {
             await EnsureRemoteShaMap();
             // A few songs at a time (each downloads several files at once in the
@@ -714,7 +717,10 @@
                     const index = next++;
                     const SInfo = pending[index];
                     const outcome = await DownloadSong(SInfo, currentSongs[SInfo.uniqueId] ?? null, index + 1, pending.length, job.id);
-                    if (outcome === 'done') done++;
+                    if (outcome === 'done') {
+                        done++;
+                        for (const genrePath of SongGenrePaths(SInfo)) genres.add(genrePath);
+                    }
                     else if (outcome === 'failed') failed++;
                     mbLeft = Math.max(0, mbLeft - (SInfo.chartSize || 0));
                     bulkStatus = { done, total: pending.length, mbLeft };
@@ -730,7 +736,7 @@
             if (failed > 0) TriggerError(get(_)('bulk.failed', { values }));
             else TriggerSuccess(get(_)('bulk.done', { values }));
 
-            const updated = await RefreshAllGenreMetadata();
+            const updated = await RefreshAllGenreMetadata(genres, job.id);
             if (updated > 0) TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
         } finally {
             job.end();
@@ -789,8 +795,8 @@
     // genre would otherwise write the same box.def on top of each other. Once the first
     // one has written it, the next sees the updated local SHA and skips the file.
     let genreMetadataLock: Promise<unknown> = Promise.resolve();
-    const EnsureGenreMetadata = (genrePath: string): Promise<boolean> => {
-        const run = genreMetadataLock.then(() => EnsureGenreMetadataUnlocked(genrePath));
+    const EnsureGenreMetadata = (genrePath: string, job?: string): Promise<boolean> => {
+        const run = genreMetadataLock.then(() => EnsureGenreMetadataUnlocked(genrePath, job));
         genreMetadataLock = run.catch(() => {});
         return run;
     }
@@ -798,7 +804,7 @@
     // Genres whose box.def was already refreshed without the remote index this session
     const boxDefRefreshedBlind = new Set<string>();
 
-    const EnsureGenreMetadataUnlocked = async (genrePath: string): Promise<boolean> => {
+    const EnsureGenreMetadataUnlocked = async (genrePath: string, job?: string): Promise<boolean> => {
         const baseDirPath = await GetGlobalSongsPath();
         const genreFullPath = await path.join(baseDirPath, genrePath);
         let changed = false;
@@ -821,7 +827,7 @@
 
             const _url = SoundtrackFileUrl(`${genrePath}/${fileName}`);
             try {
-                const report = await installFiles(genreFullPath, [{ url: _url, relPath: fileName, optional: !remoteSha }]);
+                const report = await installFiles(genreFullPath, [{ url: _url, relPath: fileName, optional: !remoteSha }], undefined, job);
                 if (report.downloaded.length === 0) continue;
                 changed = true;
                 if (remoteSha) {
@@ -840,11 +846,14 @@
         return changed;
     }
 
-    const RefreshAllGenreMetadata = async () => {
-        if (!remoteShaMap) return 0;
+    // The genres of the songs a bulk run downloaded, which the last scan may not know yet,
+    // and with the repository index every genre the scan found. Stops once cancelled.
+    const RefreshAllGenreMetadata = async (downloaded: Set<string>, job: string) => {
+        const genres = new Set([...(remoteShaMap ? Object.keys(scannedGenres) : []), ...downloaded]);
         let updated = 0;
-        for (const genrePath of Object.keys(scannedGenres)) {
-            if (await EnsureGenreMetadata(genrePath)) updated++;
+        for (const genrePath of genres) {
+            if (bulkCancelRequested) break;
+            if (await EnsureGenreMetadata(genrePath, job)) updated++;
         }
         return updated;
     }
@@ -917,9 +926,12 @@
             return 'failed';
         }
 
-        // Download / refresh box.def and default.png of every ancestor genre folder
-        for (const genrePath of SongGenrePaths(songObj)) {
-            await EnsureGenreMetadata(genrePath);
+        // Download / refresh box.def and default.png of every ancestor genre folder. A bulk
+        // run does this once at the end: here, one slow box.def held up every song after it
+        if (!quiet) {
+            for (const genrePath of SongGenrePaths(songObj)) {
+                await EnsureGenreMetadata(genrePath, job);
+            }
         }
 
         if (!quiet) TriggerSuccess(get(_)('songs.success.download_complete'));

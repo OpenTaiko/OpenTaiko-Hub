@@ -604,6 +604,7 @@ pub async fn apply_migration(
 ) -> Result<MigrateSummary, String> {
     crate::guard::checked(&app, &src_songs)?;
     crate::guard::checked(&app, &dest_songs)?;
+    let _moving = crate::jobs::in_flight(&app);
     tokio::task::spawn_blocking(move || {
         apply_plan(&PathBuf::from(&src_songs), &PathBuf::from(&dest_songs), &decisions)
     })

@@ -49,6 +49,28 @@ const MAX_RETRY_AFTER: Duration = Duration::from_secs(120);
 /// Files of one `install_files` call downloaded side by side.
 const FILE_CONCURRENCY: usize = 4;
 
+/// Transfers running at once across every call. Each call also limits its own, but thirty
+/// songs started one after the other opened over a hundred connections, and GitHub then
+/// refused them.
+const MAX_TRANSFERS: usize = 8;
+
+const CONNECT_TIMEOUT: Duration = Duration::from_secs(15);
+/// Longest wait for the next piece of a response, its headers included. Not a limit on
+/// the whole transfer, which a slow connection may need longer for.
+const READ_TIMEOUT: Duration = Duration::from_secs(60);
+
+/// Downloads and partial files are named after their destination with these added, and
+/// nothing else in the library or an instance carries them, so leftovers from a crash can
+/// be removed safely (guard.rs).
+pub(crate) const PART_SUFFIX: &str = ".hubpart";
+/// A file being replaced, set aside until the replacement is in place.
+pub(crate) const OLD_SUFFIX: &str = ".hubold";
+
+fn transfer_slots() -> &'static tokio::sync::Semaphore {
+    static SLOTS: OnceLock<tokio::sync::Semaphore> = OnceLock::new();
+    SLOTS.get_or_init(|| tokio::sync::Semaphore::new(MAX_TRANSFERS))
+}
+
 /// Same shape the upload plugin sent, so callers did not change. `progress` is the bytes
 /// received since the previous message; it is negative when a retry discards a partial
 /// transfer, so a running sum of it stays correct.
@@ -107,6 +129,10 @@ fn client() -> Result<&'static reqwest::Client, String> {
     }
     let client = reqwest::Client::builder()
         .user_agent(concat!("OpenTaiko-Hub/", env!("CARGO_PKG_VERSION")))
+        // Without these a connection that died without closing (Wi-Fi gone, the PC
+        // asleep) kept a download waiting forever. A timed-out attempt is retried.
+        .connect_timeout(CONNECT_TIMEOUT)
+        .read_timeout(READ_TIMEOUT)
         .redirect(reqwest::redirect::Policy::custom(|attempt| {
             // A stopped redirect comes back as the 3xx response, refused in fetch_once
             if attempt.previous().len() >= 10 || !redirect_allowed(attempt.url()) {
@@ -170,10 +196,23 @@ fn backoff(attempt: u32, retry_after: Option<Duration>) -> Duration {
     }
 }
 
-fn part_path(dest: &Path) -> PathBuf {
+fn with_suffix(dest: &Path, suffix: &str) -> PathBuf {
     let mut name = dest.file_name().map(|n| n.to_os_string()).unwrap_or_default();
-    name.push(".part");
+    name.push(suffix);
     dest.with_file_name(name)
+}
+
+fn part_path(dest: &Path) -> PathBuf {
+    with_suffix(dest, PART_SUFFIX)
+}
+
+/// Waits for `work`, or fails with CANCELLED the moment the operation is cancelled: a
+/// server that stops answering used to keep Cancel from doing anything.
+async fn unless_cancelled<T>(work: impl std::future::Future<Output = T>, cancel: &CancelToken) -> Result<T, Failure> {
+    tokio::select! {
+        done = work => Ok(done),
+        () = cancel.cancelled() => Err(cancelled()),
+    }
 }
 
 /// One attempt: streams `url` into `part`. `on_total` gets the announced size (0 when
@@ -186,11 +225,9 @@ async fn fetch_once(
     on_bytes: &mut (dyn FnMut(i64) + Send),
 ) -> Result<u64, Failure> {
     let label = url.as_str();
-    let mut response = client()
-        .map_err(|message| Failure::Fatal { status: None, message })?
-        .get(url.clone())
-        .send()
-        .await
+    let request = client().map_err(|message| Failure::Fatal { status: None, message })?.get(url.clone()).send();
+    let mut response = unless_cancelled(request, cancel)
+        .await?
         .map_err(|e| Failure::Retry { after: None, message: format!("Download of {label} failed: {e}") })?;
     if response.status().is_redirection() {
         let to = response.headers().get(reqwest::header::LOCATION).and_then(|v| v.to_str().ok()).unwrap_or("?");
@@ -204,14 +241,10 @@ async fn fetch_once(
     let io_error = |e: std::io::Error| Failure::Fatal { status: None, message: format!("Could not write {}: {e}", part.display()) };
     let mut file = tokio::io::BufWriter::new(tokio::fs::File::create(part).await.map_err(io_error)?);
     let mut received: u64 = 0;
-    while let Some(chunk) = response
-        .chunk()
-        .await
+    while let Some(chunk) = unless_cancelled(response.chunk(), cancel)
+        .await?
         .map_err(|e| Failure::Retry { after: None, message: format!("Download of {label} failed: {e}") })?
     {
-        if cancel.is_cancelled() {
-            return Err(cancelled());
-        }
         file.write_all(&chunk).await.map_err(io_error)?;
         received += chunk.len() as u64;
         on_bytes(chunk.len() as i64);
@@ -243,10 +276,15 @@ async fn fetch_to_part(
             counted += n;
             on_bytes(n);
         };
-        let fetched = match fetch_once(url, &part, cancel, on_total, &mut count).await {
-            Ok(_) => verify(&part, git_sha, url).await,
-            Err(failure) => Err(failure),
-        };
+        let fetched = async {
+            // Held for this attempt only, not through the pause before a retry
+            let _slot = unless_cancelled(transfer_slots().acquire(), cancel)
+                .await?
+                .map_err(|e| Failure::Fatal { status: None, message: e.to_string() })?;
+            fetch_once(url, &part, cancel, on_total, &mut count).await?;
+            verify(&part, git_sha, url).await
+        }
+        .await;
         match fetched {
             Ok(()) => return Ok(part),
             Err(failure) => {
@@ -291,14 +329,49 @@ fn cancelled() -> Failure {
 
 /// Waits `delay`, returning early (and false) once the operation is cancelled.
 async fn sleep_unless_cancelled(delay: Duration, cancel: &CancelToken) -> bool {
-    let until = Instant::now() + delay;
-    while Instant::now() < until {
-        if cancel.is_cancelled() {
-            return false;
+    unless_cancelled(tokio::time::sleep(delay), cancel).await.is_ok()
+}
+
+/// Moves each downloaded `(part, destination)` into place, all of them or none. A file
+/// that cannot be replaced (on Windows, one the game or an antivirus holds open) puts back
+/// those already replaced: the old files are set aside, not deleted, until every new one
+/// is in place. Partial files are removed either way.
+fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
+    let mut placed: Vec<(&Path, Option<PathBuf>)> = Vec::new();
+    let mut failure = None;
+    for (part, dest) in files {
+        let old = dest.exists().then(|| with_suffix(dest, OLD_SUFFIX));
+        if let Some(old) = &old {
+            if let Err(e) = std::fs::rename(dest, old) {
+                failure = Some(format!("Could not replace {}: {e}", dest.display()));
+                break;
+            }
         }
-        tokio::time::sleep((until - Instant::now()).min(Duration::from_millis(200))).await;
+        if let Err(e) = std::fs::rename(part, dest) {
+            if let Some(old) = &old {
+                let _ = std::fs::rename(old, dest);
+            }
+            failure = Some(format!("Could not write {}: {e}", dest.display()));
+            break;
+        }
+        placed.push((dest, old));
     }
-    !cancel.is_cancelled()
+    let Some(failure) = failure else {
+        for old in placed.into_iter().filter_map(|(_, old)| old) {
+            let _ = std::fs::remove_file(old);
+        }
+        return Ok(());
+    };
+    for (dest, old) in placed.into_iter().rev() {
+        let _ = match old {
+            Some(old) => std::fs::rename(old, dest),
+            None => std::fs::remove_file(dest),
+        };
+    }
+    for (part, _) in files {
+        let _ = std::fs::remove_file(part);
+    }
+    Err(failure)
 }
 
 fn failure_message(failure: Failure) -> String {
@@ -369,9 +442,8 @@ pub async fn download_file<R: Runtime>(
     let part = fetch_to_part(&parsed, &dest, None, attempts.unwrap_or(DEFAULT_ATTEMPTS), &cancel, &mut set_total, &mut add)
         .await
         .map_err(failure_message)?;
-    tokio::fs::rename(&part, &dest)
-        .await
-        .map_err(|e| format!("Could not write {}: {e}", dest.display()))?;
+    let _moving = crate::jobs::in_flight(&app);
+    crate::library::blocking(move || commit(&[(part, dest)])).await?;
     progress.lock().unwrap().flush();
     Ok(())
 }
@@ -417,9 +489,9 @@ enum Outcome {
 /// place: there is no temporary copy to make and move afterwards.
 ///
 /// Nothing is replaced until every file has arrived. Each one is downloaded next to its
-/// destination as `<name>.part`, and only once all of them succeeded are they renamed
-/// over the old files, so a failed update leaves the previous version intact rather than
-/// a mix of old and new files.
+/// destination with PART_SUFFIX added, and only once all of them succeeded are they moved
+/// over the old files (see `commit`), so a failed update leaves the previous version
+/// intact rather than a mix of old and new files.
 #[tauri::command]
 pub async fn install_files<R: Runtime>(
     app: AppHandle<R>,
@@ -497,18 +569,19 @@ pub async fn install_files<R: Runtime>(
     }
 
     let mut report = InstallReport::default();
+    let mut arrived = Vec::new();
     for ((entry, _, dest), outcome) in jobs.iter().zip(outcomes) {
         match outcome {
             Some(Outcome::Downloaded(part)) => {
-                tokio::fs::rename(&part, dest)
-                    .await
-                    .map_err(|e| format!("Could not write {}: {e}", dest.display()))?;
+                arrived.push((part, dest.clone()));
                 report.downloaded.push(entry.rel_path.clone());
             }
             Some(Outcome::Unchanged) => report.unchanged.push(entry.rel_path.clone()),
             Some(Outcome::Absent) | None => report.absent.push(entry.rel_path.clone()),
         }
     }
+    let _moving = crate::jobs::in_flight(&app);
+    crate::library::blocking(move || commit(&arrived)).await?;
     progress.lock().unwrap().flush();
     Ok(report)
 }
@@ -552,46 +625,79 @@ pub async fn fetch_cached<R: Runtime>(app: AppHandle<R>, url: String) -> Result<
             request = request.header(reqwest::header::IF_MODIFIED_SINCE, modified);
         }
     }
-    let response = request.send().await.map_err(|e| format!("Request to {url} failed: {e}"))?;
-    let status = response.status();
 
-    if status == reqwest::StatusCode::NOT_MODIFIED && cached_meta.is_some() {
-        let body = tokio::fs::read(&body_path)
-            .await
-            .map_err(|e| format!("Could not read the cached copy of {url}: {e}"))?;
-        return Ok(Response::new(body));
+    // Offline, timed out, rate limited or a server error: the copy from last time is
+    // better than an error page, so it is used when there is one
+    let fresh = async {
+        let response = request.send().await.map_err(|e| (None, format!("Request to {url} failed: {e}")))?;
+        let status = response.status();
+        if status == reqwest::StatusCode::NOT_MODIFIED && cached_meta.is_some() {
+            return Ok(None);
+        }
+        if !status.is_success() {
+            return Err((Some(status.as_u16()), format!("HTTP error status: {}", status.as_u16())));
+        }
+        let header = |name: reqwest::header::HeaderName| {
+            response.headers().get(name).and_then(|v| v.to_str().ok()).map(String::from)
+        };
+        let meta = CacheMeta {
+            etag: header(reqwest::header::ETAG),
+            last_modified: header(reqwest::header::LAST_MODIFIED),
+        };
+        let body = response.bytes().await.map_err(|e| (None, format!("Request to {url} failed: {e}")))?;
+        Ok(Some((meta, body.to_vec())))
     }
-    if !status.is_success() {
-        return Err(format!("HTTP error status: {}", status.as_u16()));
-    }
+    .await;
 
-    let header = |name: reqwest::header::HeaderName| {
-        response.headers().get(name).and_then(|v| v.to_str().ok()).map(String::from)
+    let (meta, body) = match fresh {
+        Ok(Some(fresh)) => fresh,
+        Ok(None) => {
+            let body = tokio::fs::read(&body_path)
+                .await
+                .map_err(|e| format!("Could not read the cached copy of {url}: {e}"))?;
+            return Ok(Response::new(body));
+        }
+        Err((status, message)) => {
+            let fall_back = status.map_or(true, |s| s == 403 || is_retryable_status(s));
+            if fall_back && cached_meta.is_some() {
+                if let Ok(body) = tokio::fs::read(&body_path).await {
+                    log::warn!("{message}; using the cached copy");
+                    return Ok(Response::new(body));
+                }
+            }
+            return Err(message);
+        }
     };
-    let meta = CacheMeta {
-        etag: header(reqwest::header::ETAG),
-        last_modified: header(reqwest::header::LAST_MODIFIED),
-    };
-    let body = response
-        .bytes()
-        .await
-        .map_err(|e| format!("Request to {url} failed: {e}"))?
-        .to_vec();
 
     // Caching is best-effort: a failure here costs the next request, never this one
     if meta.etag.is_some() || meta.last_modified.is_some() {
         let store = async {
             tokio::fs::create_dir_all(&dir).await?;
-            let tmp = body_path.with_extension("body.tmp");
-            tokio::fs::write(&tmp, &body).await?;
-            tokio::fs::rename(&tmp, &body_path).await?;
-            tokio::fs::write(&meta_path, serde_json::to_vec(&meta).unwrap_or_default()).await
+            write_replacing(&body_path, &body).await?;
+            write_replacing(&meta_path, &serde_json::to_vec(&meta).unwrap_or_default()).await
         };
         if let Err(e) = store.await {
             log::warn!("Could not cache {url}: {e}");
         }
     }
     Ok(Response::new(body))
+}
+
+/// Writes beside `path` under a name no other write uses, then renames over it: two
+/// requests for the same URL used to write the same temporary file at once.
+async fn write_replacing(path: &Path, bytes: &[u8]) -> std::io::Result<()> {
+    static NEXT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+    let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = with_suffix(path, &format!(".{}-{n}.tmp", std::process::id()));
+    let written = async {
+        tokio::fs::write(&tmp, bytes).await?;
+        tokio::fs::rename(&tmp, path).await
+    }
+    .await;
+    if written.is_err() {
+        let _ = tokio::fs::remove_file(&tmp).await;
+    }
+    written
 }
 
 #[cfg(test)]
@@ -663,7 +769,40 @@ mod tests {
     #[test]
     fn a_partial_file_sits_next_to_its_destination() {
         let dest = Path::new("/songs/Pop/Song/song.ogg");
-        assert_eq!(part_path(dest), Path::new("/songs/Pop/Song/song.ogg.part"));
+        assert_eq!(part_path(dest), Path::new("/songs/Pop/Song/song.ogg.hubpart"));
+    }
+
+    #[test]
+    fn a_commit_replaces_every_file_and_leaves_nothing_behind() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (a, b) = (tmp.path().join("a.tja"), tmp.path().join("b.ogg"));
+        std::fs::write(&a, "old a").unwrap();
+        std::fs::write(part_path(&a), "new a").unwrap();
+        std::fs::write(part_path(&b), "new b").unwrap();
+        commit(&[(part_path(&a), a.clone()), (part_path(&b), b.clone())]).unwrap();
+        assert_eq!(std::fs::read_to_string(&a).unwrap(), "new a");
+        assert_eq!(std::fs::read_to_string(&b).unwrap(), "new b");
+        assert_eq!(std::fs::read_dir(tmp.path()).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn a_commit_that_fails_midway_puts_everything_back() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (a, b, c) = (tmp.path().join("a.tja"), tmp.path().join("b.ogg"), tmp.path().join("c.png"));
+        std::fs::write(&a, "old a").unwrap();
+        std::fs::write(&b, "old b").unwrap();
+        std::fs::write(part_path(&a), "new a").unwrap();
+        // b's download is missing, so moving it in fails after a was replaced
+        std::fs::write(part_path(&c), "new c").unwrap();
+        let files = [(part_path(&a), a.clone()), (part_path(&b), b.clone()), (part_path(&c), c.clone())];
+        assert!(commit(&files).is_err());
+        assert_eq!(std::fs::read_to_string(&a).unwrap(), "old a");
+        assert_eq!(std::fs::read_to_string(&b).unwrap(), "old b");
+        assert!(!c.exists());
+        // No partial or set-aside file is left
+        let mut names: Vec<_> = std::fs::read_dir(tmp.path()).unwrap().map(|e| e.unwrap().file_name()).collect();
+        names.sort();
+        assert_eq!(names, ["a.tja", "b.ogg"]);
     }
 
     #[test]

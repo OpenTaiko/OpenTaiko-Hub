@@ -544,6 +544,7 @@ fn main() {
             jobs::begin_job,
             jobs::cancel_job,
             jobs::end_job,
+            jobs::reset_jobs,
             fsops::merge_move_dir,
             migrate::plan_migration,
             migrate::paths_are_same_dir,
@@ -593,7 +594,8 @@ fn main() {
             }
             health::spawn_watcher(ui_health.clone());
             guard::init(app.handle());
-            std::thread::spawn(guard::sweep_stale_tmp);
+            let instances = guard::instance_roots(app.handle());
+            std::thread::spawn(move || guard::sweep_leftovers(instances));
             Ok(())
         })
         .build(tauri::generate_context!());

@@ -61,6 +61,8 @@ pub async fn merge_move_dir(app: tauri::AppHandle, src: String, dest: String) ->
     // Both ends are written to: the source is emptied and removed
     crate::guard::checked(&app, &src)?;
     crate::guard::checked(&app, &dest)?;
+    // Cut off by a closing window, an install would leave the instance half old, half new
+    let _moving = crate::jobs::in_flight(&app);
     tokio::task::spawn_blocking(move || merge_move_dir_sync(&src, &dest))
         .await
         .map_err(|e| format!("Task failed: {e}"))?

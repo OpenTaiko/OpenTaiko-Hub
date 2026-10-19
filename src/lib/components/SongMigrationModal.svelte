@@ -2,6 +2,7 @@
     import Modal from '$lib/components/Modal.svelte';
     import { formatDateTime } from '$lib/utils/format';
     import { ipc } from '$lib/ipc';
+    import { startJob } from '$lib/stores/activity';
     // Resolves an instance's local Songs folder into the shared library. New charts are
     // moved, byte-identical charts are dropped, and charts that clash with a different
     // version already in the library are resolved by the user — per chart (showing each
@@ -83,6 +84,8 @@
     const Apply = async () => {
         if (!plan) return;
         applying = true;
+        // A job, so closing the window asks first, and then waits for the move to finish
+        const job = startJob('songs', Candidate.instance.id);
         try {
             const decisions: MigrationDecision[] = plan.items.map((item) => {
                 let action: MigrationAction;
@@ -103,6 +106,8 @@
             OnApplied();
         } catch (error) {
             TriggerError(get(_)('songs.migrate.error', { values: { error: String(error) } }));
+        } finally {
+            job.end();
         }
         applying = false;
     };

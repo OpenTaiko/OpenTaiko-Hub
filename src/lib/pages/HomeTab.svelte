@@ -402,6 +402,7 @@
         // Declared out here rather than beside the build step so the failure path can
         // drain whatever is still buffered: the last lines are the ones that say why.
         let pending: string[] = [];
+        const logChannel = new Channel<string[]>();
         let flushTimer: ReturnType<typeof setTimeout> | null = null;
         const flushBuildLog = () => {
             if (flushTimer !== null) {
@@ -493,7 +494,6 @@
             buildStage = 'build';
             progress = undefined;
             const rid = (await GetBuildTarget()).rid;
-            const logChannel = new Channel<string[]>();
             logChannel.onmessage = (lines) => {
                 pending.push(...lines);
                 // Bounded in case the flush is throttled while the window is hidden.
@@ -557,6 +557,9 @@
             // build failure, and saying so would send the user to the wrong output.
             ReportInstallError(buildStage === 'build' ? 'home.error.build_failed' : 'home.error.download_failed', err);
         } finally {
+            // Lines a cancelled build still sends are dropped rather than written into the
+            // log after the run, or into the next run's
+            logChannel.onmessage = () => {};
             // No-op on the paths above that already flushed; it is here so no timer can
             // outlive the run and write into the log of the next one.
             flushBuildLog();

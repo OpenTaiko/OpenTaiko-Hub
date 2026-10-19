@@ -108,6 +108,34 @@ pub(crate) fn apply_env(cmd: &mut Command, changes: Vec<EnvChange>) {
 const OUTPUT_INTERVAL: Duration = Duration::from_millis(100);
 /// A batch is sent early once it holds this many lines.
 const OUTPUT_BATCH_MAX: usize = 500;
+/// How long the last output of a finished build is waited for.
+const OUTPUT_GRACE: Duration = Duration::from_secs(5);
+
+/// Stops a process and everything it started.
+fn kill_tree(child: &mut std::process::Child) {
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        let _ = Command::new("taskkill")
+            .args(["/PID", &child.id().to_string(), "/T", "/F"])
+            .creation_flags(CREATE_NO_WINDOW)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    #[cfg(unix)]
+    {
+        // The child leads its own process group (see run_dotnet)
+        let _ = Command::new("kill")
+            .args(["-KILL", &format!("-{}", child.id())])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+    let _ = child.kill();
+    let _ = child.wait();
+}
 
 /// Collects lines from `rx` and hands them to `send` in batches: every `interval`, or as
 /// soon as `max` lines are waiting. Returns once every sender is gone and the last lines
@@ -148,7 +176,8 @@ const RUNTIMES: [&str; 6] = ["win-x64", "win-arm64", "linux-x64", "linux-arm64",
 ///
 /// Built here rather than taken from the page: dotnet runs whatever a project, a logger
 /// or an imported props file says, so the page used to be able to run anything through
-/// the arguments alone. No MSBuild node is left behind to serve later builds.
+/// the arguments alone. No MSBuild node or compiler server is left behind to serve later
+/// builds, holding the output pipes open after the build itself has ended.
 fn publish_args(build_dir: &Path, rid: &str) -> Vec<String> {
     vec![
         "publish".into(),
@@ -163,6 +192,7 @@ fn publish_args(build_dir: &Path, rid: &str) -> Vec<String> {
         build_dir.join("p").to_string_lossy().into_owned(),
         format!("-p:OutDir={}{}", build_dir.join("b").display(), std::path::MAIN_SEPARATOR),
         "-nodeReuse:false".into(),
+        "-p:UseSharedCompilation=false".into(),
     ]
 }
 
@@ -174,6 +204,7 @@ pub async fn list_dotnet_sdks(
     on_output: Channel<Vec<String>>,
 ) -> Result<i32, String> {
     let cancel = crate::jobs::token(&app, &job);
+    let _running = crate::jobs::in_flight(&app);
     run_dotnet(vec!["--list-sdks".into()], None, cancel, on_output).await
 }
 
@@ -194,6 +225,8 @@ pub async fn publish_game(
     }
     let src = crate::guard::build_source_dir(&app, &src_dir)?;
     let build_dir = src.parent().ok_or("The build folder could not be resolved")?.to_path_buf();
+    // Closing the window waits until a cancelled build is gone
+    let _running = crate::jobs::in_flight(&app);
     run_dotnet(publish_args(&build_dir, &rid), Some(src), cancel, on_output).await
 }
 
@@ -223,6 +256,9 @@ async fn run_dotnet(
         }
         #[cfg(unix)]
         {
+            // A group of its own, so cancelling stops the compilers it starts too
+            use std::os::unix::process::CommandExt;
+            cmd.process_group(0);
             let env: HashMap<String, String> = std::env::vars().collect();
             let cleanup = appimage_cleanup(&env);
             // PATH as the AppImage cleanup leaves it, before adding the dotnet locations
@@ -276,18 +312,24 @@ async fn run_dotnet(
                 break status;
             }
             if cancel.is_cancelled() {
-                let _ = child.kill();
-                let _ = child.wait();
-                // The output readers are not waited for: a compiler process the build
-                // started can keep the pipe open after dotnet itself is gone
+                // dotnet alone used to be stopped, and the MSBuild and compiler processes
+                // it had started carried on, the Hub closed or not
+                kill_tree(&mut child);
+                // The output readers are not waited for: a process outside the tree can
+                // still hold a pipe open
                 return Err(crate::jobs::CANCELLED.to_string());
             }
             std::thread::sleep(Duration::from_millis(200));
         };
-        for reader in readers {
-            let _ = reader.join();
+        // The last lines are worth waiting for, but not forever: a process the build left
+        // running keeps the pipes open, and the build used to look stuck until it exited
+        let until = Instant::now() + OUTPUT_GRACE;
+        while readers.iter().any(|r| !r.is_finished()) && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(50));
         }
-        let _ = batcher.join();
+        if readers.iter().all(|r| r.is_finished()) {
+            let _ = batcher.join();
+        }
         Ok(status.code().unwrap_or(-1))
     })
     .await
@@ -403,6 +445,7 @@ mod arg_tests {
         assert!(args.windows(2).any(|w| w[0] == "--output" && Path::new(&w[1]) == build.join("p")));
         assert!(args.iter().any(|a| a.starts_with("-p:OutDir=") && a.contains("1a2b3c4d")));
         assert!(args.contains(&"-nodeReuse:false".to_string()));
+        assert!(args.contains(&"-p:UseSharedCompilation=false".to_string()));
     }
 
     #[test]

@@ -365,21 +365,65 @@ fn remove_stale_in(dir: &Path, matches: fn(&str) -> bool, now: SystemTime) -> us
     removed
 }
 
+/// What a download left beside the files it was replacing (download.rs), when a crash,
+/// a forced quit or a power cut stopped it: partial files, removed, and old files set
+/// aside, put back when their replacement never arrived. Symbolic links are not followed.
+fn clean_stale_downloads(dir: &Path, now: SystemTime) -> usize {
+    let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
+    let mut cleaned = 0;
+    for entry in entries.flatten() {
+        let Ok(kind) = entry.file_type() else { continue };
+        let path = entry.path();
+        if kind.is_dir() {
+            cleaned += clean_stale_downloads(&path, now);
+            continue;
+        }
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let stale = || kind.is_file() && is_stale(&path, now);
+        let done = if name.ends_with(crate::download::PART_SUFFIX) && stale() {
+            std::fs::remove_file(&path).is_ok()
+        } else if let Some(original) = name.strip_suffix(crate::download::OLD_SUFFIX).filter(|_| stale()) {
+            let dest = path.with_file_name(original);
+            let outcome = if dest.exists() { std::fs::remove_file(&path) } else { std::fs::rename(&path, &dest) };
+            outcome.is_ok()
+        } else {
+            false
+        };
+        cleaned += usize::from(done);
+    }
+    cleaned
+}
+
 /// A download or build stopped by a crash, a forced quit or a power cut never reaches the
 /// cleanup that removes its folder, and one such folder can hold a whole game build.
 /// Anything older than the longest operation the Hub runs is one of those. The age check
 /// leaves alone a folder a second Hub window may still be writing to, and the name check
 /// matters on Linux and macOS, where `tmp` sits in ~/Documents and may be the user's own.
-pub fn sweep_stale_tmp() {
+/// Downloads go straight into the library and the instances (`instances`), where what
+/// such a download leaves is cleaned up as well.
+pub fn sweep_leftovers(instances: Vec<PathBuf>) {
     let now = SystemTime::now();
     let mut removed = 0;
+    let mut cleaned = 0;
     if let Some(root) = crate::hub_root_dir() {
         removed += remove_stale_in(&root.join("tmp"), is_hub_tmp_name, now);
+        cleaned += clean_stale_downloads(&root.join("Songs"), now) + clean_stale_downloads(&root.join("OpenTaiko"), now);
     }
     removed += remove_stale_in(&std::env::temp_dir(), is_build_dir_name, now);
+    for instance in &instances {
+        cleaned += clean_stale_downloads(instance, now);
+    }
     if removed > 0 {
         log::info!("Removed {} leftover temporary folder(s)", removed);
     }
+    if cleaned > 0 {
+        log::info!("Cleaned up {} file(s) left by interrupted downloads", cleaned);
+    }
+}
+
+/// The instance folders allowed this session.
+pub fn instance_roots<R: Runtime>(app: &AppHandle<R>) -> Vec<PathBuf> {
+    app.state::<InstanceRoots>().0.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
 #[cfg(test)]
@@ -431,6 +475,33 @@ mod tests {
         assert_eq!(remove_stale_in(tmp.path(), is_hub_tmp_name, later), 1);
         assert!(!tmp.path().join("1a2b3c4d").exists());
         assert!(tmp.path().join("mine").exists());
+    }
+
+    #[test]
+    fn interrupted_downloads_are_cleaned_up_once_old() {
+        let tmp = tempfile::tempdir().unwrap();
+        let song = tmp.path().join("Pop").join("Song");
+        std::fs::create_dir_all(&song).unwrap();
+        // A partial download, a replaced file whose replacement arrived, and one whose
+        // replacement never did
+        std::fs::write(song.join("song.ogg.hubpart"), "half").unwrap();
+        std::fs::write(song.join("song.tja"), "new").unwrap();
+        std::fs::write(song.join("song.tja.hubold"), "old").unwrap();
+        std::fs::write(song.join("jacket.png.hubold"), "original").unwrap();
+        std::fs::write(song.join("notes.part"), "the user's").unwrap();
+
+        assert_eq!(clean_stale_downloads(tmp.path(), SystemTime::now()), 0);
+        let later = SystemTime::now() + Duration::from_secs(7 * 60 * 60);
+        assert_eq!(clean_stale_downloads(tmp.path(), later), 3);
+
+        let mut names: Vec<String> = std::fs::read_dir(&song)
+            .unwrap()
+            .map(|e| e.unwrap().file_name().to_string_lossy().into_owned())
+            .collect();
+        names.sort();
+        assert_eq!(names, ["jacket.png", "notes.part", "song.tja"]);
+        assert_eq!(std::fs::read_to_string(song.join("song.tja")).unwrap(), "new");
+        assert_eq!(std::fs::read_to_string(song.join("jacket.png")).unwrap(), "original");
     }
 
     #[test]
