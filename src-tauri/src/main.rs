@@ -256,10 +256,16 @@ async fn unzip_and_get_first_folder(
                     })?;
                 }
 
-                let mut out_file = File::create(&out_path)
-                    .map_err(|err| format!("ERR: Failed to create file: {}", err))?;
+                // Buffered: unbuffered, a game build of a gigabyte and more was written in
+                // one system call per 8 KiB read from the archive
+                let mut out_file = std::io::BufWriter::with_capacity(
+                    library::COPY_BUFFER,
+                    File::create(&out_path).map_err(|err| format!("ERR: Failed to create file: {}", err))?,
+                );
                 std::io::copy(&mut file, &mut out_file)
+                    .and_then(|_| std::io::Write::flush(&mut out_file))
                     .map_err(|err| format!("ERR: Failed to write file: {}", err))?;
+                drop(out_file);
 
                 // Preserve unix permissions (e.g. the executable bit of the game binary)
                 #[cfg(unix)]
@@ -568,6 +574,7 @@ fn main() {
             hub_root,
             binver::get_game_version,
             scan::scan_songs,
+            scan::count_songs,
             assetscan::scan_asset_versions,
             procs::list_dotnet_sdks,
             procs::publish_game,

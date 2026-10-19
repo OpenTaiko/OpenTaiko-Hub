@@ -163,15 +163,59 @@ fn is_retryable_status(status: u16) -> bool {
     status == 408 || status == 429 || (500..600).contains(&status)
 }
 
+/// Seconds since 1970 of an HTTP date, `Sun, 06 Nov 1994 08:49:37 GMT` (the only form
+/// servers send now).
+fn http_date_secs(value: &str) -> Option<u64> {
+    let parts: Vec<&str> = value.split_whitespace().collect();
+    let [_, day, month, year, time, "GMT"] = parts.as_slice() else { return None };
+    const MONTHS: [&str; 12] = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    let month = MONTHS.iter().position(|m| m == month)? as i64 + 1;
+    let (day, year): (i64, i64) = (day.parse().ok()?, year.parse().ok()?);
+    let hms: Vec<i64> = time.split(':').map(|p| p.parse().ok()).collect::<Option<_>>()?;
+    let [h, m, s] = hms.as_slice() else { return None };
+    // Days from the civil date (Howard Hinnant's algorithm)
+    let y = if month <= 2 { year - 1 } else { year };
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let doy = (153 * ((month + 9) % 12) + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    let days = era * 146_097 + doe - 719_468;
+    u64::try_from(days * 86_400 + h * 3600 + m * 60 + s).ok()
+}
+
+/// How long a server asks to be left alone: a number of seconds, or a date. The date
+/// form used to be ignored, and retries came back before the server wanted them.
 fn retry_after(headers: &reqwest::header::HeaderMap) -> Option<Duration> {
-    headers
-        .get(reqwest::header::RETRY_AFTER)?
-        .to_str()
-        .ok()?
-        .trim()
-        .parse::<u64>()
-        .ok()
-        .map(Duration::from_secs)
+    let value = headers.get(reqwest::header::RETRY_AFTER)?.to_str().ok()?.trim();
+    if let Ok(secs) = value.parse::<u64>() {
+        return Some(Duration::from_secs(secs));
+    }
+    let now = SystemTime::now().duration_since(UNIX_EPOCH).ok()?.as_secs();
+    Some(Duration::from_secs(http_date_secs(value)?.saturating_sub(now)))
+}
+
+/// When each host may next be asked, after one asked to be left alone for a while.
+fn host_pauses() -> &'static Mutex<std::collections::HashMap<String, Instant>> {
+    static PAUSES: OnceLock<Mutex<std::collections::HashMap<String, Instant>>> = OnceLock::new();
+    PAUSES.get_or_init(Default::default)
+}
+
+/// Every transfer to the host waits, not only the one that was told: the others used to
+/// go on asking, each to be refused in turn.
+fn pause_host(url: &reqwest::Url, pause: Duration) {
+    let Some(host) = url.host_str() else { return };
+    let until = Instant::now() + pause.min(MAX_RETRY_AFTER);
+    let mut pauses = host_pauses().lock().unwrap_or_else(|e| e.into_inner());
+    let entry = pauses.entry(host.to_string()).or_insert(until);
+    *entry = (*entry).max(until);
+}
+
+async fn wait_for_host(url: &reqwest::Url, cancel: &CancelToken) -> Result<(), Failure> {
+    let until = url.host_str().and_then(|host| host_pauses().lock().unwrap_or_else(|e| e.into_inner()).get(host).copied());
+    match until.map(|until| until.saturating_duration_since(Instant::now())) {
+        Some(wait) if !wait.is_zero() => unless_cancelled(tokio::time::sleep(wait), cancel).await,
+        _ => Ok(()),
+    }
 }
 
 fn status_failure(url: &str, response: &reqwest::Response) -> Failure {
@@ -277,6 +321,7 @@ async fn fetch_to_part(
             on_bytes(n);
         };
         let fetched = async {
+            wait_for_host(url, cancel).await?;
             // Held for this attempt only, not through the pause before a retry
             let _slot = unless_cancelled(transfer_slots().acquire(), cancel)
                 .await?
@@ -295,6 +340,9 @@ async fn fetch_to_part(
                 let _ = tokio::fs::remove_file(&part).await;
                 match failure {
                     Failure::Retry { after, message } if attempt < attempts => {
+                        if let Some(after) = after {
+                            pause_host(url, after);
+                        }
                         let delay = backoff(attempt, after);
                         log::warn!("{message} (attempt {attempt}/{attempts}), retrying in {} ms", delay.as_millis());
                         if !sleep_unless_cancelled(delay, cancel).await {
@@ -313,10 +361,10 @@ async fn fetch_to_part(
 /// short or altered on the way is downloaded again rather than installed.
 async fn verify(part: &Path, git_sha: Option<&str>, url: &reqwest::Url) -> Result<(), Failure> {
     let Some(sha) = git_sha else { return Ok(()) };
-    let bytes = tokio::fs::read(part)
+    let matches = has_git_sha(part, sha)
         .await
         .map_err(|e| Failure::Fatal { status: None, message: format!("Could not read {}: {e}", part.display()) })?;
-    if crate::scan::git_blob_sha1(&bytes).eq_ignore_ascii_case(sha) {
+    if matches {
         Ok(())
     } else {
         Err(Failure::Retry { after: None, message: format!("Download of {url} does not match the expected file") })
@@ -471,12 +519,35 @@ pub struct InstallReport {
     absent: Vec<String>,
 }
 
+/// A file's git blob hash, worked out as it is read, 64 KiB at a time: read whole, a song
+/// update held up to a dozen audio files in memory at once just to compare them.
+fn git_blob_sha1_of_file(path: &Path) -> std::io::Result<String> {
+    use std::io::Read;
+    let mut file = std::fs::File::open(path)?;
+    let mut hasher = Sha1::new();
+    hasher.update(format!("blob {}\0", file.metadata()?.len()).as_bytes());
+    let mut buffer = vec![0u8; 64 * 1024];
+    loop {
+        let read = file.read(&mut buffer)?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(hex::encode(hasher.finalize()))
+}
+
+/// True when `path` holds the file whose git blob hash is `sha`.
+async fn has_git_sha(path: &Path, sha: &str) -> std::io::Result<bool> {
+    let (path, sha) = (path.to_path_buf(), sha.to_string());
+    tokio::task::spawn_blocking(move || git_blob_sha1_of_file(&path).map(|hash| hash.eq_ignore_ascii_case(&sha)))
+        .await
+        .map_err(std::io::Error::other)?
+}
+
 async fn is_unchanged(dest: &Path, git_sha: Option<&str>) -> bool {
     let Some(sha) = git_sha else { return false };
-    match tokio::fs::read(dest).await {
-        Ok(bytes) => crate::scan::git_blob_sha1(&bytes).eq_ignore_ascii_case(sha),
-        Err(_) => false,
-    }
+    has_git_sha(dest, sha).await.unwrap_or(false)
 }
 
 enum Outcome {
@@ -770,6 +841,51 @@ mod tests {
     fn a_partial_file_sits_next_to_its_destination() {
         let dest = Path::new("/songs/Pop/Song/song.ogg");
         assert_eq!(part_path(dest), Path::new("/songs/Pop/Song/song.ogg.hubpart"));
+    }
+
+    #[test]
+    fn retry_after_is_read_as_seconds_or_as_a_date() {
+        assert_eq!(http_date_secs("Sun, 06 Nov 1994 08:49:37 GMT"), Some(784_111_777));
+        assert_eq!(http_date_secs("Thu, 01 Jan 1970 00:00:00 GMT"), Some(0));
+        assert_eq!(http_date_secs("Tue, 29 Feb 2028 12:00:00 GMT"), Some(1_835_438_400));
+        assert_eq!(http_date_secs("Sunday, 06-Nov-94 08:49:37 GMT"), None);
+        assert_eq!(http_date_secs("soon"), None);
+
+        let mut headers = reqwest::header::HeaderMap::new();
+        headers.insert(reqwest::header::RETRY_AFTER, "120".parse().unwrap());
+        assert_eq!(retry_after(&headers), Some(Duration::from_secs(120)));
+        // A date already past means no wait
+        headers.insert(reqwest::header::RETRY_AFTER, "Sun, 06 Nov 1994 08:49:37 GMT".parse().unwrap());
+        assert_eq!(retry_after(&headers), Some(Duration::ZERO));
+    }
+
+    #[test]
+    fn a_paused_host_holds_back_every_transfer_to_it() {
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_time().build().unwrap();
+        let url = reqwest::Url::parse("https://paused.example/a").unwrap();
+        let other = reqwest::Url::parse("https://other.example/a").unwrap();
+        pause_host(&url, Duration::from_millis(300));
+        let token = CancelToken::default();
+        runtime.block_on(async {
+            let started = Instant::now();
+            wait_for_host(&other, &token).await.unwrap();
+            assert!(started.elapsed() < Duration::from_millis(100));
+            wait_for_host(&url, &token).await.unwrap();
+            assert!(started.elapsed() >= Duration::from_millis(250));
+        });
+    }
+
+    #[test]
+    fn a_file_is_hashed_as_git_hashes_it() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file = tmp.path().join("song.ogg");
+        // Larger than one read, so the hash spans several
+        let bytes: Vec<u8> = (0..200_000u32).map(|i| (i % 251) as u8).collect();
+        std::fs::write(&file, &bytes).unwrap();
+        assert_eq!(git_blob_sha1_of_file(&file).unwrap(), crate::scan::git_blob_sha1(&bytes));
+        // git hash-object of "hello\n"
+        std::fs::write(&file, "hello\n").unwrap();
+        assert_eq!(git_blob_sha1_of_file(&file).unwrap(), "ce013625030ba8dba906f756967f9e9ca394464a");
     }
 
     #[test]

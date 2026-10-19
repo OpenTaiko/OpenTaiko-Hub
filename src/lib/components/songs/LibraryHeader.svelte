@@ -58,6 +58,23 @@
         { id: 'installed', label: 'songs.scope.installed' },
         { id: 'updates', label: 'songs.scope.updates' }
     ];
+
+    // Each search rebuilds the whole library view, so typing waits for a pause instead
+    // of rebuilding it at every keystroke
+    const SEARCH_DELAY_MS = 150;
+    let searchTimer: ReturnType<typeof setTimeout> | null = null;
+    const QueueSearch = (value: string) => {
+        if (searchTimer !== null) clearTimeout(searchTimer);
+        searchTimer = setTimeout(() => {
+            searchTimer = null;
+            OnSearch?.(value);
+        }, SEARCH_DELAY_MS);
+    };
+    const ClearSearch = () => {
+        if (searchTimer !== null) clearTimeout(searchTimer);
+        searchTimer = null;
+        OnSearch?.('');
+    };
 </script>
 
 <header class="library card">
@@ -132,10 +149,10 @@
                 placeholder={$_('songs.library.search')}
                 aria-label={$_('songs.library.search')}
                 value={Search}
-                oninput={(e) => OnSearch?.(e.currentTarget.value)}
+                oninput={(e) => QueueSearch(e.currentTarget.value)}
             >
             {#if Search}
-                <button type="button" class="clear" aria-label={$_('common.clear')} title={$_('common.clear')} onclick={() => OnSearch?.('')}>✕</button>
+                <button type="button" class="clear" aria-label={$_('common.clear')} title={$_('common.clear')} onclick={ClearSearch}>✕</button>
             {/if}
         </div>
     </div>

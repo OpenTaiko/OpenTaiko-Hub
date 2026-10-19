@@ -56,6 +56,11 @@
 
     // Sub-tabs: 0 Overview, 1 Skins, 2 Characters, 3 Puchicharas, 4 Docs
     let homeSubTab = $state(0);
+    // Whether a Skins / Characters / Puchicharas tab was opened yet (see the markup)
+    let assetsOpened = $state(false);
+    $effect(() => {
+        if (homeSubTab >= 1 && homeSubTab <= 3) assetsOpened = true;
+    });
 
     // Latest stable release
     let latestVersion = $state<string | null>(null);
@@ -847,7 +852,10 @@
 </div>
 
 <!-- Skins / Characters / Puchicharas -->
-{#if assetsAvailable}
+<!-- Mounted the first time one of its tabs is opened, then kept, so its downloads go on
+     while another tab is shown: mounted from the start, it fetched the catalog and
+     scanned the instance at every launch, whether the tab was opened or not -->
+{#if assetsAvailable && assetsOpened}
 <div class="w-full h-full" style:display={homeSubTab >= 1 && homeSubTab <= 3 ? null : 'none'}>
     <!-- Only sub-tabs 1..3 map to an asset type; any other value (Docs/Saves active
          while this stays mounted) must never reach AssetsTab as an out-of-range index -->

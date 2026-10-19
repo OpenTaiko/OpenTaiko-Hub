@@ -135,6 +135,19 @@
     let view = $derived(viewOf(library, scope, librarySearch,
         (entry: LibraryEntry) => (entry.catalog ? searchTerms.get(entry.catalog.uniqueId) ?? [] : [])));
 
+    // Songs at the top of the library, outside any collection, a page at a time as a
+    // collection shows them: a library of loose charts used to build every row at once.
+    // A new search or scope starts from the first page again.
+    const ROOT_PAGE = 60;
+    let rootShown = $state(ROOT_PAGE);
+    $effect(() => {
+        void scope;
+        void librarySearch;
+        rootShown = ROOT_PAGE;
+    });
+    let rootEntries = $derived((view?.entries ?? []).slice(0, rootShown));
+    let rootHidden = $derived(Math.max(0, (view?.entries.length ?? 0) - rootShown));
+
     let topCollections = $derived(view ? [...view.children.values()].sort((a, b) => a.name.localeCompare(b.name)) : []);
     let libraryEmpty = $derived(!scanning && library.installedCount === 0 && library.totalCount > 0);
 
@@ -169,6 +182,8 @@
     // has never heard of — with no art and no audio at all.
     let songJacket = $state<string | null>(null);
     let songAudio = $state<string | null>(null);
+    // The audio file found for the selected chart, read only once it is played
+    let songAudioName = $state<string | null>(null);
     let mediaFor = $state<string | null>(null);
 
     const ReleaseSongMedia = () => {
@@ -176,6 +191,7 @@
         if (songAudio) URL.revokeObjectURL(songAudio);
         songJacket = null;
         songAudio = null;
+        songAudioName = null;
     };
 
     const blobFor = async (base: string, relPath: string, name: string): Promise<string | null> => {
@@ -192,20 +208,38 @@
         try {
             const base = globalSongsPath ?? await GetGlobalSongsPath();
             const media = await ipc.readSongMedia(base, forPath);
-            const [jacket, audio] = await Promise.all([
-                media.preimage ? blobFor(base, forPath, media.preimage) : null,
-                media.audio ? blobFor(base, forPath, media.audio) : null
-            ]);
+            // The jacket is shown at once; the audio, often several megabytes, waits
+            // until it is played (LoadSongAudio)
+            const jacket = media.preimage ? await blobFor(base, forPath, media.preimage) : null;
             // The selection may have moved on while this was in flight.
             if (mediaFor !== forPath) {
                 if (jacket) URL.revokeObjectURL(jacket);
-                if (audio) URL.revokeObjectURL(audio);
                 return;
             }
             songJacket = jacket;
-            songAudio = audio;
+            songAudioName = media.audio;
         } catch (error) {
             console.error('Could not read the chart media:', error);
+        }
+    };
+
+    const LoadSongAudio = async (): Promise<string | null> => {
+        if (songAudio) return songAudio;
+        const forPath = mediaFor;
+        const name = songAudioName;
+        if (!forPath || !name) return null;
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const audio = await blobFor(base, forPath, name);
+            if (mediaFor !== forPath) {
+                if (audio) URL.revokeObjectURL(audio);
+                return null;
+            }
+            songAudio = audio;
+            return audio;
+        } catch (error) {
+            console.error('Could not read the chart audio:', error);
+            return null;
         }
     };
 
@@ -525,6 +559,8 @@
         }
     }
     
+    const LIVE_SCAN_FLUSH_MS = 300;
+
     // Scans the shared Songs library natively (one IPC call, live progress batches)
     const crawlSongs = async () => {
         scanning = true;
@@ -549,12 +585,13 @@
         try {
             const baseDirPath = await GetGlobalSongsPath();
 
-            // Batches are merged and pushed to the UI at most once per animation frame:
-            // every update re-evaluates the status of each listed song, so applying them
-            // as they arrive would hog the UI thread for the duration of the scan.
+            // Batches are merged and pushed to the UI every LIVE_SCAN_FLUSH_MS: every
+            // update rebuilds the library tree and re-evaluates each listed song, so
+            // applying them at every animation frame kept the UI thread busy for the
+            // whole scan.
             let latestStats = { dirs: 0, found: 0 };
             let dirty = false;
-            let flushFrame: number | null = null;
+            let flushFrame: ReturnType<typeof setTimeout> | null = null;
             const flush = () => {
                 flushFrame = null;
                 scanStats = latestStats;
@@ -573,11 +610,13 @@
                     for (const song of message.batch) registerSong(liveSongs, liveAll, song);
                     dirty = true;
                 }
-                flushFrame ??= requestAnimationFrame(flush);
+                flushFrame ??= setTimeout(flush, LIVE_SCAN_FLUSH_MS);
             };
 
-            const result = await ipc.scanSongs(baseDirPath, channel);
-            if (flushFrame !== null) cancelAnimationFrame(flushFrame);
+            // The songs come in the result anyway: they are streamed as well only when
+            // shown as they are found, on a first scan, rather than sent twice every time
+            const result = await ipc.scanSongs(baseDirPath, channel, showLive);
+            if (flushFrame !== null) clearTimeout(flushFrame);
 
             // The command result is authoritative; events were only for live display
             const finalSongs: Record<string, LocalSong> = {};
@@ -608,10 +647,11 @@
                 // library, and would keep offering a migration the backend refuses.
                 if (await ipc.pathsAreSameDir(instSongs, globalSongs)) continue;
                 try {
-                    const probe = new Channel<ScanProgressEvent>();
-                    const result = await ipc.scanSongs(instSongs, probe);
-                    if (result.baseExists && result.songs.length > 0) {
-                        candidates.push({ instance: inst, count: result.songs.length, srcPath: instSongs });
+                    // Counted, not scanned: every chart of every instance used to be read
+                    // and hashed at each start, only for this number
+                    const count = await ipc.countSongs(instSongs);
+                    if (count > 0) {
+                        candidates.push({ instance: inst, count, srcPath: instSongs });
                     }
                 } catch (error) {
                     console.error(`Migration check failed for ${inst.name}:`, error);
@@ -730,6 +770,7 @@
                 }
             };
             await Promise.all(Array.from({ length: Math.min(BULK_SONG_CONCURRENCY, pending.length) }, worker));
+            FlushInstalled();
 
             const values = { count: done, total: pending.length, failed };
             if (bulkCancelRequested) {
@@ -861,6 +902,27 @@
         return updated;
     }
 
+    // Songs a bulk run finished, folded into the library a few times a second: each
+    // change to currentSongs rebuilds the whole library tree, which a bulk run used to do
+    // after every song, several times a second for hundreds of songs
+    const INSTALLED_FLUSH_MS = 250;
+    let installedPending: Record<string, LocalSong> = {};
+    let installedTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const FlushInstalled = () => {
+        if (installedTimer !== null) clearTimeout(installedTimer);
+        installedTimer = null;
+        if (Object.keys(installedPending).length === 0) return;
+        currentSongs = { ...currentSongs, ...installedPending };
+        installedPending = {};
+    };
+
+    const RecordInstalled = (uniqueId: string, song: LocalSong, batched: boolean) => {
+        installedPending[uniqueId] = song;
+        if (!batched) FlushInstalled();
+        else installedTimer ??= setTimeout(FlushInstalled, INSTALLED_FLUSH_MS);
+    };
+
     type DownloadOutcome = 'done' | 'failed' | 'cancelled' | 'skipped';
 
     // songNb is set when a bulk run drives this: the run reports one summary at the end,
@@ -943,15 +1005,11 @@
 
         if (!quiet) TriggerSuccess(get(_)('songs.success.download_complete'));
 
-        //crawlSongs();
-        currentSongs = {
-            ...currentSongs,
-            [songObj.uniqueId]: {
-                chartMD5s: [songObj.tjaMD5],
-                // Keep the actual install location when the song was relocated by the user
-                chartRelativePath: (currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath
-            }
-        };
+        RecordInstalled(songObj.uniqueId, {
+            chartMD5s: [songObj.tjaMD5],
+            // Keep the actual install location when the song was relocated by the user
+            chartRelativePath: (currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath
+        }, quiet);
         return 'done';
     }
 
@@ -1118,7 +1176,7 @@
 			</button>
 
 			{#if view.entries.length > 0}<SongRowHeader />{/if}
-			{#each view.entries as entry (entry.key)}
+			{#each rootEntries as entry (entry.key)}
 				<SongRow
 					Entry={entry}
 					Selected={selectedKey === entry.key}
@@ -1128,6 +1186,11 @@
 					OnGet={(e) => DownloadSong(e, currentSongs[e.uniqueId] ?? null)}
 				/>
 			{/each}
+			{#if rootHidden > 0}
+				<button type="button" class="more" onclick={() => rootShown += ROOT_PAGE * 4}>
+					{$_('songs.tree.show_more', { values: { count: rootHidden } })}
+				</button>
+			{/if}
 		{/if}
 	</div>
 
@@ -1161,6 +1224,7 @@
 		JacketUrl={JacketUrl}
 		LocalJacket={songJacket}
 		LocalAudio={songAudio}
+		LoadAudio={songAudioName ? LoadSongAudio : undefined}
 		OnPickPreimage={PickSongPreimage}
 		OnGet={(entry) => DownloadSong(entry, currentSongs[entry.uniqueId] ?? null)}
 		OnOpenFolder={OpenGenreFolder}
@@ -1379,4 +1443,19 @@
     /* Jacket */
 
     /* Artist info */
+    /* As a collection's "show more" (CollectionBar) */
+    .more {
+        align-self: flex-start;
+        margin: 0.25rem 0 0 0;
+        font: inherit;
+        font-size: 0.78rem;
+        font-weight: 700;
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.375rem;
+        border: 1px solid color-mix(in oklab, var(--color-surface-500) 35%, transparent);
+        background: none;
+        color: inherit;
+        cursor: pointer;
+    }
+    .more:hover {background-color: color-mix(in oklab, var(--color-primary-500) 12%, transparent);}
 </style>

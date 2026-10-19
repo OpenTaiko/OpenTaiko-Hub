@@ -24,6 +24,8 @@
         /** Art and audio read off the disk for an installed chart. */
         LocalJacket?: string | null;
         LocalAudio?: string | null;
+        /** Reads the installed chart's audio on first play (see AudioPlayer). */
+        LoadAudio?: () => Promise<string | null>;
         /** Offered for an installed chart, which can carry its own #PREIMAGE. */
         OnPickPreimage?: (entry: LibraryEntry) => void;
         OnGet?: (entry: SoundtrackEntry) => void;
@@ -42,6 +44,7 @@
         JacketUrl,
         LocalJacket = null,
         LocalAudio = null,
+        LoadAudio,
         OnPickPreimage,
         OnGet,
         OnOpenFolder,
@@ -63,7 +66,7 @@
 
     // Playable from disk once installed, and from the repository while it is only on
     // offer. A Dan course is a list of other songs, so it has nothing of its own to play.
-    let playable = $derived(!isDan && Entry && (LocalAudio || (Entry.catalog && !Entry.installed)));
+    let playable = $derived(!isDan && Entry && (LocalAudio || LoadAudio || (Entry.catalog && !Entry.installed)));
     let courses = $derived(Entry ? ALL_COURSES.filter((c) => Entry.levels[c] !== undefined) : []);
 
     const LINKS: { key: keyof ArtistLinks; icon: string; label: string }[] = [
@@ -134,7 +137,7 @@
 
         {#if playable}
             <!-- A custom song has no catalog entry: it plays from disk under its own name -->
-            <AudioPlayer songInfo={Entry.catalog} Src={LocalAudio} Title={Entry.label} Subtitle={Entry.subtitle} />
+            <AudioPlayer songInfo={Entry.catalog} Src={LocalAudio} LoadSrc={LoadAudio} Title={Entry.label} Subtitle={Entry.subtitle} />
         {/if}
 
         <div class="actions">

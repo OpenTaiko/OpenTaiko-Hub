@@ -50,6 +50,15 @@
 
     // Navigation (tile ids are stable: ThemesTab compares against 7)
     let currentTile = $state(0);
+
+    // The Songs tab is mounted the first time it is opened, then kept, so its downloads
+    // go on while another tab is shown. Mounted from the start, it scanned the library
+    // and fetched the catalog, the Hall of Fame and the artists at every launch, whether
+    // it was opened or not.
+    let songsOpened = $state(false);
+    $effect(() => {
+        if (currentTile === 1) songsOpened = true;
+    });
     let showInstanceManager = $state(false);
 
     const mainTiles: NavTile[] = [
@@ -163,7 +172,7 @@
 
         <!-- Songs -->
         <div class="w-full h-full" style:display={currentTile === 1 ? null : 'none'}>
-            {#if $instancesReady}
+            {#if $instancesReady && songsOpened}
             <SongsTab />
             {/if}
         </div>

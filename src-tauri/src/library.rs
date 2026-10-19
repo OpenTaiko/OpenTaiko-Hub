@@ -6,7 +6,7 @@
 // the user is looking at.
 
 use std::fs;
-use std::io::Read;
+use std::io::{BufWriter, Read, Write};
 use std::path::{Component, Path, PathBuf};
 
 use serde::Serialize;
@@ -14,6 +14,10 @@ use sha1::{Digest, Sha1};
 use zip::ZipArchive;
 
 use crate::scan::{decode_text, parse_unique_id};
+
+/// Write buffer for files extracted from an archive: a large one is written in a few
+/// hundred calls rather than one per 8 KiB read from the archive.
+pub(crate) const COPY_BUFFER: usize = 256 * 1024;
 
 /// Runs file work on tokio's blocking pool. Deleting a genre folder or reading a whole
 /// archive on an async worker stalled the downloads sharing those workers.
@@ -593,18 +597,27 @@ fn import_one(
             let mut entry = zip
                 .by_index(index)
                 .map_err(|e| format!("Could not read {} from the archive: {}", name, e))?;
-            let mut bytes = Vec::new();
-            entry.read_to_end(&mut bytes).map_err(|e| format!("Could not read {}: {}", name, e))?;
 
             let lower = inner.to_lowercase();
-            if lower.ends_with(".tja") && title.is_none() {
-                title = directive(&decode_text(&bytes), "TITLE:");
+            let write_error = |e: std::io::Error| format!("Could not write {}: {}", inner, e);
+            if lower.ends_with(".tja") || lower == "uniqueid.json" {
+                // Read here, so these are held in memory
+                let mut bytes = Vec::new();
+                entry.read_to_end(&mut bytes).map_err(|e| format!("Could not read {}: {}", name, e))?;
+                if lower.ends_with(".tja") && title.is_none() {
+                    title = directive(&decode_text(&bytes), "TITLE:");
+                }
+                if lower == "uniqueid.json" {
+                    has_id = parse_unique_id(&bytes).is_some();
+                }
+                fs::write(&out, &bytes).map_err(write_error)?;
+            } else {
+                // Audio and video go straight to disk: read whole first, the largest file
+                // of an archive decided how much memory an import took
+                let mut file = BufWriter::with_capacity(COPY_BUFFER, fs::File::create(&out).map_err(write_error)?);
+                std::io::copy(&mut entry, &mut file).map_err(write_error)?;
+                file.flush().map_err(write_error)?;
             }
-            if lower == "uniqueid.json" {
-                has_id = parse_unique_id(&bytes).is_some();
-            }
-
-            fs::write(&out, &bytes).map_err(|e| format!("Could not write {}: {}", inner, e))?;
         }
 
         if !has_id {

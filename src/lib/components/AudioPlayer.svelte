@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { _, locale } from 'svelte-i18n';
 	import type { SoundtrackEntry } from '$lib/types';
 	import { localizedTitle, localizedSubtitle } from '$lib/utils/titles';
@@ -11,16 +12,30 @@
 		 *  when the chart is not on disk, so a downloaded library plays offline and
 		 *  does not hammer the repository. */
 		Src?: string | null;
+		/** Reads the local audio when it is first played, for an installed chart: read on
+		 *  selection, browsing the library read every song's whole audio file. Src then
+		 *  carries what it read. */
+		LoadSrc?: () => Promise<string | null>;
 		Title?: string;
 		Subtitle?: string | null;
 	}
 
-	let { songInfo, Src = null, Title = '', Subtitle = null }: Props = $props();
+	let { songInfo, Src = null, LoadSrc, Title = '', Subtitle = null }: Props = $props();
 
+	// A chart whose audio is on disk never streams it from the repository meanwhile
 	let source = $derived(
 		Src
-		?? (songInfo ? `https://github.com/OpenTaiko/OpenTaiko-Soundtrack/raw/refs/heads/main/${songInfo.chartAudioFilePath}` : null)
+		?? (LoadSrc ? null : songInfo ? `https://github.com/OpenTaiko/OpenTaiko-Soundtrack/raw/refs/heads/main/${songInfo.chartAudioFilePath}` : null)
 	);
+
+	const TogglePlay = async () => {
+		if (paused && !source && LoadSrc) {
+			if (!(await LoadSrc())) return;
+			// Src arrives as a prop: let it reach the <audio> before playing
+			await tick();
+		}
+		paused = !paused;
+	};
 
 	let time = $state(0);
 	let duration = $state(0);
@@ -64,7 +79,7 @@
 	<button
 		class="play"
 		aria-label={paused ? $_('player.play') : $_('player.pause')}
-		onclick={() => paused = !paused}
+		onclick={TogglePlay}
 	></button>
 
 	<div class="info">

@@ -228,7 +228,20 @@ export const detachInstance = async (id: string): Promise<void> => {
     await persist();
 };
 
-export const refreshInstanceVersion = async (id: string): Promise<string | null> => {
+// Reads of one instance's version that overlap share one read: at startup the page, the
+// song library link and the Home tab each asked for the same instance's at once, three
+// reads of the game binary. A read asked for after the last one ended reads again.
+const versionReads = new Map<string, Promise<string | null>>();
+
+export const refreshInstanceVersion = (id: string): Promise<string | null> => {
+    const running = versionReads.get(id);
+    if (running) return running;
+    const read = readInstanceVersion(id).finally(() => versionReads.delete(id));
+    versionReads.set(id, read);
+    return read;
+};
+
+const readInstanceVersion = async (id: string): Promise<string | null> => {
     const instance = get(instances).find((inst) => inst.id === id);
     if (!instance) return null;
     let version: string | null = null;

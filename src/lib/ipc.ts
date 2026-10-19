@@ -129,7 +129,11 @@ export const ipc = {
     resetJobs: () => invoke<void>('reset_jobs'),
 
     // Song library (scan.rs, library.rs)
-    scanSongs: (baseDir: string, onEvent: Channel<ScanProgressEvent>) => invoke<ScanResult>('scan_songs', { baseDir, onEvent }),
+    /** Progress events carry the songs only with `streamSongs` (to show them as they are
+     *  found); the result always holds them all. */
+    scanSongs: (baseDir: string, onEvent: Channel<ScanProgressEvent>, streamSongs = true) =>
+        invoke<ScanResult>('scan_songs', { baseDir, streamSongs, onEvent }),
+    countSongs: (baseDir: string) => invoke<number>('count_songs', { baseDir }),
     readBoxDef: (base: string, relPath: string) => invoke<BoxDef>('read_box_def', { base, relPath }),
     writeBoxDef: (base: string, relPath: string, text: string) => invoke<void>('write_box_def', { base, relPath, text }),
     createGenreFolder: (base: string, parentRel: string, name: string) =>
