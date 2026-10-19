@@ -16,9 +16,14 @@ const KNOWN: [RegExp, string][] = [
     [/error sending request|dns error|failed to lookup|connection (refused|reset|closed)|timed out|network is unreachable/i, 'errors.offline']
 ];
 
+/** The translation key of the error's cause, when it is one of the known ones. */
+export const ErrorCause = (error: unknown): string | null => {
+    const raw = ErrorText(error);
+    return KNOWN.find(([pattern]) => pattern.test(raw))?.[1] ?? null;
+};
+
 /** A message for the user: a plain explanation when the cause is known, else the raw text. */
 export const DescribeError = (error: unknown): string => {
-    const raw = ErrorText(error);
-    const known = KNOWN.find(([pattern]) => pattern.test(raw));
-    return known ? get(_)(known[1]) : raw;
+    const cause = ErrorCause(error);
+    return cause ? get(_)(cause) : ErrorText(error);
 };

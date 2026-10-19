@@ -121,6 +121,9 @@
       "fetch_release": "Ophalen van de nieuwste OpenTaiko-release mislukt: {error}",
       "build_failed": "Compileren van OpenTaiko mislukt: {error}. Zie de build-uitvoer hieronder.",
       "download_failed": "Downloaden van OpenTaiko mislukt: {error}",
+      "instance_busy": "Een andere taak schrijft nog naar deze instantie. Wacht tot die klaar is en probeer het dan opnieuw.",
+      "branch_head": "De nieuwste versie van de experimentele branch is niet gevonden",
+      "build_exit": "Het compileren stopte met foutcode {code}",
       "incomplete_build": "De geïnstalleerde build is onvolledig (ontbrekende spelbestanden), installeer opnieuw."
     },
     "success": {
@@ -391,7 +394,8 @@
     },
     "error": {
       "scanning": "Kan geen {type} downloaden terwijl lokale mappen worden gescand",
-      "zip_not_found": "Het skinpakket kon niet op de server worden gevonden. Probeer het over 5 minuten opnieuw. Als het probleem aanhoudt, neem dan contact op met het OpenTaiko-team."
+      "zip_not_found": "Het skinpakket kon niet op de server worden gevonden. Probeer het over 5 minuten opnieuw. Als het probleem aanhoudt, neem dan contact op met het OpenTaiko-team.",
+      "instance_busy": "OpenTaiko wordt in deze instantie geïnstalleerd. Wacht tot dat klaar is en probeer het dan opnieuw."
     },
     "success": {
       "all_up_to_date": "Alle {type} zijn al up-to-date",
@@ -627,6 +631,7 @@
     "close_message": "Er loopt nog een download of build. Als je de Hub sluit, stopt die.",
     "close": "Sluiten",
     "keep": "Open laten",
+    "cancelling": "Annuleren…",
     "installing_into": "Installeren in {name}",
     "install_cancelled": "Installatie geannuleerd",
     "dotnet_page": ".NET 8 downloaden",

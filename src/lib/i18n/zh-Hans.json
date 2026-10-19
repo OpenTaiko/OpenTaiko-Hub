@@ -121,6 +121,9 @@
       "fetch_release": "获取最新 OpenTaiko 版本失败：{error}",
       "build_failed": "OpenTaiko 构建失败：{error}。请查看下方的构建输出。",
       "download_failed": "下载 OpenTaiko 失败：{error}",
+      "instance_busy": "另一项任务仍在写入此实例。请等待完成后再试。",
+      "branch_head": "未能找到实验分支的最新版本",
+      "build_exit": "构建已停止，错误代码 {code}",
       "incomplete_build": "已安装的版本不完整（缺少游戏文件），请重新安装。"
     },
     "success": {
@@ -391,7 +394,8 @@
     },
     "error": {
       "scanning": "正在扫描本地文件夹，无法下载{type}",
-      "zip_not_found": "在服务器上找不到皮肤包。请在5分钟后重试。如果问题仍然存在，请联系OpenTaiko团队。"
+      "zip_not_found": "在服务器上找不到皮肤包。请在5分钟后重试。如果问题仍然存在，请联系OpenTaiko团队。",
+      "instance_busy": "正在向此实例安装 OpenTaiko。请等待完成后再试。"
     },
     "success": {
       "all_up_to_date": "所有{type}均已是最新",
@@ -627,6 +631,7 @@
     "close_message": "下载或构建仍在进行。关闭 Hub 会使其中断。",
     "close": "关闭",
     "keep": "保持打开",
+    "cancelling": "正在取消…",
     "installing_into": "正在安装到 {name}",
     "install_cancelled": "安装已取消",
     "dotnet_page": "获取 .NET 8",

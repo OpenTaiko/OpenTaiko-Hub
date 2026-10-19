@@ -7,20 +7,16 @@
     import { Toast } from '@skeletonlabs/skeleton-svelte';
     import { ipc } from '$lib/ipc';
     import { error as logError, warn as logWarn } from '@tauri-apps/plugin-log';
-    import { download } from '$lib/utils/download';
     import { readTextFile } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
 
     import { setupI18n } from '$lib/i18n';
     import { _, isLoading, locale } from 'svelte-i18n';
-    import { get } from 'svelte/store';
 
     import { GetPreferencesPath } from '$lib/utils/path';
     import { toaster } from '$lib/utils/toaster';
     import { SafeHtml } from '$lib/utils/sanitize';
-    import { isCancelled } from '$lib/stores/activity';
-    import { DescribeError, ErrorText } from '$lib/utils/errors';
-    import type { ErrorToastOptions, ProgressPayload, ToastContext } from '$lib/types';
+    import type { ErrorToastOptions, ToastContext } from '$lib/types';
 
     interface Props {
         children?: Snippet;
@@ -39,10 +35,13 @@
 
     // Errors stay until dismissed: they often carry what to do next, and a report needs
     // their text, which used to vanish after four seconds. The copy button takes the raw
-    // details when the message is a friendlier rewording of them.
+    // details when the message is a friendlier rewording of them. The same message again
+    // updates the toast already shown instead of stacking another: retrying while offline
+    // used to pile up identical errors to close one by one.
     const TriggerError = (msg: string, options: ErrorToastOptions = {}) => {
         console.error(options.details ? `${msg} (${options.details})` : msg);
         toaster.error({
+            id: `error:${msg}`,
             description: msg,
             duration: Infinity,
             meta: { details: options.details ?? PlainText(msg), action: options.action }
@@ -73,9 +72,10 @@
         setTimeout(() => { if (copiedToast === toastId) copiedToast = null; }, 1500);
     };
 
+    // Notices of something refused or stopped, not failures: they go away by themselves
     const TriggerWarning = (msg: string) => {
         console.warn(msg);
-        toaster.warning({ description: msg, duration: 4000 });
+        toaster.warning({ id: `warning:${msg}`, description: msg, duration: 6000 });
     };
 
     const TriggerSuccess = (msg: string) => {
@@ -87,30 +87,7 @@
         return new Promise(resolve => setTimeout(resolve, ms));
     }
 
-    // Retries happen in the backend, with an increasing delay, and only for failures
-    // another attempt can fix: a missing file fails at once instead of ten times over.
-    // They are logged rather than announced, so a flaky connection does not bury the
-    // screen in warnings; the user hears about the download only if it gives up.
-    const backoffDownload = async (
-        url: string,
-        path: string,
-        prfunc?: (progress: ProgressPayload) => void,
-        attempts?: number,
-        job?: string
-    ): Promise<boolean> => {
-        try {
-            await download(url, path, prfunc, attempts, job);
-            return true;
-        } catch (error) {
-            // A cancellation is the caller's to report
-            if (isCancelled(error)) throw error;
-            console.error(`Download of ${url} failed:`, error);
-            TriggerError(`${get(_)('dl.error.failed_abort')}<br>${DescribeError(error)}`, { details: `${url}: ${ErrorText(error)}` });
-            return false;
-        }
-    }
-
-    const toastContext: ToastContext = { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload, wait };
+    const toastContext: ToastContext = { TriggerError, TriggerWarning, TriggerSuccess, wait };
     setContext('toast', toastContext);
 
     // Shipped builds have devtools compiled out, so anything written to the console is

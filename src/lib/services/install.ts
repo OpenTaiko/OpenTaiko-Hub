@@ -13,8 +13,8 @@ export interface InstallHooks {
     /** Percent, or undefined while no percentage is known. */
     onProgress: (percent: number | undefined) => void;
     onStage: (stage: InstallStage) => void;
-    /** Downloads with retries; resolves false once it gave up (and said so). */
-    download: (url: string, dest: string, onProgress: (percent: number | undefined) => void) => Promise<boolean>;
+    /** Downloads (the backend retries); throws once it gave up. */
+    download: (url: string, dest: string, onProgress: (percent: number | undefined) => void) => Promise<void>;
 }
 
 /** The game executable's file name on this system. */
@@ -37,17 +37,18 @@ export const WriteVersionJson = async (instancePath: string, version: string | n
 };
 
 /**
- * Downloads a release zip and merges its content into the instance folder. Returns false
- * when the download gave up. Throws on any other failure, or with "Cancelled" when the
- * job was cancelled before the files started moving into the instance.
+ * Downloads a release zip and merges its content into the instance folder. Throws on any
+ * failure, the download giving up included, or with "Cancelled" when the job was
+ * cancelled before the files started moving into the instance. The caller reports it,
+ * once.
  */
-export const InstallReleaseZip = async (url: string, instancePath: string, job: string, hooks: InstallHooks): Promise<boolean> => {
+export const InstallReleaseZip = async (url: string, instancePath: string, job: string, hooks: InstallHooks): Promise<void> => {
     const tmpDir = await GetTmpPath(crypto.randomUUID());
     await mkdir(tmpDir, { recursive: true });
     const zipPath = await path.join(tmpDir, 'OpenTaiko.zip');
     try {
         hooks.onStage('download');
-        if (!(await hooks.download(url, zipPath, hooks.onProgress))) return false;
+        await hooks.download(url, zipPath, hooks.onProgress);
 
         hooks.onStage('extract');
         hooks.onProgress(undefined);
@@ -61,7 +62,6 @@ export const InstallReleaseZip = async (url: string, instancePath: string, job: 
         // Songs live in the shared library, so never install a build's own copies
         await ipc.stripSongContent(await path.join(sourceFolder, 'Songs'));
         await ipc.mergeMoveDir(sourceFolder, instancePath);
-        return true;
     } finally {
         try { await remove(tmpDir, { recursive: true }); } catch {}
     }

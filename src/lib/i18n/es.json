@@ -121,6 +121,9 @@
       "fetch_release": "No se pudo obtener la última versión de OpenTaiko: {error}",
       "build_failed": "Error al compilar OpenTaiko: {error}. Consulta la salida de compilación más abajo.",
       "download_failed": "No se pudo descargar OpenTaiko: {error}",
+      "instance_busy": "Otra tarea todavía está escribiendo en esta instancia. Espera a que termine y vuelve a intentarlo.",
+      "branch_head": "No se encontró la última versión de la rama experimental",
+      "build_exit": "La compilación se detuvo con el código de error {code}",
       "incomplete_build": "La versión instalada está incompleta (faltan archivos del juego), reinstálala."
     },
     "success": {
@@ -391,7 +394,8 @@
     },
     "error": {
       "scanning": "No se pueden descargar {type} mientras se escanean las carpetas locales",
-      "zip_not_found": "No se pudo encontrar el paquete del skin en el servidor. Inténtalo de nuevo en 5 minutos. Si el problema persiste, contacta con el equipo de OpenTaiko."
+      "zip_not_found": "No se pudo encontrar el paquete del skin en el servidor. Inténtalo de nuevo en 5 minutos. Si el problema persiste, contacta con el equipo de OpenTaiko.",
+      "instance_busy": "OpenTaiko se está instalando en esta instancia. Espera a que termine y vuelve a intentarlo."
     },
     "success": {
       "all_up_to_date": "Todos los {type} ya están actualizados",
@@ -627,6 +631,7 @@
     "close_message": "Hay una descarga o compilación en curso. Cerrar el Hub la detendrá.",
     "close": "Cerrar",
     "keep": "Mantener abierto",
+    "cancelling": "Cancelando…",
     "installing_into": "Instalando en {name}",
     "install_cancelled": "Instalación cancelada",
     "dotnet_page": "Obtener .NET 8",

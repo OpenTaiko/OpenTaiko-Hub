@@ -13,6 +13,9 @@ interface Activity {
     area: ActivityArea;
     /** The instance the operation writes into, if any. */
     instanceId: string | null;
+    /** Replaces the game's files (an install): nothing else may write into the instance
+     *  meanwhile, and it may not start while anything else does. */
+    exclusive: boolean;
 }
 
 const activities = writable<Activity[]>([]);
@@ -28,9 +31,17 @@ export interface Job {
     end: () => void;
 }
 
-export const startJob = (area: ActivityArea, instanceId: string | null = null): Job => {
+/**
+ * True when what already runs in `instanceId` rules out a new operation there. An install
+ * and a skin download used to write into the same instance at once, the install
+ * replacing System/ while the skins were being written into it.
+ */
+export const InstanceInUse = (instanceId: string, exclusive: boolean): boolean =>
+    get(activities).some((a) => a.instanceId === instanceId && (exclusive || a.exclusive));
+
+export const startJob = (area: ActivityArea, instanceId: string | null = null, exclusive = false): Job => {
     const id = crypto.randomUUID();
-    activities.update((list) => [...list, { id, area, instanceId }]);
+    activities.update((list) => [...list, { id, area, instanceId, exclusive }]);
     const t = get(_);
     ipc.beginJob(id, {
         title: t('jobs.close_title'),

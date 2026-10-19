@@ -25,6 +25,8 @@
         OnOpenLibrary?: () => void;
         OnGetAll?: () => void;
         OnCancelBulk?: () => void;
+        /** Cancel was pressed and the run has yet to stop. */
+        Cancelling?: boolean;
     }
 
     let {
@@ -44,7 +46,8 @@
         OnReload,
         OnOpenLibrary,
         OnGetAll,
-        OnCancelBulk
+        OnCancelBulk,
+        Cancelling = false
     }: Props = $props();
 
     let percent = $derived(Total === 0 ? 0 : Math.round((Installed / Total) * 100));
@@ -94,8 +97,8 @@
                  song's own progress are often inside collapsed folders -->
             <i class="fa-solid fa-spinner fa-spin"></i>
             {$_('bulk.status', { values: { done: Bulk.done, total: Bulk.total, size: formatSize(Bulk.mbLeft) } })}
-            <button type="button" class="button-gray button-main cancel" onclick={() => OnCancelBulk?.()}>
-                <i class="fa-solid fa-xmark"></i> {$_('common.cancel')}
+            <button type="button" class="button-gray button-main cancel" disabled={Cancelling} onclick={() => OnCancelBulk?.()}>
+                <i class="fa-solid {Cancelling ? 'fa-spinner fa-spin' : 'fa-xmark'}"></i> {Cancelling ? $_('jobs.cancelling') : $_('common.cancel')}
             </button>
         {:else}
             <b class="pct">{percent}%</b>

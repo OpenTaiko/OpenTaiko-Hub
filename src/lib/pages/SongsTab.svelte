@@ -91,7 +91,8 @@
     // What the library header shows while a bulk download runs, and how to stop it
     let bulkStatus = $state<{ done: number; total: number; mbLeft: number } | null>(null);
     let bulkJob: Job | null = null;
-    let bulkCancelRequested = false;
+    // Read by the Cancel button, which says it is cancelling until the run stops
+    let bulkCancelRequested = $state(false);
     let activeSingleDownloads = $state(0);  // single-song downloads currently in flight (they run concurrently)
     let songBusy = $derived(activeSingleDownloads > 0);
 
@@ -685,7 +686,7 @@
     /** Downloads everything a folder is still missing, updates included. */
     const DownloadFolder = async (folder: LibraryFolder) => {
         if (scanning) {
-            TriggerError(get(_)('songs.error.scanning'));
+            TriggerWarning(get(_)('songs.error.scanning'));
             return;
         }
         if (bulkBusy || songBusy) return;
@@ -866,7 +867,7 @@
         // Never write into the library while it is still being scanned, the scan's
         // final result would otherwise clobber this download's bookkeeping.
         if (scanning) {
-            TriggerError(get(_)('songs.error.scanning'));
+            TriggerWarning(get(_)('songs.error.scanning'));
             return 'skipped';
         }
         // songNb is set when the bulk loop drives this, which owns the busy flag itself
@@ -972,7 +973,7 @@
             } else if (event.payload.type === 'drop') {
                 dropActive = false;
                 if (!usable || !target) {
-                    TriggerError(get(_)('songs.folder.drop_needs_folder'));
+                    TriggerWarning(get(_)('songs.folder.drop_needs_folder'));
                     return;
                 }
                 await ImportArchives(target.relPath, event.payload.paths);
@@ -1039,6 +1040,7 @@
 	Found={scanStats.found}
 	Busy={bulkBusy || songBusy}
 	Bulk={bulkStatus}
+	Cancelling={bulkCancelRequested}
 	OnCancelBulk={CancelBulk}
 	CurrentScope={scope}
 	Search={librarySearch}
@@ -1057,7 +1059,7 @@
 				<h3>{$_('songs.start.title')}</h3>
 				<p>{$_('songs.start.body')}</p>
 				<div class="start-actions">
-					<button type="button" class="button-green button-main" disabled={bulkBusy || scanning} onclick={() => DownloadFolder(library)}>
+					<button type="button" class="button-green button-main" disabled={bulkBusy || songBusy || scanning} onclick={() => DownloadFolder(library)}>
 						<i class="fa-solid fa-download"></i>
 						{$_('songs.library.get_everything', { values: { count: library.totalCount } })}
 						<span class="dim">{formatSize(library.pendingMb)}</span>
@@ -1129,7 +1131,7 @@
 			BoxText={boxText}
 			BoxFileExists={boxFileExists}
 			Saving={savingBox}
-			Busy={bulkBusy || scanning}
+			Busy={bulkBusy || songBusy || scanning}
 			DropActive={dropActive}
 			Importing={importing}
 			Official={selectedIsOfficial}

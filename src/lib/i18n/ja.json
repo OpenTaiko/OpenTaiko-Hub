@@ -121,6 +121,9 @@
       "fetch_release": "最新のOpenTaikoリリースの取得に失敗しました：{error}",
       "build_failed": "OpenTaiko のビルドに失敗しました: {error}。下のビルド出力を確認してください。",
       "download_failed": "OpenTaikoのダウンロードに失敗しました：{error}",
+      "instance_busy": "別の処理がまだこのインスタンスに書き込んでいます。完了してから、もう一度お試しください。",
+      "branch_head": "実験版ブランチの最新バージョンが見つかりませんでした",
+      "build_exit": "ビルドはエラーコード {code} で停止しました",
       "incomplete_build": "インストールされたビルドは不完全です（ゲームファイルが不足しています）。再インストールしてください。"
     },
     "success": {
@@ -391,7 +394,8 @@
     },
     "error": {
       "scanning": "ローカルフォルダーのスキャン中は{type}をダウンロードできません",
-      "zip_not_found": "スキンパッケージがサーバーに見つかりませんでした。5分後に再試行してください。問題が解決しない場合は、OpenTaikoチームにお問い合わせください。"
+      "zip_not_found": "スキンパッケージがサーバーに見つかりませんでした。5分後に再試行してください。問題が解決しない場合は、OpenTaikoチームにお問い合わせください。",
+      "instance_busy": "このインスタンスに OpenTaiko をインストール中です。完了してから、もう一度お試しください。"
     },
     "success": {
       "all_up_to_date": "{type}はすべて最新の状態です",
@@ -627,6 +631,7 @@
     "close_message": "ダウンロードまたはビルドが実行中です。Hubを閉じると中断されます。",
     "close": "閉じる",
     "keep": "閉じない",
+    "cancelling": "キャンセル中…",
     "installing_into": "{name} にインストール中",
     "install_cancelled": "インストールを中止しました",
     "dotnet_page": ".NET 8 を入手",

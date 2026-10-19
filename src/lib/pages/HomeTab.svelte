@@ -14,10 +14,11 @@
     import { get } from 'svelte/store';
 
     import type { BuildOption, GitHubRelease, HubOS, IndevBuildInfo, Instance, ToastContext } from '$lib/types';
-    const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
+    const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
     import { GetOS, GetBuildPath, GetBuildTarget, GetRootPath } from "$lib/utils/path";
-    import { startJob, isCancelled, type Job } from "$lib/stores/activity";
+    import { startJob, isCancelled, InstanceInUse, type Job } from "$lib/stores/activity";
+    import { download } from '$lib/utils/download';
     import { DescribeError, ErrorText } from "$lib/utils/errors";
     import { openUrl } from '@tauri-apps/plugin-opener';
     import { isVersionAtLeast } from "$lib/utils/versions";
@@ -189,7 +190,7 @@
             latestVersion = latestRelease.tag_name; // Latest tag version number
         } catch (err) {
             latestVersionErrorFound = true;
-            TriggerError(get(_)('home.error.fetch_release', { values: { error: String(err) } }));
+            TriggerError(get(_)('home.error.fetch_release', { values: { error: DescribeError(err) } }), { details: ErrorText(err) });
         }
         latestLoading = false;
     }
@@ -243,8 +244,8 @@
     };
 
     // Downloads a release zip and merges its content into the instance folder
-    const DownloadAndInstallZip = async (url: string, instancePath: string, job: Job): Promise<boolean> => {
-        const installed = await InstallReleaseZip(url, instancePath, job.id, {
+    const DownloadAndInstallZip = async (url: string, instancePath: string, job: Job): Promise<void> => {
+        await InstallReleaseZip(url, instancePath, job.id, {
             onProgress: (percent) => progress = percent,
             onStage: (stage) => {
                 if (stage === 'extract') TriggerSuccess(get(_)('home.success.unzipping'));
@@ -256,7 +257,9 @@
             // progressTotal rather than a running sum of chunk sizes: a retry restarts
             // the transfer, and a sum kept across attempts would count the re-downloaded
             // bytes twice and drive the bar past 100%.
-            download: (zipUrl, dest, onProgress) => backoffDownload(
+            // A failure throws, and the install reports it once (it used to be announced
+            // here and then again by the install)
+            download: (zipUrl, dest, onProgress) => download(
                 zipUrl,
                 dest,
                 (pr) => onProgress(pr.total ? 100 * (pr.progressTotal / pr.total) : undefined),
@@ -264,8 +267,7 @@
                 job.id
             )
         });
-        if (installed) await VerifyInstall(instancePath);
-        return installed;
+        await VerifyInstall(instancePath);
     };
 
     // What a release install needs to know, found once the busy flag is held
@@ -280,14 +282,19 @@
     // Claims the Hub-wide install slot for `instance`. Returns null when it is taken.
     const BeginInstall = (instance: Instance): Job | null => {
         if (downloadBusy === true) {
-            TriggerError(get(_)('home.error.already_downloading'));
+            TriggerWarning(get(_)('home.error.already_downloading'));
+            return null;
+        }
+        if (InstanceInUse(instance.id, true)) {
+            TriggerWarning(get(_)('home.error.instance_busy'));
             return null;
         }
         // Claimed before the first await, so a second click cannot start a second install
         downloadBusy = true;
         busyInstance = instance;
-        busyJob = startJob('home', instance.id);
+        busyJob = startJob('home', instance.id, true);
         cancellable = true;
+        cancelling = false;
         progress = undefined;
         // A previous experimental build's output must not sit under this download.
         resetBuildOutput();
@@ -302,8 +309,13 @@
         downloadBusy = false;
     };
 
+    // The work stops when the backend next checks, which can take a moment: the button
+    // says so instead of looking as if the click did nothing
+    let cancelling = $state(false);
     const CancelInstall = () => {
-        if (cancellable) busyJob?.cancel();
+        if (!cancellable || cancelling) return;
+        cancelling = true;
+        busyJob?.cancel();
     };
 
     // A failed install says why in plain words when the cause is known, and keeps the raw
@@ -335,14 +347,12 @@
             if (!release) return;
             progress = 0;
 
-            const installed = await DownloadAndInstallZip(release.url, instance.path, job);
-            if (installed) {
-                await WriteVersionJson(instance.path, release.version);
-                const updated = await updateInstance(instance.id, release.patch);
-                await linkGlobalSongs(updated);
-                await refreshInstanceVersion(instance.id);
-                TriggerSuccess(get(_)('home.success.installed'));
-            }
+            await DownloadAndInstallZip(release.url, instance.path, job);
+            await WriteVersionJson(instance.path, release.version);
+            const updated = await updateInstance(instance.id, release.patch);
+            await linkGlobalSongs(updated);
+            await refreshInstanceVersion(instance.id);
+            TriggerSuccess(get(_)('home.success.installed'));
         } catch (err) {
             ReportInstallError('home.error.download_failed', err);
         } finally {
@@ -446,7 +456,7 @@
             const branch = option.branch ?? INDEV_BRANCH;
             const sha = await fetchBranchHeadSha(branch);
             if (!sha) {
-                throw new Error('Could not resolve the branch head commit');
+                throw new Error(get(_)('home.error.branch_head'));
             }
 
             // 3. Download the source archive of that exact commit
@@ -457,7 +467,7 @@
             tmpDir = await GetBuildPath();
             await mkdir(tmpDir, { recursive: true });
             const srcZip = await path.join(tmpDir, 'src.zip');
-            const success = await backoffDownload(
+            await download(
                 `https://codeload.github.com/${repoOwner}/${repoName}/zip/${sha}`,
                 srcZip,
                 (pr) => {
@@ -473,9 +483,6 @@
                 3,
                 job.id
             );
-            if (!success) {
-                throw new Error('Source download failed');
-            }
 
             // 4. Extract
             buildStage = 'extract';
@@ -508,7 +515,7 @@
             const exitCode = await ipc.publishGame(srcFolder, rid, logChannel, job.id);
             flushBuildLog();
             if (exitCode !== 0) {
-                throw new Error(`dotnet publish exited with code ${exitCode}`);
+                throw new Error(get(_)('home.error.build_exit', { values: { code: exitCode } }));
             }
 
             // 6. Install the publish output (and local docs when the branch ships them)
@@ -707,7 +714,9 @@
                             <ProgressBar value={progress} max={100} />
                         </div>
                         {#if cancellable}
-                            <button type="button" onclick={CancelInstall} class="button-gray button-main"><i class="fa-solid fa-xmark"></i> {$_('common.cancel')}</button>
+                            <button type="button" onclick={CancelInstall} class="button-gray button-main" disabled={cancelling}>
+                                <i class="fa-solid {cancelling ? 'fa-spinner fa-spin' : 'fa-xmark'}"></i> {cancelling ? $_('jobs.cancelling') : $_('common.cancel')}
+                            </button>
                         {/if}
                     {:else}
                         {#if currentVersion}

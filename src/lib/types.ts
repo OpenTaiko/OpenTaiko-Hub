@@ -28,15 +28,6 @@ export interface ToastContext {
     TriggerError(message: string, options?: ErrorToastOptions): void;
     TriggerWarning(message: string): void;
     TriggerSuccess(message: string): void;
-    /** Downloads with retries (in the backend); resolves to false once it gave up. */
-    backoffDownload(
-        url: string,
-        path: string,
-        onProgress?: (progress: ProgressPayload) => void,
-        attempts?: number,
-        /** See startJob. A cancelled download throws instead of resolving to false. */
-        job?: string
-    ): Promise<boolean>;
     wait(ms: number): Promise<void>;
 }
 

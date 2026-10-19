@@ -121,6 +121,9 @@
       "fetch_release": "Failed to fetch latest OpenTaiko release: {error}",
       "build_failed": "Building OpenTaiko failed: {error}. See the build output below.",
       "download_failed": "Failed to download OpenTaiko: {error}",
+      "instance_busy": "Another task is still writing into this instance. Wait for it to finish, then try again.",
+      "branch_head": "Could not find the latest version of the experimental branch",
+      "build_exit": "The build stopped with error code {code}",
       "incomplete_build": "The installed build is incomplete (missing game files), please reinstall it."
     },
     "success": {
@@ -391,7 +394,8 @@
     },
     "error": {
       "scanning": "Cannot download {type} while local folders are being scanned",
-      "zip_not_found": "The skin package could not be found on the server. Please try again in 5 minutes. If the issue persists, please contact the OpenTaiko Team."
+      "zip_not_found": "The skin package could not be found on the server. Please try again in 5 minutes. If the issue persists, please contact the OpenTaiko Team.",
+      "instance_busy": "OpenTaiko is being installed into this instance. Wait for it to finish, then try again."
     },
     "success": {
       "all_up_to_date": "All {type} are already up-to-date",
@@ -627,6 +631,7 @@
     "close_message": "A download or build is still running. Closing the Hub stops it.",
     "close": "Close",
     "keep": "Keep open",
+    "cancelling": "Cancelling…",
     "installing_into": "Installing into {name}",
     "install_cancelled": "Install cancelled",
     "dotnet_page": "Get .NET 8",

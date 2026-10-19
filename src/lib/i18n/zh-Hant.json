@@ -121,6 +121,9 @@
       "fetch_release": "擷取最新 OpenTaiko 版本失敗：{error}",
       "build_failed": "OpenTaiko 建置失敗：{error}。請查看下方的建置輸出。",
       "download_failed": "下載 OpenTaiko 失敗：{error}",
+      "instance_busy": "另一項工作仍在寫入此實例。請等待完成後再試。",
+      "branch_head": "未能找到實驗分支的最新版本",
+      "build_exit": "建置已停止，錯誤代碼 {code}",
       "incomplete_build": "已安裝的版本不完整（缺少遊戲檔案），請重新安裝。"
     },
     "success": {
@@ -391,7 +394,8 @@
     },
     "error": {
       "scanning": "仍在掃描本機資料夾，因此無法下載{type}",
-      "zip_not_found": "在伺服器上找不到主題壓縮包。請在 5 分鐘後重試 1 次。如果問題仍然存在，請聯絡 OpenTaiko 團隊。"
+      "zip_not_found": "在伺服器上找不到主題壓縮包。請在 5 分鐘後重試 1 次。如果問題仍然存在，請聯絡 OpenTaiko 團隊。",
+      "instance_busy": "正在向此實例安裝 OpenTaiko。請等待完成後再試。"
     },
     "success": {
       "all_up_to_date": "所有{type}皆是最新版",
@@ -627,6 +631,7 @@
     "close_message": "下載或建置仍在進行。關閉 Hub 會使其中斷。",
     "close": "關閉",
     "keep": "保持開啟",
+    "cancelling": "正在取消…",
     "installing_into": "正在安裝到 {name}",
     "install_cancelled": "安裝已取消",
     "dotnet_page": "取得 .NET 8",

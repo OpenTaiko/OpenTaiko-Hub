@@ -121,6 +121,9 @@
       "fetch_release": "최신 OpenTaiko 릴리스를 가져오지 못했습니다: {error}",
       "build_failed": "OpenTaiko 빌드에 실패했습니다: {error}. 아래 빌드 출력을 확인하세요.",
       "download_failed": "OpenTaiko 다운로드에 실패했습니다: {error}",
+      "instance_busy": "다른 작업이 아직 이 인스턴스에 쓰는 중입니다. 끝난 뒤 다시 시도하세요.",
+      "branch_head": "실험 브랜치의 최신 버전을 찾지 못했습니다",
+      "build_exit": "빌드가 오류 코드 {code}(으)로 중단되었습니다",
       "incomplete_build": "설치된 빌드가 불완전합니다(게임 파일 누락). 다시 설치해 주세요."
     },
     "success": {
@@ -236,19 +239,19 @@
     },
     "folder": {
         "loading": "곡을 불러오는 중입니다.",
-        "name_taken": "'{name}'은(는) 이미 있습니다.",
+        "name_taken": "‘{name}’은(는) 이미 있습니다.",
         "not_downloaded": "이 폴더는 아직 다운로드되지 않았습니다.",
         "new_folder": "새 폴더",
         "new_subfolder": "새 하위 폴더",
         "new_prompt": "새 폴더 이름",
         "new_placeholder": "예: 내 채보",
         "create": "만들기",
-        "created": "'{name}'을(를) 만들었습니다",
+        "created": "‘{name}’을(를) 만들었습니다",
         "create_failed": "폴더를 만들 수 없습니다: {error}",
         "delete": "삭제",
-        "delete_confirm": "'{name}'과(와) 그 안의 {count}곡을 삭제할까요? 되돌릴 수 없습니다.",
-        "delete_song_confirm": "'{name}'을(를) 삭제할까요? 되돌릴 수 없습니다.",
-        "deleted": "'{name}'을(를) 삭제했습니다",
+        "delete_confirm": "‘{name}’과(와) 그 안의 {count}곡을 삭제할까요? 되돌릴 수 없습니다.",
+        "delete_song_confirm": "‘{name}’을(를) 삭제할까요? 되돌릴 수 없습니다.",
+        "deleted": "‘{name}’을(를) 삭제했습니다",
         "delete_failed": "삭제할 수 없습니다: {error}",
         "box_missing": "box.def 없음",
         "box_loading": "불러오는 중...",
@@ -391,7 +394,8 @@
     },
     "error": {
       "scanning": "로컬 폴더 스캔 중에는 {type}을(를) 다운로드할 수 없습니다",
-      "zip_not_found": "서버에서 스킨 패키지를 찾을 수 없습니다. 5분 후에 다시 시도해 주세요. 문제가 계속되면 OpenTaiko 팀에 문의해 주세요."
+      "zip_not_found": "서버에서 스킨 패키지를 찾을 수 없습니다. 5분 후에 다시 시도해 주세요. 문제가 계속되면 OpenTaiko 팀에 문의해 주세요.",
+      "instance_busy": "이 인스턴스에 OpenTaiko를 설치하는 중입니다. 끝난 뒤 다시 시도하세요."
     },
     "success": {
       "all_up_to_date": "모든 {type}이(가) 이미 최신 상태입니다",
@@ -627,6 +631,7 @@
     "close_message": "다운로드 또는 빌드가 진행 중입니다. Hub를 닫으면 중단됩니다.",
     "close": "닫기",
     "keep": "열어 두기",
+    "cancelling": "취소하는 중…",
     "installing_into": "{name}에 설치 중",
     "install_cancelled": "설치를 취소했습니다",
     "dotnet_page": ".NET 8 받기",

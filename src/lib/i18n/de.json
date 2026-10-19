@@ -121,6 +121,9 @@
       "fetch_release": "Das neueste OpenTaiko-Release konnte nicht abgerufen werden: {error}",
       "build_failed": "Kompilieren von OpenTaiko fehlgeschlagen: {error}. Siehe die Build-Ausgabe unten.",
       "download_failed": "OpenTaiko konnte nicht heruntergeladen werden: {error}",
+      "instance_busy": "Eine andere Aufgabe schreibt noch in diese Instanz. Warte, bis sie fertig ist, und versuche es dann erneut.",
+      "branch_head": "Die neueste Version des experimentellen Zweigs wurde nicht gefunden",
+      "build_exit": "Das Kompilieren wurde mit Fehlercode {code} beendet",
       "incomplete_build": "Der installierte Build ist unvollständig (fehlende Spieldateien), bitte neu installieren."
     },
     "success": {
@@ -391,7 +394,8 @@
     },
     "error": {
       "scanning": "{type} können nicht heruntergeladen werden, während lokale Ordner gescannt werden",
-      "zip_not_found": "Das Skin-Paket wurde auf dem Server nicht gefunden. Bitte in 5 Minuten erneut versuchen. Falls das Problem weiterhin besteht, bitte das OpenTaiko-Team kontaktieren."
+      "zip_not_found": "Das Skin-Paket wurde auf dem Server nicht gefunden. Bitte in 5 Minuten erneut versuchen. Falls das Problem weiterhin besteht, bitte das OpenTaiko-Team kontaktieren.",
+      "instance_busy": "OpenTaiko wird gerade in diese Instanz installiert. Warte, bis es fertig ist, und versuche es dann erneut."
     },
     "success": {
       "all_up_to_date": "Alle {type} sind bereits aktuell",
@@ -627,6 +631,7 @@
     "close_message": "Ein Download oder Build läuft noch. Beim Schließen des Hubs wird er abgebrochen.",
     "close": "Schließen",
     "keep": "Offen lassen",
+    "cancelling": "Wird abgebrochen…",
     "installing_into": "Installation in {name}",
     "install_cancelled": "Installation abgebrochen",
     "dotnet_page": ".NET 8 herunterladen",

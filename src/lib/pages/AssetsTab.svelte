@@ -7,15 +7,15 @@
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
     import { mkdir, remove } from '@tauri-apps/plugin-fs';
-    import { installFiles, fetchCachedJson, type InstallEntry } from '$lib/utils/download';
-    import { startJob, isCancelled, type Job } from '$lib/stores/activity';
-    import { DescribeError, ErrorText } from '$lib/utils/errors';
+    import { download, installFiles, fetchCachedJson, type InstallEntry } from '$lib/utils/download';
+    import { startJob, isCancelled, InstanceInUse, type Job } from '$lib/stores/activity';
+    import { DescribeError, ErrorCause, ErrorText } from '$lib/utils/errors';
     import { path } from '@tauri-apps/api';
     import { Channel } from '@tauri-apps/api/core';
-    import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, LocalAsset, ToastContext } from '$lib/types';
+    import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, Instance, LocalAsset, ToastContext } from '$lib/types';
 
     import { getContext } from 'svelte';
-    const { TriggerError, TriggerWarning, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
+    const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
     import { GetTmpPath, IsPlainRelPath } from "$lib/utils/path";
     import { activeInstance, instanceVersions } from "$lib/stores/instances";
@@ -71,7 +71,8 @@
     });
     // Running bulk downloads, per asset type, so each can be cancelled
     const bulkJobs: Partial<Record<AssetType, Job>> = {};
-    const bulkCancelRequested: Partial<Record<AssetType, boolean>> = {};
+    // Read by the Cancel button, which says it is cancelling until the run stops
+    const bulkCancelRequested = $state<Partial<Record<AssetType, boolean>>>({});
     // Set when the catalog could not be loaded: an empty table would otherwise read as
     // "everything is up to date"
     let catalogFetchFailed = $state(false);
@@ -140,7 +141,7 @@
     const DownloadDisplayedAssets = async (assetType: AssetType) => {
         if (assetScanning === true) {
             const translatedType = get(_)(`assets.type.${assetType.toLowerCase()}`);
-            TriggerError(get(_)('assets.error.scanning', { values: { type: translatedType } }));
+            TriggerWarning(get(_)('assets.error.scanning', { values: { type: translatedType } }));
             return ;
         }
 
@@ -164,7 +165,7 @@
         }
 
         const instance = get(activeInstance);
-        if (!instance) return;
+        if (!instance || !CanWriteInto(instance)) return;
         const job = startJob('home', instance.id);
         bulkJobs[assetType] = job;
         bulkCancelRequested[assetType] = false;
@@ -206,13 +207,24 @@
     // A bulk run passes its job and reports a summary itself, so the asset stays quiet.
     // A single asset gets a job of its own, so it shows as running and can be noticed
     // before the window is closed on it.
+    // Said once, before a run starts: a bulk run used to say it again for every asset
+    const CanWriteInto = (instance: Instance): boolean => {
+        if (instance.channel === 'experimental') {
+            TriggerWarning(get(_)('assets.experimental.blocked_text'));
+            return false;
+        }
+        // An install replaces the game's files, these included
+        if (InstanceInUse(instance.id, false)) {
+            TriggerWarning(get(_)('assets.error.instance_busy'));
+            return false;
+        }
+        return true;
+    };
+
     const DownloadAsset = async (assetObj: AssetInfo, currentObj: LocalAsset | null, assetType: AssetType, assetNb?: number, assetTotal?: number, bulkJob?: Job): Promise<DownloadOutcome> => {
         const instance = get(activeInstance);
         if (!instance) return 'skipped';
-        if (instance.channel === 'experimental') {
-            TriggerError(get(_)('assets.experimental.blocked_text'));
-            return 'skipped';
-        }
+        if (!bulkJob && !CanWriteInto(instance)) return 'skipped';
         const quiet = bulkJob !== undefined;
         const job = bulkJob ?? startJob('home', instance.id);
         try {
@@ -259,7 +271,7 @@
                 const zipPath = await path.join(assetDownloadFolder, 'skin.zip');
 
                 let totbyts = 0;
-                const success = await backoffDownload(
+                await download(
                     zipUrl,
                     zipPath,
                     (pr) => {
@@ -269,12 +281,6 @@
                     undefined,
                     job.id
                 );
-
-                if (!success) {
-                    // backoffDownload already shows an error toast; show zip-specific guidance on top
-                    if (!quiet) TriggerError(get(_)('assets.error.zip_not_found'));
-                    return 'failed';
-                }
 
                 assetDLProgress[assetType][assetRelpath] = 0;
 
@@ -309,7 +315,11 @@
         } catch (error) {
             if (isCancelled(error)) return 'cancelled';
             console.error(`Installing ${assetRelpath} failed:`, error);
-            if (!quiet) TriggerError(`${get(_)('dl.error.failed_abort')}<br>${DescribeError(error)}`, { details: ErrorText(error) });
+            if (!quiet) {
+                // A skin package missing on the server has advice of its own
+                const missing = assetType === 'Skins' && ErrorCause(error) === 'errors.not_found';
+                TriggerError(missing ? get(_)('assets.error.zip_not_found') : `${get(_)('dl.error.failed_abort')}<br>${DescribeError(error)}`, { details: ErrorText(error) });
+            }
             return 'failed';
         } finally {
             delete assetDLProgress[assetType][assetRelpath];
@@ -401,7 +411,7 @@
 					{#if assetCountProgressBar[AssetTabType(currentAsset)] !== null}
 					<div class="flex items-center gap-2">
 						<ProgressBar value={assetCountProgressBar[AssetTabType(currentAsset)]} max={100} />
-						<button type="button" onclick={() => CancelBulk(AssetTabType(currentAsset))} class="button-gray button-main" title={$_('common.cancel')} aria-label={$_('common.cancel')}><i class="fa-solid fa-xmark"></i></button>
+						<button type="button" onclick={() => CancelBulk(AssetTabType(currentAsset))} class="button-gray button-main" disabled={bulkCancelRequested[AssetTabType(currentAsset)]} title={bulkCancelRequested[AssetTabType(currentAsset)] ? $_('jobs.cancelling') : $_('common.cancel')} aria-label={bulkCancelRequested[AssetTabType(currentAsset)] ? $_('jobs.cancelling') : $_('common.cancel')}><i class="fa-solid {bulkCancelRequested[AssetTabType(currentAsset)] ? 'fa-spinner fa-spin' : 'fa-xmark'}"></i></button>
 					</div>
 					{:else}
 					<button type="button" onclick={() => DownloadDisplayedAssets(AssetTabType(currentAsset))} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('assets.button.bulk_download')}</button>
