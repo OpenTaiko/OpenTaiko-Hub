@@ -1,6 +1,6 @@
 <script lang="ts">
     import { ipc } from '$lib/ipc';
-    import { formatBytes } from '$lib/utils/format';
+    import { formatBytes } from '$lib/utils/format.svelte';
     import { InstallReleaseZip, IsInstallComplete, WriteVersionJson as WriteVersionFile } from '$lib/services/install';
     import { getContext } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
@@ -16,11 +16,12 @@
     import type { BuildOption, GitHubRelease, HubOS, IndevBuildInfo, Instance, ToastContext } from '$lib/types';
     const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
-    import { GetOS, GetBuildPath, GetBuildTarget, GetRootPath } from "$lib/utils/path";
+    import { GetOS, GetBuildPath, GetBuildTarget, GetRootPath, OpenFolder } from "$lib/utils/path";
     import { startJob, isCancelled, InstanceInUse, type Job } from "$lib/stores/activity";
     import { download } from '$lib/utils/download';
-    import { DescribeError, ErrorText } from "$lib/utils/errors";
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { openUrl } from '@tauri-apps/plugin-opener';
+    import { confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
     import { isVersionAtLeast } from "$lib/utils/versions";
     import {
         repoOwner,
@@ -199,12 +200,14 @@
         const build = instance.pendingInstall;
         await updateInstance(instance.id, { pendingInstall: null });
         if (!build) return;
+        // The instance is passed on: re-reading the selected one after the await above
+        // installed into whichever instance the user had switched to meanwhile
         if (build.kind === 'stable') {
-            await DownloadStable();
+            await DownloadStable(instance);
         } else if (build.kind === 'indev') {
-            await DownloadIndev(build);
+            await DownloadIndev(build, instance);
         } else if (build.kind === 'prerelease') {
-            await DownloadPrerelease(build);
+            await DownloadPrerelease(build, instance);
         }
     };
 
@@ -222,7 +225,7 @@
                 pendingInstall: build
             });
         } catch (error) {
-            TriggerError(get(_)('instances.error.create_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('instances.error.create_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -318,6 +321,11 @@
         busyJob?.cancel();
     };
 
+    const OpenLogsAction = () => ({
+        label: get(_)('toast.open_logs'),
+        run: () => { ipc.logDirectory().then((dir) => { if (dir) OpenFolder(dir); }).catch(() => {}); }
+    });
+
     // A failed install says why in plain words when the cause is known, and keeps the raw
     // error for the copy button; a cancelled one is not an error at all
     const ReportInstallError = (key: string, err: unknown) => {
@@ -330,15 +338,19 @@
             TriggerError(err.message);
             return;
         }
-        TriggerError(get(_)(key, { values: { error: DescribeError(err) } }), { details: ErrorText(err) });
+        // A build writes its whole output to the log, which says more than any message
+        TriggerError(get(_)(key, { values: { error: DescribeError(err) } }), {
+            details: ErrorText(err),
+            action: key === 'home.error.build_failed' ? OpenLogsAction() : undefined
+        });
     };
 
     // Stable and prerelease installs only differ in which release they read and how the
     // instance is recorded afterwards, so both go through here.
-    const InstallRelease = async (resolve: () => Promise<ReleaseToInstall | null>) => {
-        if (!current) return;
+    const InstallRelease = async (resolve: () => Promise<ReleaseToInstall | null>, target?: Instance) => {
         // Capture the target so switching instances mid-download cannot retarget it
-        const instance = current;
+        const instance = target ?? current;
+        if (!instance) return;
         const job = BeginInstall(instance);
         if (!job) return;
 
@@ -375,29 +387,44 @@
         return asset;
     };
 
-    const DownloadStable = () => InstallRelease(async () => {
+    const DownloadStable = (target?: Instance) => InstallRelease(async () => {
         if (!latestRelease) await TryFetchingLatestVersion();
         // The lookup has already said why it failed
         if (!latestRelease) return null;
         const asset = await FindAsset(latestRelease);
         return { url: asset.browser_download_url, version: latestVersion, patch: { channel: 'stable', experimental: null } };
-    });
+    }, target);
 
-    const DownloadPrerelease = (option: { tag: string; label: string }) => InstallRelease(async () => {
+    // An update that breaks the installed skins, and a reinstall of the same version,
+    // used to start on a single click; the first was only flagged by red text beside it
+    const UpdateStable = async () => {
+        if (checkSkinCompatibility(latestVersion, currentVersion) === false) {
+            const go = await confirmDialog(get(_)('home.warn.skin_update_confirm'), { title: get(_)('home.button.update'), kind: 'warning' });
+            if (!go) return;
+        }
+        await DownloadStable();
+    };
+
+    const RedownloadStable = async () => {
+        const go = await confirmDialog(get(_)('home.warn.redownload_confirm', { values: { version: latestVersion ?? currentVersion ?? '' } }), { title: get(_)('home.button.redownload') });
+        if (go) await DownloadStable();
+    };
+
+    const DownloadPrerelease = (option: { tag: string; label: string }, target?: Instance) => InstallRelease(async () => {
         const asset = await FindAsset(await fetchReleaseByTag(option.tag));
         return {
             url: asset.browser_download_url,
             version: option.tag,
             patch: { channel: 'experimental', experimental: { kind: 'prerelease', tag: option.tag, label: option.label } }
         };
-    });
+    }, target);
 
     // Fetches the experimental branch source at its current head commit, builds it with
     // the .NET SDK and installs the publish output into the instance folder.
-    const DownloadIndev = async (option: { branch?: string; label?: string }) => {
-        if (!current) return;
+    const DownloadIndev = async (option: { branch?: string; label?: string }, target?: Instance) => {
         // Capture the target so switching instances mid-download cannot retarget it
-        const instance = current;
+        const instance = target ?? current;
+        if (!instance) return;
         const job = BeginInstall(instance);
         if (!job) return;
         let tmpDir: string | null = null;
@@ -605,10 +632,6 @@
         stderr: string;
     }
 
-    /** Toast messages render as HTML, so text coming from the game must not be markup. */
-    const escapeHtml = (text: string) =>
-        text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-
     onMount(() => {
         const pending = listen<GameExit>('game-exited', (event) => {
             const { code, signal, ranForSecs, stderr } = event.payload;
@@ -623,16 +646,18 @@
             const reason = signal !== null && signal !== undefined
                 ? get(_)('home.error.game_signal', { values: { signal } })
                 : get(_)('home.error.game_code', { values: { code: code ?? '?' } });
-            const detail = stderr ? escapeHtml(stderr.split('\n').slice(-3).join(' ')) : '';
+            // What the game printed goes to the copied details and the log rather than
+            // into the message, where it was unreadable in a toast
+            const report = { details: stderr || reason, action: OpenLogsAction() };
 
             // A launch that collapses immediately and a crash mid-session are different
             // problems, so they are reported differently.
             if (playedASession) {
                 TriggerError(get(_)('home.error.game_crashed', {
-                    values: { mins: Math.max(1, Math.round(ranForSecs / 60)), reason, detail }
-                }));
+                    values: { mins: Math.max(1, Math.round(ranForSecs / 60)), reason, detail: '' }
+                }), report);
             } else {
-                TriggerError(get(_)('home.error.game_exited', { values: { reason, detail } }));
+                TriggerError(get(_)('home.error.game_exited', { values: { reason, detail: '' } }), report);
             }
         });
         return () => { pending.then((unlisten) => unlisten()); };
@@ -749,13 +774,13 @@
                             <button type="button" onclick={() => showBuildPicker = true} class="button-gray button-main"><i class="fa-solid fa-code-branch"></i> {$_('home.button.change_build')}</button>
                         {:else if latestVersion !== null && latestVersion !== currentVersion}
                             <button type="button" onclick={LaunchOpenTaiko} disabled={launching} class="button-blue button-main"><i class="fa-solid {launching ? 'fa-spinner fa-spin' : 'fa-rocket'}"></i> {$_('home.button.launch')}</button>
-                            <button type="button" onclick={DownloadStable} class="button-green button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.update')}</button>
+                            <button type="button" onclick={UpdateStable} class="button-green button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.update')}</button>
                             {#if checkSkinCompatibility(latestVersion, currentVersion) === false}
                                 <span class="text-red-500">{$_('home.warn.skin_update')}</span>
                             {/if}
                         {:else}
                             <button type="button" onclick={LaunchOpenTaiko} disabled={launching} class="button-blue button-main"><i class="fa-solid {launching ? 'fa-spinner fa-spin' : 'fa-rocket'}"></i> {$_('home.button.launch')}</button>
-                            <button type="button" onclick={DownloadStable} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
+                            <button type="button" onclick={RedownloadStable} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('home.button.redownload')}</button>
                         {/if}
                         {#if downloadBusy && busyInstance}
                             <!-- The install runs for another instance; say where its progress is -->
@@ -774,11 +799,11 @@
                         {:else}
                             <span>{current.experimental?.label} @{indevLatestSha.slice(0, 7)}</span>
                             {#if indevUpdateAvailable}
-                                <span class="text-yellow-500">{$_('home.experimental.update_available')}</span>
+                                <span class="update-available">{$_('home.experimental.update_available')}</span>
                             {:else}
                                 <span class="opacity-70">{$_('home.experimental.up_to_date')}</span>
                             {/if}
-                            <button type="button" onclick={CheckIndevUpdate} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
+                            <button type="button" onclick={CheckIndevUpdate} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.check_updates')}</button>
                         {/if}
                     {:else}
                         <span class="nowrap"><b>{$_('home.label.latest_version')}</b></span>
@@ -789,7 +814,7 @@
                             <div class="placeholder animate-pulse flex-1"></div>
                         {:else}
                             <span>{latestVersion}</span>
-                            <button type="button" onclick={TryFetchingLatestVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
+                            <button type="button" onclick={TryFetchingLatestVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.check_updates')}</button>
                         {/if}
                     {/if}
                 </div>
@@ -846,6 +871,7 @@
 <BuildPickerModal Show={showBuildPicker} OnClose={() => showBuildPicker = false} OnPick={current ? OnBuildPicked : OnFirstInstall} />
 
 <style>
+    .update-available {color: light-dark(#a16207, #eab308);}
     .nowrap {white-space: nowrap;}
 
     .progressbar {

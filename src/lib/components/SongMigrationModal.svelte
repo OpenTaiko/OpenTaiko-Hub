@@ -1,6 +1,7 @@
 <script lang="ts">
     import Modal from '$lib/components/Modal.svelte';
-    import { formatDateTime } from '$lib/utils/format';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
+    import { formatDateTime } from '$lib/utils/format.svelte';
     import { ipc } from '$lib/ipc';
     import { startJob } from '$lib/stores/activity';
     // Resolves an instance's local Songs folder into the shared library. New charts are
@@ -57,7 +58,7 @@
             // Default: keep the version already in the shared library
             choices = Object.fromEntries(conflicts.map((item) => [item.src.relPath, 'keep_global' as const]));
         } catch (error) {
-            TriggerError(get(_)('songs.migrate.error', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.migrate.error', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
             OnClose();
         }
         loading = false;
@@ -105,7 +106,7 @@
             }));
             OnApplied();
         } catch (error) {
-            TriggerError(get(_)('songs.migrate.error', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.migrate.error', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         } finally {
             job.end();
         }

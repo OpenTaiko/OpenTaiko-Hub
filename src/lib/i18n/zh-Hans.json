@@ -1,6 +1,6 @@
 {
   "common": {
-    "fetch_error": "获取错误",
+    "fetch_error": "无法连接到服务器。请检查网络连接后再试。",
     "retry": "重试",
     "reload": "重新加载",
     "cancel": "取消",
@@ -82,6 +82,7 @@
     },
     "button": {
       "reload": "重新加载",
+      "check_updates": "检查更新",
       "launch": "启动 OpenTaiko",
       "update": "更新 OpenTaiko",
       "redownload": "重装 OpenTaiko",
@@ -91,7 +92,9 @@
       "change_build": "更换版本"
     },
     "warn": {
-      "skin_update": "（更新需要同步更新皮肤文件）"
+      "skin_update": "（更新需要同步更新皮肤文件）",
+      "skin_update_confirm": "此更新之后，已安装的皮肤也需要更新。现在更新 OpenTaiko 吗？",
+      "redownload_confirm": "重新下载 OpenTaiko {version} 并在此实例中重新安装吗？"
     },
     "hint": {
       "first_start": "在第一次启动游戏前，请确保在「皮肤」页面下载皮肤，在「歌曲列表」页面下载歌曲！",
@@ -99,7 +102,7 @@
     },
     "experimental": {
       "unavailable": "当前没有可用的实验版构建",
-      "requires_dotnet": "构建实验版需要 .NET SDK 8。请从 https://dotnet.microsoft.com/download/dotnet/8.0 安装后重试。",
+      "requires_dotnet": "构建实验版需要 .NET SDK 8 或更高版本。请安装后再试。",
       "update_available": "有新的实验版构建可用！",
       "up_to_date": "此实验版构建已是最新。",
       "stage": {
@@ -169,6 +172,7 @@
     },
     "error": {
       "no_db": "此实例尚无存档数据库。",
+      "game_running": "更改存档前请先关闭 OpenTaiko：游戏退出时会覆盖这些更改。",
       "load": "无法读取存档数据库。",
       "invalid_file": "不是有效的 OpenTaiko 存档文件。",
       "export": "导出存档失败：{error}",
@@ -349,7 +353,7 @@
       "error": "移动歌曲失败：{error}"
     },
     "metadata": {
-      "updated": "已更新 {count} 个曲风文件夹（box.def / preimages）"
+      "updated": "已更新 {count} 个曲风文件夹"
     },
     "error": {
       "open_folder": "无法打开文件夹：{error}",
@@ -570,7 +574,6 @@
   },
   "themes": {
     "title": "请选择主题。",
-    "title_debug": "请选择主题。（调试模式已开启）",
     "optgroup": {
       "optk": "OpenTaiko Hub 主题：",
       "skeleton": "Skeleton 预设主题："
@@ -600,16 +603,6 @@
       "dark": "深色",
       "light": "浅色",
       "current": "当前模式：{mode}"
-    },
-    "debug": {
-      "disable_btn": "禁用调试模式"
-    },
-    "warn": {
-      "same_theme": "所选主题与当前主题相同。",
-      "same_theme_debug": "调试：所选主题与当前主题相同。"
-    },
-    "success": {
-      "debug_disabled": "<b>调试模式已禁用。</b><br><p class=\"smalltext\">（注意：您需要更改「debugMode」值才能完全禁用调试模式！）</p>"
     }
   },
   "lang": {
@@ -639,7 +632,8 @@
   },
   "toast": {
     "copy": "复制详情",
-    "copied": "已复制"
+    "copied": "已复制",
+    "open_logs": "打开日志文件夹"
   },
   "errors": {
     "rate_limited": "GitHub 正在限制来自你的网络的请求。请稍后再试。",

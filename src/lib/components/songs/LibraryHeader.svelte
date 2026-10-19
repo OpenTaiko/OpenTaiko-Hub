@@ -199,11 +199,12 @@
     }
     .scope:hover {opacity: 1;}
     /* The theme's --color-primary-contrast-500 is black, and primary-500 is a mid blue,
-       so the label was black on blue and unreadable. White with a dark shadow reads on
-       any primary colour a theme picks, which a contrast token does not guarantee. */
+       so the label was black on blue and unreadable. White on primary-500 was no better
+       where a theme's primary is light (about 1.6:1 on Seafoam), so the pill takes a dark
+       shade of the theme's primary, on which white reads whatever the theme. */
     .scope[aria-selected='true'] {
         opacity: 1;
-        background-color: var(--color-primary-500);
+        background-color: var(--color-primary-900);
         color: #fff;
         text-shadow: 0 1px 2px rgb(0 0 0 / 0.55);
     }

@@ -151,6 +151,10 @@ pub async fn write_saves<R: Runtime>(app: AppHandle<R>, request: Request<'_>) ->
             .map_err(|_| "The save database must be sent as bytes".to_string())?,
     };
     let dir = crate::guard::instance_dir(&app, &instance)?;
+    // The game would write its own copy back on exit, undoing this one
+    if crate::game_is_running(&app, &dir) {
+        return Err("OpenTaiko is running in this instance; close it before changing its saves".into());
+    }
     blocking(move || replace_saves(&dir, &backup, &bytes)).await
 }
 

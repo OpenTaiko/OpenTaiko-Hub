@@ -1,6 +1,6 @@
 {
   "common": {
-    "fetch_error": "Fetch Error",
+    "fetch_error": "Could not reach the server. Check your connection, then try again.",
     "retry": "Retry",
     "reload": "Reload",
     "cancel": "Cancel",
@@ -82,6 +82,7 @@
     },
     "button": {
       "reload": "Reload",
+      "check_updates": "Check for updates",
       "launch": "Launch OpenTaiko",
       "update": "Update OpenTaiko",
       "redownload": "Redownload OpenTaiko",
@@ -91,7 +92,9 @@
       "change_build": "Change build"
     },
     "warn": {
-      "skin_update": "(Updating will require a skin update)"
+      "skin_update": "(Updating will require a skin update)",
+      "skin_update_confirm": "Your installed skins will need an update too after this one. Update OpenTaiko now?",
+      "redownload_confirm": "Download OpenTaiko {version} again and reinstall it in this instance?"
     },
     "hint": {
       "first_start": "Be sure to download a skin (\"Skins\" tab) and songs (\"Songlist\" tab) before first starting the game!",
@@ -99,7 +102,7 @@
     },
     "experimental": {
       "unavailable": "No experimental build is currently available",
-      "requires_dotnet": "Building experimental versions requires the .NET SDK 8. Please install it from https://dotnet.microsoft.com/download/dotnet/8.0 and retry.",
+      "requires_dotnet": "Building experimental versions requires the .NET SDK 8 or later. Install it, then try again.",
       "update_available": "A new experimental build is available!",
       "up_to_date": "This experimental build is up to date.",
       "stage": {
@@ -169,6 +172,7 @@
     },
     "error": {
       "no_db": "This instance has no save database yet.",
+      "game_running": "Close OpenTaiko before changing its saves: the game would overwrite the change when it exits.",
       "load": "Could not read the save database.",
       "invalid_file": "Not a valid OpenTaiko save file.",
       "export": "Failed to export the save: {error}",
@@ -299,7 +303,7 @@
     },
     "library": {
         "title": "Song library",
-        "summary": "{installed} of {total} songs installed",
+        "summary": "{installed} of {total, plural, one {# song} other {# songs}} installed",
         "get_everything": "Get all {count}",
         "updates_waiting": "{count} to update",
         "search": "Search songs and folders..."
@@ -349,7 +353,7 @@
       "error": "Failed to transfer the songs: {error}"
     },
     "metadata": {
-      "updated": "Updated {count, plural, one {# genre folder} other {# genre folders}} (box.def / preimages)"
+      "updated": "Updated {count, plural, one {# genre folder} other {# genre folders}}"
     },
     "error": {
       "open_folder": "Could not open the folder: {error}",
@@ -570,7 +574,6 @@
   },
   "themes": {
     "title": "Select a theme.",
-    "title_debug": "Select a theme. (DEBUG MODE ON)",
     "optgroup": {
       "optk": "OpenTaiko Hub themes:",
       "skeleton": "Skeleton preset themes:"
@@ -600,16 +603,6 @@
       "dark": "Dark",
       "light": "Light",
       "current": "Current Mode: {mode}"
-    },
-    "debug": {
-      "disable_btn": "Disable debug mode"
-    },
-    "warn": {
-      "same_theme": "Selected theme is the same as current theme.",
-      "same_theme_debug": "DEBUG: Selected theme is the same as current theme."
-    },
-    "success": {
-      "debug_disabled": "<b>Debug mode has been disabled.</b><br><p class=\"smalltext\">(Note: You need to change the \"debugMode\" value to fully disable debug mode!)</p>"
     }
   },
   "lang": {
@@ -639,7 +632,8 @@
   },
   "toast": {
     "copy": "Copy details",
-    "copied": "Copied"
+    "copied": "Copied",
+    "open_logs": "Open log folder"
   },
   "errors": {
     "rate_limited": "GitHub is limiting requests from your connection. Try again later.",

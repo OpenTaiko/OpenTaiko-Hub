@@ -134,6 +134,11 @@ ${event.error?.stack ?? ''}`).catch(() => {});
 
     onMount(async () => {
         captureFrontendProblems();
+        // The app is up: what fails from here on goes to the log, not to the box app.html
+        // shows when the app cannot start
+        window.__hubStarted?.();
+        window.addEventListener('error', (event) => console.error('Uncaught error:', event.error ?? event.message));
+        window.addEventListener('unhandledrejection', (event) => console.error('Unhandled rejection:', event.reason));
         sendHeartbeat();
         heartbeat = setInterval(sendHeartbeat, 5000);
 

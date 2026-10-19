@@ -23,7 +23,7 @@ use std::io::{BufReader, Read};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_opener::OpenerExt;
 use tokio::task;
 use zip::ZipArchive;
@@ -54,7 +54,8 @@ const GAME_BINARY: &str = "OpenTaiko";
 /// including the Hub's temporary folder.
 #[tauri::command]
 fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String> {
-    let path = guard::instance_dir(&app_handle, &instance_dir)?.join(GAME_BINARY);
+    let instance = guard::instance_dir(&app_handle, &instance_dir)?;
+    let path = instance.join(GAME_BINARY);
     let full_path = if cfg!(windows) {
         path.with_extension("exe").to_string_lossy().into_owned()
     } else {
@@ -91,6 +92,7 @@ fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String
         .map_err(|e| format!("Failed to execute the app: {}", e))?;
 
     log::info!("Launched {} (pid {})", full_path, child.id());
+    running_games(&app_handle).push(instance.clone());
 
     // Watching in a thread also reaps the child, which previously became a zombie for as
     // long as the Hub stayed open.
@@ -116,6 +118,12 @@ fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String
 
         let status = child.wait();
         let ran_for_secs = started.elapsed().as_secs();
+        {
+            let mut running = running_games(&app_handle);
+            if let Some(at) = running.iter().position(|dir| dir == &instance) {
+                running.remove(at);
+            }
+        }
         let code = status.as_ref().ok().and_then(|s| s.code());
         let success = status.as_ref().map(|s| s.success()).unwrap_or(false);
 
@@ -154,6 +162,27 @@ fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String
     });
 
     Ok(())
+}
+
+/// Instance folders whose game the Hub started and that is still running, once per copy.
+#[derive(Default)]
+struct RunningGames(std::sync::Mutex<Vec<std::path::PathBuf>>);
+
+fn running_games<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> std::sync::MutexGuard<'_, Vec<std::path::PathBuf>> {
+    app.state::<RunningGames>().inner().0.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// True while a game the Hub started from `dir` runs. A game started some other way is
+/// not known.
+pub(crate) fn game_is_running<R: tauri::Runtime>(app: &tauri::AppHandle<R>, dir: &Path) -> bool {
+    running_games(app).iter().any(|running| migrate::is_same_dir(running, dir))
+}
+
+/// For the saves page: the game keeps its save database open and writes it back when it
+/// exits, which undid any change made meanwhile.
+#[tauri::command]
+fn game_running(instance_dir: String, app_handle: AppHandle) -> bool {
+    game_is_running(&app_handle, Path::new(&instance_dir))
 }
 
 #[tauri::command]
@@ -534,6 +563,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             unzip_and_get_first_folder,
             launch_game,
+            game_running,
             open_folder,
             hub_root,
             binver::get_game_version,
@@ -581,6 +611,7 @@ fn main() {
             (!relocation_report.is_quiet()).then(|| relocation_report.clone()),
         )))
         .manage(jobs::Jobs::default())
+        .manage(RunningGames::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 if !jobs::allow_close(window) {

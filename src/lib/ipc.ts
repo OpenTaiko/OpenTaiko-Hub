@@ -77,6 +77,8 @@ export interface ClosePrompt {
 export const ipc = {
     // Game instances (main.rs, binver.rs, configini.rs, guard.rs)
     launchGame: (instanceDir: string) => invoke<void>('launch_game', { instanceDir }),
+    /** True while a game the Hub started from this instance runs. */
+    gameRunning: (instanceDir: string) => invoke<boolean>('game_running', { instanceDir }),
     getGameVersion: (instanceDir: string) => invoke<string | null>('get_game_version', { instanceDir }),
     ensureConfigTjapath: (instanceDir: string, globalSongsPath: string, includeLocal: boolean) =>
         invoke<string>('ensure_config_tjapath', { instanceDir, globalSongsPath, includeLocal }),

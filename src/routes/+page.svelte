@@ -122,7 +122,9 @@
                             <span class="tile-icon">
                                 <i class={tile.icon}></i>
                                 {#if tileArea[tile.value] && $busyAreas.has(tileArea[tile.value]!)}
-                                    <i class="fa-solid fa-spinner fa-spin tile-busy" aria-label={$_('jobs.busy')}></i>
+                                    <!-- Text, since a label on an <i> without a role is not read out -->
+                                    <i class="fa-solid fa-spinner fa-spin tile-busy" aria-hidden="true"></i>
+                                    <span class="sr-only">{$_('jobs.busy')}</span>
                                 {/if}
                             </span>
                             <Navigation.TriggerText>{$_(tile.label)}</Navigation.TriggerText>
@@ -149,7 +151,8 @@
         </Navigation>
       </aside>
       <!-- Main Content -->
-      <main class="h-screen space-y-4 p-4">
+      <!-- tabindex: where focus returns when a dialog closes and its opener is gone -->
+      <main class="h-screen space-y-4 p-4" tabindex="-1">
         <!-- OpenTaiko instance management (Home only: the songs library is global) -->
         <div class="w-full h-full space-y-4" style:display={currentTile === 0 ? null : 'none'}>
             {#if $instancesReady}
@@ -195,7 +198,7 @@
 
 <style>
     /* Main CSS */
-    main {overflow-y: auto;}
+    main {overflow-y: auto; outline: none;}
     .tile-icon {position: relative; display: inline-block;}
     .tile-busy {position: absolute; top: -0.4rem; right: -0.9rem; font-size: 0.7rem;}
 </style>

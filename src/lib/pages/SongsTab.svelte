@@ -235,7 +235,7 @@
             mediaFor = null;   // force the effect to reload it
             await LoadSongMedia(entry);
         } catch (error) {
-            TriggerError(get(_)('songs.box.jacket_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.box.jacket_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -329,7 +329,7 @@
             // The panel reloads the image itself; no chart changed, so no rescan.
             await LoadFolderJacket(relPath);
         } catch (error) {
-            TriggerError(get(_)('songs.box.jacket_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.box.jacket_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -353,7 +353,7 @@
                 };
             }
         } catch (error) {
-            TriggerError(get(_)('songs.folder.box_save_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.folder.box_save_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         } finally {
             savingBox = false;
         }
@@ -398,7 +398,7 @@
             // The tree has not rebuilt yet, so the node is named rather than looked up.
             SelectFolder({ relPath: created, onDisk: true } as LibraryFolder);
         } catch (error) {
-            TriggerError(get(_)('songs.folder.create_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.folder.create_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -414,7 +414,7 @@
             selectedFolder = null;
             DropUnder(folder.relPath);
         } catch (error) {
-            TriggerError(get(_)('songs.folder.delete_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.folder.delete_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -428,7 +428,7 @@
             selectedKey = null;
             DropUnder(entry.relPath);
         } catch (error) {
-            TriggerError(get(_)('songs.folder.delete_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.folder.delete_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -451,6 +451,7 @@
     const ImportArchives = async (relPath: string, archives: string[]) => {
         if (archives.length === 0 || importing) return;
         importing = true;
+        const job = startJob('songs');
         try {
             const base = await GetGlobalSongsPath();
             const report = await ipc.importChartArchives(base, relPath, archives);
@@ -462,9 +463,10 @@
                 TriggerError(get(_)('songs.folder.import_rejected', { values: { names: report.rejected.join(', ') } }));
             }
         } catch (error) {
-            TriggerError(get(_)('songs.folder.import_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.folder.import_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         } finally {
             importing = false;
+            job.end();
         }
     };
 
@@ -587,7 +589,7 @@
             scanStats = { dirs: latestStats.dirs, found: finalAll.length };
         } catch (error) {
             console.error('Song scan failed:', error);
-            TriggerError(get(_)('songs.error.scan_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.error.scan_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
         scanning = false;
         CheckMigrations();
@@ -652,7 +654,7 @@
             TriggerSuccess(get(_)('songs.duplicates.success', { values: { count: removed } }));
             duplicateCandidates = duplicateCandidates.filter((c) => c !== candidate);
         } catch (error) {
-            TriggerError(get(_)('songs.duplicates.error', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.duplicates.error', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
         duplicateBusy = false;
     }
@@ -677,7 +679,7 @@
             const songsDir = await GetGlobalSongsPath();
             await OpenFolder(relPath ? await path.join(songsDir, relPath) : songsDir);
         } catch (error) {
-            TriggerError(get(_)('songs.error.open_folder', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.error.open_folder', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -759,7 +761,7 @@
             await OpenFolder(songsDir);
         } catch (error) {
             // OpenFolder reports its own failures; this is the folder creation failing
-            TriggerError(get(_)('songs.error.open_folder', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.error.open_folder', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     }
 
@@ -879,16 +881,20 @@
             if (bulkBusy || songDLProgress[songObj.uniqueId] !== undefined) return 'skipped';
             activeSingleDownloads++;
         }
+        // A song of its own is a job too: the Songs tile shows it is running, and
+        // closing the window asks first instead of cutting it off
+        const ownJob = standalone ? startJob('songs') : null;
         // Claim the row right away (nothing awaited above) so a second click on the
         // same song cannot slip through before the download shows its progress bar
         songDLProgress[songObj.uniqueId] = 0;
         try {
-            return await RunDownloadSong(songObj, currentObj, songNb !== undefined, job);
+            return await RunDownloadSong(songObj, currentObj, songNb !== undefined, ownJob?.id ?? job);
         } finally {
             // Also releases the row when the download throws, otherwise the button
             // would stay replaced by a stuck progress bar
             delete songDLProgress[songObj.uniqueId];
             if (standalone) activeSingleDownloads--;
+            ownJob?.end();
         }
     }
 
@@ -1310,10 +1316,10 @@
     /* Grade letter colors */
     .grade { font-weight: bold; }
     .grade-E { color: light-dark(#6b7280, #ffffff); }
-    .grade-D { color: #ff4444; }
-    .grade-C { color: #ff9933; }
-    .grade-B { color: #ffdd00; }
-    .grade-A { color: #44cc44; }
+    .grade-D { color: light-dark(#b91c1c, #ff4444); }
+    .grade-C { color: light-dark(#c2410c, #ff9933); }
+    .grade-B { color: light-dark(#a16207, #ffdd00); }
+    .grade-A { color: light-dark(#15803d, #44cc44); }
     .grade-S {
         background: linear-gradient(90deg, #56ccf2, #2f80ed, #56ccf2);
         background-size: 200% auto;

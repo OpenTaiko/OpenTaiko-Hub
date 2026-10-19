@@ -128,7 +128,7 @@
                             oninput={(e) => set(c.key, e.currentTarget.value)}>
                         <span>{$_(c.label)}</span>
                         {#if current && !ReadOnly}
-                            <button type="button" class="drop" title={$_('songs.box.clear')} onclick={() => set(c.key, '')}>✕</button>
+                            <button type="button" class="drop" title={$_('songs.box.clear')} aria-label={$_('songs.box.clear')} onclick={() => set(c.key, '')}>✕</button>
                         {/if}
                     </label>
                 {/each}

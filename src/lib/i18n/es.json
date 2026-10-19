@@ -1,6 +1,6 @@
 {
   "common": {
-    "fetch_error": "Error al obtener los datos",
+    "fetch_error": "No se pudo contactar con el servidor. Comprueba tu conexión y vuelve a intentarlo.",
     "retry": "Reintentar",
     "reload": "Recargar",
     "cancel": "Cancelar",
@@ -82,6 +82,7 @@
     },
     "button": {
       "reload": "Recargar",
+      "check_updates": "Buscar actualizaciones",
       "launch": "Iniciar OpenTaiko",
       "update": "Actualizar OpenTaiko",
       "redownload": "Volver a descargar OpenTaiko",
@@ -91,7 +92,9 @@
       "change_build": "Cambiar versión"
     },
     "warn": {
-      "skin_update": "(Actualizar requerirá una actualización del skin)"
+      "skin_update": "(Actualizar requerirá una actualización del skin)",
+      "skin_update_confirm": "Después también habrá que actualizar los skins instalados. ¿Actualizar OpenTaiko ahora?",
+      "redownload_confirm": "¿Volver a descargar OpenTaiko {version} y reinstalarlo en esta instancia?"
     },
     "hint": {
       "first_start": "¡Asegúrate de descargar un skin (pestaña \"Skins\") y canciones (pestaña \"Canciones\") antes de iniciar el juego por primera vez!",
@@ -99,7 +102,7 @@
     },
     "experimental": {
       "unavailable": "No hay ninguna build experimental disponible actualmente",
-      "requires_dotnet": "Compilar versiones experimentales requiere el .NET SDK 8. Instálalo desde https://dotnet.microsoft.com/download/dotnet/8.0 y vuelve a intentarlo.",
+      "requires_dotnet": "Compilar versiones experimentales requiere el .NET SDK 8 o posterior. Instálalo y vuelve a intentarlo.",
       "update_available": "¡Hay una nueva build experimental disponible!",
       "up_to_date": "Esta build experimental está actualizada.",
       "stage": {
@@ -169,6 +172,7 @@
     },
     "error": {
       "no_db": "Esta instancia aún no tiene base de datos de partidas.",
+      "game_running": "Cierra OpenTaiko antes de cambiar sus partidas guardadas: el juego sobrescribiría el cambio al salir.",
       "load": "No se pudo leer la base de datos de partidas.",
       "invalid_file": "Archivo de partida de OpenTaiko no válido.",
       "export": "No se pudo exportar la partida: {error}",
@@ -299,7 +303,7 @@
     },
     "library": {
         "title": "Biblioteca de canciones",
-        "summary": "{installed} de {total} canciones instaladas",
+        "summary": "{installed} de {total, plural, one {# canción instalada} other {# canciones instaladas}}",
         "get_everything": "Descargar las {count}",
         "updates_waiting": "{count} por actualizar",
         "search": "Buscar canciones y carpetas..."
@@ -349,7 +353,7 @@
       "error": "No se pudieron transferir las canciones: {error}"
     },
     "metadata": {
-      "updated": "Se {count, plural, one {actualizó # carpeta de género} other {actualizaron # carpetas de género}} (box.def / preimages)"
+      "updated": "Se {count, plural, one {actualizó # carpeta de género} other {actualizaron # carpetas de género}}"
     },
     "error": {
       "open_folder": "No se pudo abrir la carpeta: {error}",
@@ -570,7 +574,6 @@
   },
   "themes": {
     "title": "Selecciona un tema.",
-    "title_debug": "Selecciona un tema. (MODO DEBUG ACTIVADO)",
     "optgroup": {
       "optk": "Temas del OpenTaiko Hub:",
       "skeleton": "Temas predefinidos de Skeleton:"
@@ -600,20 +603,10 @@
       "dark": "Oscuro",
       "light": "Claro",
       "current": "Modo actual: {mode}"
-    },
-    "debug": {
-      "disable_btn": "Desactivar el modo debug"
-    },
-    "warn": {
-      "same_theme": "El tema seleccionado es el mismo que el tema actual.",
-      "same_theme_debug": "DEBUG: El tema seleccionado es el mismo que el tema actual."
-    },
-    "success": {
-      "debug_disabled": "<b>El modo debug ha sido desactivado.</b><br><p class=\"smalltext\">(Nota: ¡Necesitas cambiar el valor de \"debugMode\" para desactivar completamente el modo debug!)</p>"
     }
   },
   "lang": {
-    "label": "Language",
+    "label": "Idioma",
     "en": "English",
     "ja": "日本語",
     "zh_Hans": "中文 (简体)",
@@ -639,7 +632,8 @@
   },
   "toast": {
     "copy": "Copiar detalles",
-    "copied": "Copiado"
+    "copied": "Copiado",
+    "open_logs": "Abrir carpeta de registros"
   },
   "errors": {
     "rate_limited": "GitHub está limitando las solicitudes de tu conexión. Inténtalo más tarde.",

@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { getVersion } from '@tauri-apps/api/app';
     import { fetchCachedJson } from '$lib/utils/download';
     import { openUrl } from '@tauri-apps/plugin-opener';
@@ -47,7 +48,7 @@
         try {
             await openUrl("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest");
         } catch (err) {
-            TriggerError(get(_)('hub.error.fetch', { values: { error: String(err) } }));
+            TriggerError(get(_)('hub.error.fetch', { values: { error: DescribeError(err) } }), { details: ErrorText(err) });
         }
     }
 
@@ -68,7 +69,6 @@
         <div class="flex gap-4">
             {#if latestVersionErrorFound === true}
                 <span>{$_('hub.status.fetch_failed')}</span>
-                <span class="fetch-error"><b>{$_('common.fetch_error')}</b></span>
                 <button type="button" onclick={TryFetchingLatestVersion} class="button-blue button-main"><i class="fa-solid fa-rotate"></i> {$_('common.retry')}</button>
             {:else if latestVersion === null}
                 <span>{$_('hub.status.checking')}</span>

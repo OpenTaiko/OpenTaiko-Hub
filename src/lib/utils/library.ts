@@ -417,4 +417,4 @@ export const shownUnder = (node: LibraryFolder): number => {
 };
 
 // Kept here for the components that already import it from the library model
-export { formatSize } from './format';
+export { formatSize } from './format.svelte';

@@ -1,6 +1,6 @@
 <script lang="ts">
     import { ipc } from '$lib/ipc';
-    import { formatSize } from '$lib/utils/format';
+    import { formatSize } from '$lib/utils/format.svelte';
     import { ValidAssetCatalog } from '$lib/utils/validate';
     // Dependencies
     import { onMount } from 'svelte';
@@ -153,6 +153,13 @@
             const _outdated = _notdownloaded || local.assetVersion !== Field(a, assetPrefix, 'Version');
             return _notdownloaded || _outdated;
         };
+
+        // Without the catalog nothing is known to be missing, which used to be reported
+        // as everything being up to date
+        if (catalogFetchFailed) {
+            TriggerWarning(get(_)('common.fetch_error'));
+            return;
+        }
 
         const AInfo = assetsInfo[assetType].filter((a) => _filter(a));
 

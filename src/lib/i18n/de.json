@@ -1,6 +1,6 @@
 {
   "common": {
-    "fetch_error": "Abruffehler",
+    "fetch_error": "Der Server war nicht erreichbar. Prüfe deine Verbindung und versuche es dann erneut.",
     "retry": "Erneut versuchen",
     "reload": "Neu laden",
     "cancel": "Abbrechen",
@@ -82,6 +82,7 @@
     },
     "button": {
       "reload": "Neu laden",
+      "check_updates": "Nach Updates suchen",
       "launch": "OpenTaiko starten",
       "update": "OpenTaiko aktualisieren",
       "redownload": "OpenTaiko erneut herunterladen",
@@ -91,7 +92,9 @@
       "change_build": "Version wechseln"
     },
     "warn": {
-      "skin_update": "(Nach dem Aktualisieren ist ein Skin-Update erforderlich)"
+      "skin_update": "(Nach dem Aktualisieren ist ein Skin-Update erforderlich)",
+      "skin_update_confirm": "Danach müssen auch deine installierten Skins aktualisiert werden. OpenTaiko jetzt aktualisieren?",
+      "redownload_confirm": "OpenTaiko {version} erneut herunterladen und in dieser Instanz neu installieren?"
     },
     "hint": {
       "first_start": "Vor dem ersten Start des Spiels unbedingt einen Skin (Tab \"Skins\") und Songs (Tab \"Songliste\") herunterladen!",
@@ -99,7 +102,7 @@
     },
     "experimental": {
       "unavailable": "Derzeit ist kein experimenteller Build verfügbar",
-      "requires_dotnet": "Zum Erstellen experimenteller Versionen wird das .NET SDK 8 benötigt. Bitte von https://dotnet.microsoft.com/download/dotnet/8.0 installieren und erneut versuchen.",
+      "requires_dotnet": "Zum Erstellen experimenteller Versionen wird das .NET SDK 8 oder neuer benötigt. Installiere es und versuche es dann erneut.",
       "update_available": "Ein neuer experimenteller Build ist verfügbar!",
       "up_to_date": "Dieser experimentelle Build ist auf dem neuesten Stand.",
       "stage": {
@@ -169,6 +172,7 @@
     },
     "error": {
       "no_db": "Diese Instanz hat noch keine Spielstand-Datenbank.",
+      "game_running": "Schließe OpenTaiko, bevor du Spielstände änderst: Das Spiel würde die Änderung beim Beenden überschreiben.",
       "load": "Die Spielstand-Datenbank konnte nicht gelesen werden.",
       "invalid_file": "Keine gültige OpenTaiko-Spielstanddatei.",
       "export": "Spielstand konnte nicht exportiert werden: {error}",
@@ -299,7 +303,7 @@
     },
     "library": {
         "title": "Songbibliothek",
-        "summary": "{installed} von {total} Liedern installiert",
+        "summary": "{installed} von {total, plural, one {# Lied} other {# Liedern}} installiert",
         "get_everything": "Alle {count} laden",
         "updates_waiting": "{count} zu aktualisieren",
         "search": "Lieder und Ordner suchen..."
@@ -349,7 +353,7 @@
       "error": "Songs konnten nicht übertragen werden: {error}"
     },
     "metadata": {
-      "updated": "{count} Genre-Ordner aktualisiert (box.def / preimages)"
+      "updated": "{count} Genre-Ordner aktualisiert"
     },
     "error": {
       "open_folder": "Ordner konnte nicht geöffnet werden: {error}",
@@ -570,7 +574,6 @@
   },
   "themes": {
     "title": "Ein Theme auswählen.",
-    "title_debug": "Ein Theme auswählen. (DEBUG-MODUS AN)",
     "optgroup": {
       "optk": "Themes des OpenTaiko Hub:",
       "skeleton": "Skeleton-Preset-Themes:"
@@ -600,20 +603,10 @@
       "dark": "Dunkel",
       "light": "Hell",
       "current": "Aktueller Modus: {mode}"
-    },
-    "debug": {
-      "disable_btn": "Debug-Modus deaktivieren"
-    },
-    "warn": {
-      "same_theme": "Das ausgewählte Theme ist bereits das aktuelle Theme.",
-      "same_theme_debug": "DEBUG: Das ausgewählte Theme ist bereits das aktuelle Theme."
-    },
-    "success": {
-      "debug_disabled": "<b>Der Debug-Modus wurde deaktiviert.</b><br><p class=\"smalltext\">(Hinweis: Der Wert \"debugMode\" muss geändert werden, um den Debug-Modus vollständig zu deaktivieren!)</p>"
     }
   },
   "lang": {
-    "label": "Language",
+    "label": "Sprache",
     "en": "English",
     "ja": "日本語",
     "zh_Hans": "中文 (简体)",
@@ -639,7 +632,8 @@
   },
   "toast": {
     "copy": "Details kopieren",
-    "copied": "Kopiert"
+    "copied": "Kopiert",
+    "open_logs": "Protokollordner öffnen"
   },
   "errors": {
     "rate_limited": "GitHub begrenzt die Anfragen deiner Verbindung. Versuche es später erneut.",

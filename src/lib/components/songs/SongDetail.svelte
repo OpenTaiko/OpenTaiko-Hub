@@ -107,6 +107,7 @@
                             type="button"
                             class="setjacket"
                             title={$_('songs.detail.set_jacket')}
+                            aria-label={$_('songs.detail.set_jacket')}
                             onclick={() => OnPickPreimage?.(Entry)}
                         >
                             <i class="fa-solid fa-camera"></i>
@@ -191,7 +192,7 @@
                             {#each LINKS as link (link.key)}
                                 {@const url = SafeUrl(artist[link.key])}
                                 {#if url}
-                                    <a href={url} target="_blank" rel="noreferrer" title={link.label || $_('songs.detail.website')}>
+                                    <a href={url} target="_blank" rel="noreferrer" title={link.label || $_('songs.detail.website')} aria-label={link.label || $_('songs.detail.website')}>
                                         <i class={link.icon}></i>
                                     </a>
                                 {/if}
@@ -295,7 +296,7 @@
     .cname {font-weight: 700; overflow-wrap: anywhere;}
     .clevel {font-variant-numeric: tabular-nums; text-align: right;}
     .cmaker {opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
-    .crown {background: none; border: 0; padding: 0; cursor: pointer; color: #eab308; font-size: 0.75rem; font-weight: 700;}
+    .crown {background: none; border: 0; padding: 0; cursor: pointer; color: light-dark(#a16207, #eab308); font-size: 0.75rem; font-weight: 700;}
 
     .artists {display: flex; flex-direction: column; gap: 0.35rem;}
     .artist {display: flex; align-items: center; gap: 0.5rem; font-size: 0.8rem; flex-wrap: wrap;}

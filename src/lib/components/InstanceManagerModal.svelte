@@ -1,5 +1,6 @@
 <script lang="ts">
     import { getContext } from 'svelte';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
     import { ipc } from '$lib/ipc';
@@ -52,7 +53,7 @@
             await linkGlobalSongs(get(instances).find((i) => i.id === instance.id));
             TriggerSuccess(get(_)('instances.success.attached', { values: { name: instance.name } }));
         } catch (error) {
-            TriggerError(get(_)('instances.error.attach_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('instances.error.attach_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -69,7 +70,7 @@
             TriggerSuccess(get(_)('instances.success.created', { values: { name: instance.name } }));
             OnClose();
         } catch (error) {
-            TriggerError(get(_)('instances.error.create_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('instances.error.create_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 

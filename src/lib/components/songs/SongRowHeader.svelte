@@ -37,5 +37,5 @@
     .names {flex: 1;}
     .levels {flex: none; display: flex; gap: 0.15rem;}
     .cell {width: 2.1rem; text-align: center;}
-    .state {flex: none; width: 7rem;}
+    .state {flex: none; width: 9rem;}
 </style>

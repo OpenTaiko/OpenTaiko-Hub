@@ -1,6 +1,6 @@
 {
   "common": {
-    "fetch_error": "擷取錯誤",
+    "fetch_error": "無法連線到伺服器。請檢查網路連線後再試。",
     "retry": "重試",
     "reload": "重新整理",
     "cancel": "取消",
@@ -82,6 +82,7 @@
     },
     "button": {
       "reload": "重新整理",
+      "check_updates": "檢查更新",
       "launch": "啟動 OpenTaiko",
       "update": "更新 OpenTaiko",
       "redownload": "重新下載 OpenTaiko",
@@ -91,7 +92,9 @@
       "change_build": "更換版本"
     },
     "warn": {
-      "skin_update": "（更新後需要在「主題」頁面更新主題）"
+      "skin_update": "（更新後需要在「主題」頁面更新主題）",
+      "skin_update_confirm": "此更新之後，已安裝的主題也需要更新。現在更新 OpenTaiko 嗎？",
+      "redownload_confirm": "重新下載 OpenTaiko {version} 並在此實例中重新安裝嗎？"
     },
     "hint": {
       "first_start": "在首次啟動遊戲前，請確定已在「主題」頁面下載任一主題，且已在「歌曲」頁面下載任何歌曲！",
@@ -99,7 +102,7 @@
     },
     "experimental": {
       "unavailable": "目前沒有可用的實驗版",
-      "requires_dotnet": "建置實驗版需要 .NET SDK 8。請從 https://dotnet.microsoft.com/download/dotnet/8.0 安裝後再重試。",
+      "requires_dotnet": "建置實驗版需要 .NET SDK 8 或更新版本。請安裝後再試。",
       "update_available": "有新的實驗版可用！",
       "up_to_date": "此實驗版已是最新版。",
       "stage": {
@@ -169,6 +172,7 @@
     },
     "error": {
       "no_db": "此實例尚無存檔資料庫。",
+      "game_running": "變更存檔前請先關閉 OpenTaiko：遊戲結束時會覆寫這些變更。",
       "load": "無法讀取存檔資料庫。",
       "invalid_file": "不是有效的 OpenTaiko 存檔檔案。",
       "export": "匯出存檔失敗：{error}",
@@ -349,7 +353,7 @@
       "error": "移動歌曲失敗：{error}"
     },
     "metadata": {
-      "updated": "已更新 {count} 個曲風資料夾（box.def／預覽圖）"
+      "updated": "已更新 {count} 個曲風資料夾"
     },
     "error": {
       "open_folder": "無法開啟資料夾：{error}",
@@ -570,7 +574,6 @@
   },
   "themes": {
     "title": "選擇主題。",
-    "title_debug": "選擇主題。（偵錯模式開啟）",
     "optgroup": {
       "optk": "OpenTaiko Hub 主題：",
       "skeleton": "Skeleton 內建主題："
@@ -600,16 +603,6 @@
       "dark": "深色",
       "light": "淺色",
       "current": "目前配色：{mode}"
-    },
-    "debug": {
-      "disable_btn": "停用偵錯模式"
-    },
-    "warn": {
-      "same_theme": "所選主題已是目前主題。",
-      "same_theme_debug": "偵錯：所選主題已是目前主題。"
-    },
-    "success": {
-      "debug_disabled": "<b>偵錯模式已停用。</b><br><p class=\"smalltext\">（注意：需要更改「debugMode」的值，才能完全停用偵錯模式！）</p>"
     }
   },
   "lang": {
@@ -639,7 +632,8 @@
   },
   "toast": {
     "copy": "複製詳細資訊",
-    "copied": "已複製"
+    "copied": "已複製",
+    "open_logs": "開啟記錄資料夾"
   },
   "errors": {
     "rate_limited": "GitHub 正在限制來自你網路的請求。請稍後再試。",

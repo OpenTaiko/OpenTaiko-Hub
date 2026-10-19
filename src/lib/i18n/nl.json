@@ -1,6 +1,6 @@
 {
   "common": {
-    "fetch_error": "Ophaalfout",
+    "fetch_error": "De server was niet bereikbaar. Controleer je verbinding en probeer het dan opnieuw.",
     "retry": "Opnieuw proberen",
     "reload": "Herladen",
     "cancel": "Annuleren",
@@ -82,6 +82,7 @@
     },
     "button": {
       "reload": "Herladen",
+      "check_updates": "Controleren op updates",
       "launch": "OpenTaiko starten",
       "update": "OpenTaiko bijwerken",
       "redownload": "OpenTaiko opnieuw downloaden",
@@ -91,7 +92,9 @@
       "change_build": "Versie wijzigen"
     },
     "warn": {
-      "skin_update": "(Na het bijwerken is ook een skin-update nodig)"
+      "skin_update": "(Na het bijwerken is ook een skin-update nodig)",
+      "skin_update_confirm": "Daarna moeten ook je geïnstalleerde skins worden bijgewerkt. OpenTaiko nu bijwerken?",
+      "redownload_confirm": "OpenTaiko {version} opnieuw downloaden en in deze instantie opnieuw installeren?"
     },
     "hint": {
       "first_start": "Download eerst een skin (tabblad \"Skins\") en nummers (tabblad \"Songlijst\") voordat je het spel voor het eerst start!",
@@ -99,7 +102,7 @@
     },
     "experimental": {
       "unavailable": "Er is momenteel geen experimentele build beschikbaar",
-      "requires_dotnet": "Voor het bouwen van experimentele versies is de .NET SDK 8 vereist. Installeer deze via https://dotnet.microsoft.com/download/dotnet/8.0 en probeer het opnieuw.",
+      "requires_dotnet": "Voor het bouwen van experimentele versies is de .NET SDK 8 of nieuwer vereist. Installeer deze en probeer het dan opnieuw.",
       "update_available": "Er is een nieuwe experimentele build beschikbaar!",
       "up_to_date": "Deze experimentele build is up-to-date.",
       "stage": {
@@ -169,6 +172,7 @@
     },
     "error": {
       "no_db": "Deze instantie heeft nog geen save-database.",
+      "game_running": "Sluit OpenTaiko voordat je de saves wijzigt: het spel zou de wijziging bij het afsluiten overschrijven.",
       "load": "Kon de save-database niet lezen.",
       "invalid_file": "Geen geldig OpenTaiko-savebestand.",
       "export": "Kon de save niet exporteren: {error}",
@@ -299,7 +303,7 @@
     },
     "library": {
         "title": "Muziekbibliotheek",
-        "summary": "{installed} van {total} nummers geïnstalleerd",
+        "summary": "{installed} van {total, plural, one {# nummer} other {# nummers}} geïnstalleerd",
         "get_everything": "Alle {count} ophalen",
         "updates_waiting": "{count} bij te werken",
         "search": "Zoek nummers en mappen..."
@@ -349,7 +353,7 @@
       "error": "Kon de nummers niet overzetten: {error}"
     },
     "metadata": {
-      "updated": "{count, plural, one {# genremap} other {# genremappen}} bijgewerkt (box.def / preimages)"
+      "updated": "{count, plural, one {# genremap} other {# genremappen}} bijgewerkt"
     },
     "error": {
       "open_folder": "Kon de map niet openen: {error}",
@@ -570,7 +574,6 @@
   },
   "themes": {
     "title": "Kies een thema.",
-    "title_debug": "Kies een thema. (DEBUGMODUS AAN)",
     "optgroup": {
       "optk": "OpenTaiko Hub-thema's:",
       "skeleton": "Skeleton-presetthema's:"
@@ -600,20 +603,10 @@
       "dark": "Donker",
       "light": "Licht",
       "current": "Huidige modus: {mode}"
-    },
-    "debug": {
-      "disable_btn": "Debugmodus uitschakelen"
-    },
-    "warn": {
-      "same_theme": "Het geselecteerde thema is hetzelfde als het huidige thema.",
-      "same_theme_debug": "DEBUG: Het geselecteerde thema is hetzelfde als het huidige thema."
-    },
-    "success": {
-      "debug_disabled": "<b>De debugmodus is uitgeschakeld.</b><br><p class=\"smalltext\">(Let op: je moet de waarde \"debugMode\" aanpassen om de debugmodus volledig uit te schakelen!)</p>"
     }
   },
   "lang": {
-    "label": "Language",
+    "label": "Taal",
     "en": "English",
     "ja": "日本語",
     "zh_Hans": "中文 (简体)",
@@ -639,7 +632,8 @@
   },
   "toast": {
     "copy": "Details kopiëren",
-    "copied": "Gekopieerd"
+    "copied": "Gekopieerd",
+    "open_logs": "Logmap openen"
   },
   "errors": {
     "rate_limited": "GitHub beperkt de verzoeken van je verbinding. Probeer het later opnieuw.",

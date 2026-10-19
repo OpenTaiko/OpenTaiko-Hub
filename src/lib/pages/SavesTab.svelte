@@ -8,6 +8,7 @@
     // as a new save. Imports are only accepted when the archive is the same version as,
     // or newer than, the instance's current save database.
     import { getContext } from 'svelte';
+    import { DescribeError, ErrorCause, ErrorText } from '$lib/utils/errors';
     import { readFile, exists } from '@tauri-apps/plugin-fs';
     import { open as openDialog, confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
     import { ipc } from '$lib/ipc';
@@ -19,10 +20,11 @@
     import { compareVersions } from '$lib/utils/versions';
     import { readDbVersion, listSaves, exportSave, importSaveInto, rebindSlot, createSave, deleteSave } from '$lib/utils/savesdb';
     import { activeInstance } from '$lib/stores/instances';
+    import { startJob } from '$lib/stores/activity';
     import type { Database } from 'sql.js';
     import type { Instance, PortableSave, SaveSummary, ToastContext } from '$lib/types';
 
-    const { TriggerError, TriggerSuccess } = getContext<ToastContext>('toast');
+    const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
     const DB_NAME = 'Saves.db3';
 
@@ -50,7 +52,22 @@
     // and renames it over, so a crash or a full disk mid-write leaves the previous save
     // intact instead of a truncated file. If the backup cannot be made, nothing is written.
     const WriteDb = async (inst: Instance, bytes: Uint8Array) => {
-        await ipc.writeSaves(inst.path, BackupName(), bytes);
+        // A job, so closing the window asks first instead of cutting the write off
+        const job = startJob('home', inst.id);
+        try {
+            await ipc.writeSaves(inst.path, BackupName(), bytes);
+        } finally {
+            job.end();
+        }
+    };
+
+    // The game keeps its save database open and writes it back when it exits, which
+    // undid any change made meanwhile. Only advised against before; the backend refuses
+    // the write as well.
+    const GameRunning = async (inst: Instance): Promise<boolean> => {
+        const running = await ipc.gameRunning(inst.path).catch(() => false);
+        if (running) TriggerWarning(get(_)('saves.error.game_running'));
+        return running;
     };
 
     // No step of a load may hang forever: a stuck await would leave the tab spinning
@@ -58,7 +75,8 @@
     // user can act on.
     const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => Promise.race([
         promise,
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out`)), ms))
+        // Not "timed out": that reads as a network failure (see DescribeError)
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} took too long`)), ms))
     ]);
 
     // Loads a specific instance's DB. Captures a token so a slow reload for a previous
@@ -118,7 +136,7 @@
             if (!dest) return;
             TriggerSuccess(get(_)('saves.success.export', { values: { name: entry.name } }));
         } catch (error) {
-            TriggerError(get(_)('saves.error.export', { values: { error: String(error) } }));
+            TriggerError(get(_)('saves.error.export', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         } finally {
             db?.close();
             busy = false;
@@ -133,6 +151,7 @@
     const WithDb = async <T,>(action: (db: Database) => T | Promise<T>): Promise<T | null> => {
         if (busy || !instance) return null;
         const inst = instance;
+        if (await GameRunning(inst)) return null;
         let db: Database | null = null;
         busy = true;
         try {
@@ -160,7 +179,7 @@
             const result = await WithDb((db) => createSave(db, get(_)('saves.new_name'), crypto.randomUUID()));
             if (result) TriggerSuccess(get(_)('saves.success.created', { values: { name: result.name } }));
         } catch (error) {
-            TriggerError(get(_)('saves.error.create', { values: { error: String(error) } }));
+            TriggerError(get(_)('saves.error.create', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -176,7 +195,7 @@
             const result = await WithDb((db) => deleteSave(db, entry.saveId));
             if (result?.deleted) TriggerSuccess(get(_)('saves.success.deleted', { values: { name: result.name } }));
         } catch (error) {
-            TriggerError(get(_)('saves.error.delete', { values: { error: String(error) } }));
+            TriggerError(get(_)('saves.error.delete', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
@@ -186,6 +205,7 @@
     const Import = async (entry: SaveSummary) => {
         if (busy || !instance) return;
         const inst = instance;
+        if (await GameRunning(inst)) return;
         let db: Database | null = null;
         try {
             const src = await openDialog({
@@ -248,7 +268,7 @@
                 values: { name: result.name, slot: SlotLabel(entry) }
             }));
         } catch (error) {
-            TriggerError(get(_)('saves.error.import', { values: { error: String(error) } }));
+            TriggerError(get(_)('saves.error.import', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         } finally {
             db?.close();
             busy = false;
@@ -261,7 +281,14 @@
     const Rebind = async (entry: SaveSummary, event: Event) => {
         if (busy || !instance) return;
         const inst = instance;
-        const targetSlot = Number((event.currentTarget as HTMLSelectElement).value);
+        // Read before anything is awaited: the event no longer has a target afterwards
+        const select = event.currentTarget as HTMLSelectElement;
+        const targetSlot = Number(select.value);
+        if (await GameRunning(inst)) {
+            // Nothing changed, so the selector goes back to where the save really is
+            select.value = entry.slot === null ? 'reserve' : String(entry.slot);
+            return;
+        }
         const fromSlot = entry.slot;
         let db: Database | null = null;
         busy = true;
@@ -289,7 +316,7 @@
                 }
             }
         } catch (error) {
-            TriggerError(get(_)('saves.error.rebind', { values: { error: String(error) } }));
+            TriggerError(get(_)('saves.error.rebind', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
             // Resync quietly so the selectors match the real layout, without the
             // loading placeholder that would shift the layout
             await Load(inst, true);
@@ -336,8 +363,9 @@
             </button>
         </div>
 
-        {#if loadError}
-            <p class="text-sm opacity-70">{loadError}</p>
+        <!-- The cause in plain words when it is a known one; the raw error is in the log -->
+        {#if loadError && ErrorCause(loadError)}
+            <p class="text-sm opacity-70">{DescribeError(loadError)}</p>
         {/if}
 
         {#if !loading && saves.length > 0}
@@ -360,6 +388,7 @@
                                 value={entry.slot === null ? 'reserve' : String(entry.slot)}
                                 disabled={busy}
                                 title={$_('saves.rebind_hint')}
+                                aria-label={$_('saves.rebind_hint')}
                                 onchange={(e) => Rebind(entry, e)}
                             >
                                 <!-- Reserve is only a display state for reserve saves, never a

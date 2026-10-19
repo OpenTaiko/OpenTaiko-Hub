@@ -11,8 +11,10 @@ export const ErrorText = (error: unknown): string =>
 const KNOWN: [RegExp, string][] = [
     [/HTTP (error status: )?(403|429)\b/, 'errors.rate_limited'],
     [/HTTP (error status: )?404\b/, 'errors.not_found'],
-    [/no space left|not enough space|os error (28|112)\b/i, 'errors.disk_full'],
-    [/access is denied|permission denied|os error (5|13)\b/i, 'errors.access_denied'],
+    // By the system's own wording: an OS error number means something else on each
+    // system (5 is "access denied" on Windows, an input/output error on Linux)
+    [/no space left|not enough space/i, 'errors.disk_full'],
+    [/access is denied|permission denied|operation not permitted/i, 'errors.access_denied'],
     [/error sending request|dns error|failed to lookup|connection (refused|reset|closed)|timed out|network is unreachable/i, 'errors.offline']
 ];
 

@@ -1,6 +1,6 @@
 {
   "common": {
-    "fetch_error": "불러오기 오류",
+    "fetch_error": "서버에 연결하지 못했습니다. 연결을 확인한 뒤 다시 시도하세요.",
     "retry": "재시도",
     "reload": "새로고침",
     "cancel": "취소",
@@ -82,6 +82,7 @@
     },
     "button": {
       "reload": "새로고침",
+      "check_updates": "업데이트 확인",
       "launch": "OpenTaiko 실행",
       "update": "OpenTaiko 업데이트",
       "redownload": "OpenTaiko 다시 다운로드",
@@ -91,7 +92,9 @@
       "change_build": "빌드 변경"
     },
     "warn": {
-      "skin_update": "(업데이트하면 스킨 업데이트가 필요합니다)"
+      "skin_update": "(업데이트하면 스킨 업데이트가 필요합니다)",
+      "skin_update_confirm": "이 업데이트 후에는 설치된 스킨도 업데이트해야 합니다. 지금 OpenTaiko를 업데이트할까요?",
+      "redownload_confirm": "OpenTaiko {version}을(를) 다시 내려받아 이 인스턴스에 다시 설치할까요?"
     },
     "hint": {
       "first_start": "게임을 처음 시작하기 전에 스킨(\"스킨\" 탭)과 곡(\"곡 목록\" 탭)을 꼭 다운로드하세요!",
@@ -99,7 +102,7 @@
     },
     "experimental": {
       "unavailable": "현재 사용 가능한 실험판 빌드가 없습니다",
-      "requires_dotnet": "실험판 버전을 빌드하려면 .NET SDK 8이 필요합니다. https://dotnet.microsoft.com/download/dotnet/8.0 에서 설치한 후 다시 시도해 주세요.",
+      "requires_dotnet": "실험판 버전을 빌드하려면 .NET SDK 8 이상이 필요합니다. 설치한 뒤 다시 시도하세요.",
       "update_available": "새 실험판 빌드가 있습니다!",
       "up_to_date": "이 실험판 빌드는 최신 상태입니다.",
       "stage": {
@@ -169,6 +172,7 @@
     },
     "error": {
       "no_db": "이 인스턴스에는 아직 세이브 데이터베이스가 없습니다.",
+      "game_running": "세이브를 바꾸기 전에 OpenTaiko를 종료하세요. 게임이 종료될 때 변경 내용을 덮어씁니다.",
       "load": "세이브 데이터베이스를 읽을 수 없습니다.",
       "invalid_file": "올바른 OpenTaiko 세이브 파일이 아닙니다.",
       "export": "세이브 내보내기에 실패했습니다: {error}",
@@ -349,7 +353,7 @@
       "error": "곡을 옮기지 못했습니다: {error}"
     },
     "metadata": {
-      "updated": "장르 폴더 {count}개를 업데이트했습니다 (box.def / preimages)"
+      "updated": "장르 폴더 {count}개를 업데이트했습니다"
     },
     "error": {
       "open_folder": "폴더를 열 수 없습니다: {error}",
@@ -570,7 +574,6 @@
   },
   "themes": {
     "title": "테마를 선택하세요.",
-    "title_debug": "테마를 선택하세요. (디버그 모드 켜짐)",
     "optgroup": {
       "optk": "OpenTaiko Hub 테마:",
       "skeleton": "Skeleton 프리셋 테마:"
@@ -600,16 +603,6 @@
       "dark": "다크",
       "light": "라이트",
       "current": "현재 모드: {mode}"
-    },
-    "debug": {
-      "disable_btn": "디버그 모드 끄기"
-    },
-    "warn": {
-      "same_theme": "선택한 테마가 현재 테마와 같습니다.",
-      "same_theme_debug": "DEBUG: 선택한 테마가 현재 테마와 같습니다."
-    },
-    "success": {
-      "debug_disabled": "<b>디버그 모드가 비활성화되었습니다.</b><br><p class=\"smalltext\">(참고: 디버그 모드를 완전히 끄려면 \"debugMode\" 값을 변경해야 합니다!)</p>"
     }
   },
   "lang": {
@@ -639,7 +632,8 @@
   },
   "toast": {
     "copy": "세부 정보 복사",
-    "copied": "복사됨"
+    "copied": "복사됨",
+    "open_logs": "로그 폴더 열기"
   },
   "errors": {
     "rate_limited": "GitHub가 현재 연결의 요청을 제한하고 있습니다. 잠시 후 다시 시도하세요.",

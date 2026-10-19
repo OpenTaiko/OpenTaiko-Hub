@@ -1,6 +1,6 @@
 {
   "common": {
-    "fetch_error": "取得エラー",
+    "fetch_error": "サーバーに接続できませんでした。接続を確認してから、もう一度お試しください。",
     "retry": "再試行",
     "reload": "再読み込み",
     "cancel": "キャンセル",
@@ -82,6 +82,7 @@
     },
     "button": {
       "reload": "再読み込み",
+      "check_updates": "更新を確認",
       "launch": "OpenTaikoを起動",
       "update": "OpenTaikoを更新",
       "redownload": "OpenTaikoを再ダウンロード",
@@ -91,7 +92,9 @@
       "change_build": "ビルドを変更"
     },
     "warn": {
-      "skin_update": "（更新にはスキンの更新が必要です）"
+      "skin_update": "（更新にはスキンの更新が必要です）",
+      "skin_update_confirm": "この更新の後、インストール済みのスキンも更新が必要になります。今すぐ OpenTaiko を更新しますか？",
+      "redownload_confirm": "OpenTaiko {version} を再ダウンロードして、このインスタンスに再インストールしますか？"
     },
     "hint": {
       "first_start": "初めてゲームを起動する前に、スキン（「スキン」タブ）と曲（「曲一覧」タブ）をダウンロードしてください！",
@@ -99,7 +102,7 @@
     },
     "experimental": {
       "unavailable": "現在利用可能な実験版ビルドはありません",
-      "requires_dotnet": "実験版のビルドには .NET SDK 8 が必要です。https://dotnet.microsoft.com/download/dotnet/8.0 からインストールして再試行してください。",
+      "requires_dotnet": "実験版のビルドには .NET SDK 8 以降が必要です。インストールしてから、もう一度お試しください。",
       "update_available": "新しい実験版ビルドが利用可能です！",
       "up_to_date": "この実験版ビルドは最新の状態です。",
       "stage": {
@@ -169,6 +172,7 @@
     },
     "error": {
       "no_db": "このインスタンスにはまだセーブデータベースがありません。",
+      "game_running": "セーブデータを変更する前に OpenTaiko を終了してください。終了時にゲームが変更を上書きしてしまいます。",
       "load": "セーブデータベースを読み込めませんでした。",
       "invalid_file": "有効な OpenTaiko セーブファイルではありません。",
       "export": "セーブの書き出しに失敗しました：{error}",
@@ -349,7 +353,7 @@
       "error": "曲の移動に失敗しました：{error}"
     },
     "metadata": {
-      "updated": "{count}個のジャンルフォルダを更新しました（box.def / preimages）"
+      "updated": "{count}個のジャンルフォルダを更新しました"
     },
     "error": {
       "open_folder": "フォルダーを開けませんでした: {error}",
@@ -570,7 +574,6 @@
   },
   "themes": {
     "title": "テーマを選択してください。",
-    "title_debug": "テーマを選択してください。（デバッグモードON）",
     "optgroup": {
       "optk": "OpenTaiko Hubテーマ：",
       "skeleton": "Skeletonプリセットテーマ："
@@ -600,16 +603,6 @@
       "dark": "ダーク",
       "light": "ライト",
       "current": "現在のモード：{mode}"
-    },
-    "debug": {
-      "disable_btn": "デバッグモードを無効にする"
-    },
-    "warn": {
-      "same_theme": "選択されたテーマは現在のテーマと同じです。",
-      "same_theme_debug": "DEBUG：選択されたテーマは現在のテーマと同じです。"
-    },
-    "success": {
-      "debug_disabled": "<b>デバッグモードが無効になりました。</b><br><p class=\"smalltext\">（注意：デバッグモードを完全に無効にするには「debugMode」の値を変更する必要があります！）</p>"
     }
   },
   "lang": {
@@ -639,7 +632,8 @@
   },
   "toast": {
     "copy": "詳細をコピー",
-    "copied": "コピーしました"
+    "copied": "コピーしました",
+    "open_logs": "ログフォルダーを開く"
   },
   "errors": {
     "rate_limited": "GitHubへのリクエストが制限されています。しばらくしてから再試行してください。",

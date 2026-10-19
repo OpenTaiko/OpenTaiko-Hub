@@ -171,11 +171,13 @@
     .c-Tower {background-color: light-dark(#fddfb8, #5c3a0a); color: light-dark(#6b3405, #ffd9a6);}
     .c-Dan   {background-color: light-dark(#ccd5f5, #1b2a63); color: light-dark(#17265e, #ccd5f5);}
 
-    /* Fixed so a row never reflows as it moves Get -> progress -> Installed. */
-    .state {flex: none; width: 7rem; display: flex; justify-content: flex-end; align-items: center;}
+    /* Fixed so a row never reflows as it moves Get -> progress -> Installed. Wide enough
+       for the longest label, the German and French "Update", which spilled over the
+       levels at 7rem. */
+    .state {flex: none; width: 9rem; display: flex; justify-content: flex-end; align-items: center;}
     .get {white-space: nowrap;}
     .word {font-size: 0.72rem; opacity: 0.7; white-space: nowrap;}
-    .word.done {color: #16a34a; opacity: 1;}
+    .word.done {color: light-dark(#15803d, #4ade80); opacity: 1;}
 
     .bar {
         display: block;

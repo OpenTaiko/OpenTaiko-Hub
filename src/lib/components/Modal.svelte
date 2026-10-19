@@ -40,9 +40,17 @@
         if (card && !card.contains(document.activeElement)) (focusables()[0] ?? card).focus();
         return () => {
             open.splice(open.indexOf(id), 1);
-            previous?.focus();
+            // The button that opened the dialog may be gone by now (the first-run Install
+            // button once the instance exists): focus then falls back to the page itself
+            // rather than to nothing, where keyboard users lost their place
+            const target = previous?.isConnected ? previous : document.querySelector<HTMLElement>('main');
+            target?.focus({ preventScroll: true });
         };
     });
+
+    // A click whose press began inside the card and was released over the backdrop (a
+    // text selection dragged too far) used to close the dialog, and lose what was typed
+    let pressedOnBackdrop = false;
 
     const onKeydown = (event: KeyboardEvent) => {
         if (open[open.length - 1] !== id || !card) return;
@@ -73,10 +81,14 @@
 
 <svelte:window onkeydown={onKeydown} />
 
-<!-- The backdrop only closes on a click that lands on it, never one inside the card.
-     Keyboard users close with Escape, handled above. -->
+<!-- The backdrop only closes on a click that both starts and ends on it, never one inside
+     the card. Keyboard users close with Escape, handled above. -->
 <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={(event) => { if (event.target === event.currentTarget) close(); }}>
+<div
+    class="modal-backdrop"
+    onpointerdown={(event) => { pressedOnBackdrop = event.target === event.currentTarget; }}
+    onclick={(event) => { if (pressedOnBackdrop && event.target === event.currentTarget) close(); pressedOnBackdrop = false; }}
+>
     <div bind:this={card} class="card modal-card {cardClass}" role="dialog" aria-modal="true" aria-label={Label} tabindex="-1">
         {@render children()}
     </div>
