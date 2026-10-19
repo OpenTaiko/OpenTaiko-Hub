@@ -102,14 +102,26 @@ export const loadInstances = async (): Promise<void> => {
     let storedList: unknown = [];
     let storedActiveId: string | null = null;
     let registryFound = false;
+    const readRegistry = async (file: string): Promise<Partial<InstanceRegistry>> =>
+        JSON.parse(await readTextFile(file)) as Partial<InstanceRegistry>;
+    let data: Partial<InstanceRegistry> | null = null;
     try {
-        const content = await readTextFile(await registryPath());
-        const data = JSON.parse(content) as Partial<InstanceRegistry>;
-        storedList = Array.isArray(data.instances) ? data.instances : [];
-        storedActiveId = data.activeId ?? null;
+        data = await readRegistry(await registryPath());
         registryFound = true;
     } catch {
-        // No registry yet: first run of 0.2, or a fresh install
+        // No registry yet (first run of 0.2, or a fresh install), or one that cannot be
+        // read: the backend keeps the previous list beside it, which beats starting over
+        // with no instances. Saved again below, which repairs the main file.
+        try {
+            data = await readRegistry(`${await registryPath()}.bak`);
+            console.warn('The instance list could not be read; using its previous copy');
+        } catch {
+            data = null;
+        }
+    }
+    if (data) {
+        storedList = Array.isArray(data.instances) ? data.instances : [];
+        storedActiveId = data.activeId ?? null;
     }
 
     let legacyPath: string | null = null;

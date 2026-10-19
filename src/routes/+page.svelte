@@ -27,6 +27,7 @@
     } from '$lib/stores/instances';
     import { busyAreas, type ActivityArea } from '$lib/stores/activity';
     import { ipc } from '$lib/ipc';
+    import { toaster } from '$lib/utils/toaster';
 
     // Operations a previous load of the page started (a reload, a crashed renderer) have
     // nobody left to show or end them. Here rather than in onMount, which runs after the
@@ -63,6 +64,27 @@
         { value: 7, icon: 'fa-solid fa-gear', label: 'nav.themes', tooltip: 'nav.tooltip.themes' }
     ];
 
+    // The Hub moved its data into a folder of its own at startup (Linux and macOS, from
+    // Documents). Said once, so the songs and games are not simply gone from where the
+    // user knew them; and a move that failed is said every start until it is sorted out,
+    // since the library looks empty meanwhile.
+    const ReportRelocation = async () => {
+        const report = await ipc.takeRelocationReport().catch(() => null);
+        if (!report) return;
+        const t = get(_);
+        const folder = report.newRoot;
+        if (report.moved.length > 0) {
+            toaster.info({ description: t('relocate.moved', { values: { count: report.moved.length, folder } }), duration: 20000 });
+        }
+        if (report.problems.length > 0) {
+            toaster.error({
+                description: t('relocate.failed', { values: { folder } }),
+                duration: Infinity,
+                meta: { details: report.problems.join('\n') }
+            });
+        }
+    };
+
     onMount(async () => {
         try {
             await loadInstances();
@@ -72,6 +94,7 @@
                 refreshInstanceVersion(inst.id);
                 linkGlobalSongs(inst);
             }
+            await ReportRelocation();
         } catch (error) {
             console.error('Instance initialization failed:', error);
         } finally {

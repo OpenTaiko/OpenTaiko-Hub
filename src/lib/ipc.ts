@@ -54,6 +54,15 @@ export interface InstallReport {
     absent: string[];
 }
 
+/** What moving the Hub's data to a folder of its own did at startup (relocate.rs). */
+export interface RelocationReport {
+    newRoot: string;
+    /** Folders moved, as [from, to]. */
+    moved: [string, string][];
+    /** Steps that failed, in the log's words. */
+    problems: string[];
+}
+
 export interface ClosePrompt {
     title: string;
     message: string;
@@ -78,6 +87,8 @@ export const ipc = {
     openFolder: (path: string) => invoke<void>('open_folder', { path }),
     hubRoot: () => invoke<string>('hub_root'),
     logDirectory: () => invoke<string | null>('log_directory'),
+    /** Once per start; null when there is nothing to tell. */
+    takeRelocationReport: () => invoke<RelocationReport | null>('take_relocation_report'),
     uiHeartbeat: () => invoke<void>('ui_heartbeat'),
 
     // Files and processes (main.rs, fsops.rs, procs.rs)

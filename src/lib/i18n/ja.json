@@ -655,5 +655,9 @@
     "images": "画像",
     "chart_archives": "譜面アーカイブ",
     "optk_save": "OpenTaikoのセーブ"
+  },
+  "relocate": {
+    "moved": "OpenTaiko Hub は曲とゲームを {folder} に保存するようになりました。{count} 個のフォルダーをそこへ移動しました。",
+    "failed": "Hub のデータの一部を {folder} に移動できなかったため、曲やゲームが見つからない場合があります。詳細をコピーすると、移動が残っているものを確認できます。"
   }
 }

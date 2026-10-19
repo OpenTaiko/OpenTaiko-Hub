@@ -374,6 +374,16 @@ fn log_directory(dir: tauri::State<'_, LogDirectory>) -> Option<String> {
     dir.0.as_ref().map(|d| d.display().to_string())
 }
 
+/// What moving the Hub's data did at startup, when there is something to tell the user.
+struct RelocationReport(std::sync::Mutex<Option<relocate::Report>>);
+
+/// Taken once by the page, which tells the user: a move that partly failed used to be
+/// written to the log only, leaving an empty library and nothing to explain it.
+#[tauri::command]
+fn take_relocation_report(report: tauri::State<'_, RelocationReport>) -> Option<relocate::Report> {
+    report.0.lock().unwrap_or_else(|e| e.into_inner()).take()
+}
+
 #[tauri::command]
 fn hub_root() -> Result<String, String> {
     hub_root_dir()
@@ -465,11 +475,11 @@ fn main() {
     #[cfg(all(not(debug_assertions), not(target_os = "windows")))]
     let relocation_report = match (old_shared_root(), hub_root_dir()) {
         (Some(old_root), Some(new_root)) => relocate::migrate_documents_layout(&old_root, &new_root, &registry, &roots),
-        _ => Vec::new(),
+        _ => relocate::Report::default(),
     };
     #[cfg(all(not(debug_assertions), target_os = "windows"))]
-    let relocation_report: Vec<String> = { let _ = (&registry, &roots); Vec::new() };
-    for line in &relocation_report {
+    let relocation_report = { let _ = (&registry, &roots); relocate::Report::default() };
+    for line in &relocation_report.lines {
         eprintln!("{}", line);
     }
 
@@ -562,10 +572,14 @@ fn main() {
             library::read_song_media,
             library::set_song_preimage,
             health::ui_heartbeat,
-            log_directory
+            log_directory,
+            take_relocation_report
         ])
         .manage(ui_health.clone())
         .manage(LogDirectory(log_dir.clone()))
+        .manage(RelocationReport(std::sync::Mutex::new(
+            (!relocation_report.is_quiet()).then(|| relocation_report.clone()),
+        )))
         .manage(jobs::Jobs::default())
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
@@ -589,13 +603,18 @@ fn main() {
             if let Some(outcome) = &fd_limit_outcome {
                 log::info!("{}", outcome);
             }
-            for line in &relocation_report {
+            for line in &relocation_report.lines {
                 log::info!("{}", line);
             }
             health::spawn_watcher(ui_health.clone());
             guard::init(app.handle());
             let instances = guard::instance_roots(app.handle());
-            std::thread::spawn(move || guard::sweep_leftovers(instances));
+            // Linux and macOS kept tmp in Documents itself before the Hub had a folder
+            #[cfg(all(not(debug_assertions), not(target_os = "windows")))]
+            let old_tmp = old_shared_root().map(|root| root.join("tmp"));
+            #[cfg(any(debug_assertions, target_os = "windows"))]
+            let old_tmp = None;
+            std::thread::spawn(move || guard::sweep_leftovers(instances, old_tmp));
             Ok(())
         })
         .build(tauri::generate_context!());

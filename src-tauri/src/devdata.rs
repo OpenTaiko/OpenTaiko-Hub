@@ -8,6 +8,8 @@
 
 use std::path::{Path, PathBuf};
 
+use crate::relocate::Report;
+
 pub fn dev_root() -> PathBuf {
     if let Some(dir) = std::env::var_os("OTK_HUB_ROOT").filter(|d| !d.is_empty()) {
         return PathBuf::from(dir);
@@ -25,9 +27,9 @@ fn is_hub_data(name: &str) -> bool {
 /// into `new_root`, and points the instance registry and the Hub's own list of instance
 /// folders at the new place. Once moved, there is nothing left to move, so this does
 /// nothing on later starts. A folder that already exists at the destination is left where
-/// it is. Returns what happened, for the log.
-pub fn migrate_from(old_root: &Path, new_root: &Path, registry: &Path, roots: &Path) -> Vec<String> {
-    let mut report = Vec::new();
+/// it is.
+pub fn migrate_from(old_root: &Path, new_root: &Path, registry: &Path, roots: &Path) -> Report {
+    let mut report = Report::new(new_root);
     if crate::migrate::is_same_dir(old_root, new_root) {
         return report;
     }
@@ -40,20 +42,20 @@ pub fn migrate_from(old_root: &Path, new_root: &Path, registry: &Path, roots: &P
         }
         let dest = new_root.join(&name);
         if dest.exists() {
-            report.push(format!("Left {} in place: {} already exists", entry.path().display(), dest.display()));
+            report.note(format!("Left {} in place: {} already exists", entry.path().display(), dest.display()));
             continue;
         }
         if let Err(e) = std::fs::create_dir_all(new_root) {
-            report.push(format!("Could not create {}: {}", new_root.display(), e));
+            report.problem(format!("Could not create {}: {}", new_root.display(), e));
             return report;
         }
         // A rename on the same drive: gigabytes move instantly
         match std::fs::rename(entry.path(), &dest) {
             Ok(()) => {
                 moved = true;
-                report.push(format!("Moved dev data {} to {}", name, dest.display()));
+                report.moved(&entry.path(), &dest);
             }
-            Err(e) => report.push(format!("Could not move {}: {}", entry.path().display(), e)),
+            Err(e) => report.problem(format!("Could not move {}: {}", entry.path().display(), e)),
         }
     }
     if moved {
@@ -94,7 +96,8 @@ mod tests {
 
         let absent = tmp.path().join("absent.json");
         let report = migrate_from(&old, &new, &registry, &absent);
-        assert!(!report.is_empty());
+        assert_eq!(report.moved.len(), 3);
+        assert!(report.problems.is_empty());
 
         // Hub data moved, build output and resources stayed
         assert!(new.join("Songs/Pop").is_dir());
@@ -111,7 +114,7 @@ mod tests {
         assert_eq!(updated["activeId"], "a");
 
         // Nothing left to do on the next start
-        assert!(migrate_from(&old, &new, &registry, &absent).is_empty());
+        assert!(migrate_from(&old, &new, &registry, &absent).is_quiet());
     }
 
     #[test]

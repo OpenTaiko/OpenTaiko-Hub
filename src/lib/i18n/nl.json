@@ -655,5 +655,9 @@
     "images": "Afbeeldingen",
     "chart_archives": "Chart-archieven",
     "optk_save": "OpenTaiko-opslag"
+  },
+  "relocate": {
+    "moved": "OpenTaiko Hub bewaart zijn nummers en games nu in {folder}. {count, plural, one {# map is} other {# mappen zijn}} daarheen verplaatst.",
+    "failed": "Een deel van de gegevens van de Hub kon niet naar {folder} worden verplaatst, waardoor nummers of games kunnen ontbreken. Kopieer de details om te zien wat nog verplaatst moet worden."
   }
 }

@@ -655,5 +655,9 @@
     "images": "圖片",
     "chart_archives": "譜面壓縮檔",
     "optk_save": "OpenTaiko 存檔"
+  },
+  "relocate": {
+    "moved": "OpenTaiko Hub 現在將歌曲和遊戲保存在 {folder}。已將 {count} 個資料夾移到那裡。",
+    "failed": "Hub 的部分資料未能移到 {folder}，因此可能缺少歌曲或遊戲。複製詳細資訊可查看還需要移動的內容。"
   }
 }

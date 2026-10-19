@@ -655,5 +655,9 @@
     "images": "Bilder",
     "chart_archives": "Chart-Archive",
     "optk_save": "OpenTaiko-Spielstand"
+  },
+  "relocate": {
+    "moved": "Der OpenTaiko Hub bewahrt seine Lieder und Spiele jetzt in {folder} auf. {count, plural, one {# Ordner wurde} other {# Ordner wurden}} dorthin verschoben.",
+    "failed": "Einige Daten des Hubs konnten nicht nach {folder} verschoben werden, daher können Lieder oder Spiele fehlen. Kopiere die Details, um zu sehen, was noch zu verschieben ist."
   }
 }

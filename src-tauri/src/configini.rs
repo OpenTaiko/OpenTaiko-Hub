@@ -104,27 +104,24 @@ pub(crate) fn repoint_songs_entry(instance_dir: &Path, old: &Path, new: &Path) -
     let (text, _, _) = SHIFT_JIS.decode(&bytes);
     let mut lines: Vec<String> = text.replace("\r\n", "\n").split('\n').map(String::from).collect();
     let old_key = entry_key(instance_dir, &old.to_string_lossy());
-    let replacement = songs_entry(instance_dir, &new.to_string_lossy())
-        .ok_or_else(|| format!("{} cannot be stored in Config.ini (Shift_JIS)", new.display()))?;
-
-    let mut changed = false;
-    for line in lines.iter_mut() {
-        let Some(value) = line.trim_start().strip_prefix("TJAPath=") else { continue };
-        let entries: Vec<String> = value
-            .split(';')
-            .map(|entry| entry.trim())
-            .filter(|entry| !entry.is_empty())
-            .map(|entry| {
-                if entry_key(instance_dir, entry) == old_key {
-                    changed = true;
-                    replacement.clone()
-                } else {
-                    entry.to_string()
-                }
-            })
+    let Some(line) = lines.iter_mut().find(|line| line.trim_start().starts_with("TJAPath=")) else { return Ok(false) };
+    let entries: Vec<&str> = line
+        .trim_start()
+        .trim_start_matches("TJAPath=")
+        .split(';')
+        .map(|entry| entry.trim())
+        .filter(|entry| !entry.is_empty())
+        .collect();
+    let changed = entries.iter().any(|entry| entry_key(instance_dir, entry) == old_key);
+    if changed {
+        // Only now: an instance that does not name the old folder is no reason to fail
+        let replacement = songs_entry(instance_dir, &new.to_string_lossy())
+            .ok_or_else(|| format!("{} cannot be stored in Config.ini (Shift_JIS)", new.display()))?;
+        let rewritten: Vec<String> = entries
+            .iter()
+            .map(|entry| if entry_key(instance_dir, entry) == old_key { replacement.clone() } else { entry.to_string() })
             .collect();
-        *line = format!("TJAPath={}", entries.join(";"));
-        break;
+        *line = format!("TJAPath={}", rewritten.join(";"));
     }
     if changed {
         let text = lines.join("\r\n");

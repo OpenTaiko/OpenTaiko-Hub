@@ -44,11 +44,13 @@ fn allow_dir<R: Runtime>(app: &AppHandle<R>, dir: &Path) {
         log::warn!("Could not allow {}: {}", dir.display(), e);
     }
     // Checked paths are canonicalized first, which on Windows also normalizes the letter
-    // case, so the canonical spelling is allowed as well.
-    if let Ok(real) = std::fs::canonicalize(dir) {
-        if real != dir {
-            let _ = scope.allow_directory(&real, true);
-        }
+    // case, so the canonical spelling is allowed as well. Worked out through the deepest
+    // folder that exists: on a first start the Hub's folders do not exist yet, and under
+    // a Documents folder that is a symbolic link, only the spelling through the link was
+    // allowed, so every download into a folder created later was refused.
+    let real = resolve_existing(dir);
+    if real != dir {
+        let _ = scope.allow_directory(&real, true);
     }
 }
 
@@ -290,7 +292,7 @@ fn is_hex(s: &str) -> bool {
     !s.is_empty() && s.chars().all(|c| c.is_ascii_hexdigit())
 }
 
-fn is_uuid(s: &str) -> bool {
+pub(crate) fn is_uuid(s: &str) -> bool {
     let parts: Vec<&str> = s.split('-').collect();
     parts.len() == 5
         && parts.iter().map(|p| p.len()).eq([8, 4, 4, 4, 12])
@@ -400,14 +402,18 @@ fn clean_stale_downloads(dir: &Path, now: SystemTime) -> usize {
 /// leaves alone a folder a second Hub window may still be writing to, and the name check
 /// matters on Linux and macOS, where `tmp` sits in ~/Documents and may be the user's own.
 /// Downloads go straight into the library and the instances (`instances`), where what
-/// such a download leaves is cleaned up as well.
-pub fn sweep_leftovers(instances: Vec<PathBuf>) {
+/// such a download leaves is cleaned up as well. `old_tmp` is where Linux and macOS kept
+/// tmp before the Hub had a folder of its own, which nothing would empty any more.
+pub fn sweep_leftovers(instances: Vec<PathBuf>, old_tmp: Option<PathBuf>) {
     let now = SystemTime::now();
     let mut removed = 0;
     let mut cleaned = 0;
     if let Some(root) = crate::hub_root_dir() {
         removed += remove_stale_in(&root.join("tmp"), is_hub_tmp_name, now);
         cleaned += clean_stale_downloads(&root.join("Songs"), now) + clean_stale_downloads(&root.join("OpenTaiko"), now);
+    }
+    if let Some(old_tmp) = old_tmp {
+        removed += remove_stale_in(&old_tmp, is_hub_tmp_name, now);
     }
     removed += remove_stale_in(&std::env::temp_dir(), is_build_dir_name, now);
     for instance in &instances {

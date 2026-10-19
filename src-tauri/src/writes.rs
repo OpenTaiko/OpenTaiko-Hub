@@ -13,7 +13,7 @@ use tauri_plugin_dialog::DialogExt;
 use crate::library::blocking;
 
 /// The Hub's own files in the app config folder.
-const SETTINGS_FILES: [&str; 4] = ["instances.json", "theme.json", "thememode.json", "language.json"];
+const SETTINGS_FILES: [&str; 4] = [INSTANCE_LIST, "theme.json", "thememode.json", "language.json"];
 
 const SAVES_DB: &str = "Saves.db3";
 /// Copies of Saves.db3 taken before each change, in the instance folder.
@@ -49,7 +49,36 @@ pub async fn write_settings_file<R: Runtime>(app: AppHandle<R>, name: String, co
     }
     serde_json::from_str::<serde_json::Value>(&contents).map_err(|e| format!("{} is not valid JSON: {}", name, e))?;
     let dir = app.path().app_config_dir().map_err(|e| e.to_string())?;
-    blocking(move || write_atomic(&dir.join(&name), contents.as_bytes())).await
+    blocking(move || {
+        let path = dir.join(&name);
+        if name == INSTANCE_LIST {
+            keep_backup(&path);
+        }
+        write_atomic(&path, contents.as_bytes())
+    })
+    .await
+}
+
+const INSTANCE_LIST: &str = "instances.json";
+
+/// Where the previous instance list is kept.
+fn backup_path(path: &Path) -> PathBuf {
+    let mut name = path.file_name().unwrap_or_default().to_os_string();
+    name.push(".bak");
+    path.with_file_name(name)
+}
+
+/// Keeps the current instance list beside it before it is replaced, for the page to fall
+/// back on when the list cannot be read: without one, an unreadable list was taken for no
+/// list at all and overwritten, and every instance had to be added again. A list that is
+/// not valid JSON is not kept, so it can never replace a good copy.
+fn keep_backup(path: &Path) {
+    let Ok(text) = fs::read_to_string(path) else { return };
+    if serde_json::from_str::<serde_json::Value>(&text).is_ok() {
+        if let Err(e) = write_atomic(&backup_path(path), text.as_bytes()) {
+            log::warn!("Could not keep a copy of {}: {}", path.display(), e);
+        }
+    }
 }
 
 /// version.json in an instance folder, which Hub versions before 0.2 read.
@@ -164,6 +193,19 @@ mod tests {
         write_atomic(&file, b"two").unwrap();
         assert_eq!(fs::read(&file).unwrap(), b"two");
         assert!(!temp_path(&file).exists());
+    }
+
+    #[test]
+    fn only_a_readable_instance_list_is_kept_as_the_copy() {
+        let tmp = tempfile::tempdir().unwrap();
+        let list = tmp.path().join(INSTANCE_LIST);
+        fs::write(&list, r#"{"instances":[]}"#).unwrap();
+        keep_backup(&list);
+        assert_eq!(fs::read_to_string(backup_path(&list)).unwrap(), r#"{"instances":[]}"#);
+        // A broken list leaves the good copy alone
+        fs::write(&list, r#"{"instances":["#).unwrap();
+        keep_backup(&list);
+        assert_eq!(fs::read_to_string(backup_path(&list)).unwrap(), r#"{"instances":[]}"#);
     }
 
     #[test]
