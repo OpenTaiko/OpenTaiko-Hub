@@ -468,6 +468,9 @@ fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
                 failure = Some(format!("Could not replace {}: {e}", dest.display()));
                 break;
             }
+            // Dated now: a rename keeps the file's own date, and the startup sweep (guard.rs)
+            // took any set-aside copy of an old file for one a crash had left
+            mark_set_aside(old);
         }
         if let Err(e) = std::fs::rename(part, dest) {
             if let Some(old) = &old {
@@ -484,16 +487,37 @@ fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
         }
         return Ok(());
     };
+    // A file that cannot be put back (held open by an antivirus, say) keeps its .hubold
+    // copy, and is named in the error rather than left for nobody to notice
+    let mut not_restored = Vec::new();
     for (dest, old) in placed.into_iter().rev() {
-        let _ = match old {
+        let undone = match old {
             Some(old) => std::fs::rename(old, dest),
             None => std::fs::remove_file(dest),
         };
+        if let Err(e) = undone {
+            log::error!("Could not put {} back after a failed update: {e}", dest.display());
+            not_restored.push(dest.display().to_string());
+        }
     }
     for (part, _) in files {
         let _ = std::fs::remove_file(part);
     }
-    Err(failure)
+    if not_restored.is_empty() {
+        Err(failure)
+    } else {
+        Err(format!("{failure}. Could not put back as they were: {}", not_restored.join(", ")))
+    }
+}
+
+fn mark_set_aside(path: &Path) {
+    let dated = std::fs::File::options()
+        .write(true)
+        .open(path)
+        .and_then(|file| file.set_modified(SystemTime::now()));
+    if let Err(e) = dated {
+        log::warn!("Could not date {}: {e}", path.display());
+    }
 }
 
 fn failure_message(failure: Failure) -> String {
@@ -942,6 +966,21 @@ mod tests {
         let commits = reqwest::Url::parse(&format!("https://api.github.com/repos/OpenTaiko/OpenTaiko/commits/{other}")).unwrap();
         remember_branch_head(&commits, format!(r#"{{"commit":{{"sha":"{other}"}}}}"#).as_bytes());
         assert!(!ok(&format!("https://codeload.github.com/OpenTaiko/OpenTaiko/zip/{other}")));
+    }
+
+    // A set-aside copy of a file last changed a year ago was taken by the startup sweep
+    // for one a crash had left, while its update was still under way
+    #[test]
+    fn a_file_set_aside_is_dated_when_it_was_set_aside() {
+        let tmp = tempfile::tempdir().unwrap();
+        let old = tmp.path().join("song.ogg.hubold");
+        std::fs::write(&old, "old").unwrap();
+        let year_ago = SystemTime::now() - Duration::from_secs(365 * 24 * 60 * 60);
+        std::fs::File::options().write(true).open(&old).unwrap().set_modified(year_ago).unwrap();
+        mark_set_aside(&old);
+        let age = SystemTime::now().duration_since(std::fs::metadata(&old).unwrap().modified().unwrap()).unwrap_or_default();
+        assert!(age < Duration::from_secs(60), "{age:?}");
+        assert_eq!(std::fs::read_to_string(&old).unwrap(), "old");
     }
 
     #[test]

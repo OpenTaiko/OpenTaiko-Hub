@@ -4,7 +4,7 @@
     import { ConfirmDiscardEdits } from '$lib/stores/editing';
     import { LoadHallOfFame, ChartScores, HOF_DIFFICULTY_INDEX, type HoFRanks } from '$lib/services/hof';
     import { LoadSongArtists } from '$lib/services/artists';
-    import { FetchSoundtrackCatalog, FetchRemoteShaMap, SongInstallEntries, SongGenrePaths, SoundtrackFileUrl } from '$lib/services/soundtrack';
+    import { FetchSoundtrackCatalog, FetchSoundtrackIndex, IndexedFile, SongInstallEntries, SongGenrePaths, type SoundtrackIndex } from '$lib/services/soundtrack';
     // Dependencies
     import { onMount, onDestroy } from 'svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
@@ -97,14 +97,19 @@
     let activeSingleDownloads = $state(0);  // single-song downloads currently in flight (they run concurrently)
     let songBusy = $derived(activeSingleDownloads > 0);
 
-    // Git blob SHAs of the soundtrack repository (path → sha), fetched once per session
-    // and used to detect outdated box.def / default.png files
-    let remoteShaMap: Map<string, string> | null = null;
-    let remoteShaMapFetch: Promise<Map<string, string> | null> | null = null;   // in-flight fetch, shared by downloads that start together
-    // After a failed tree fetch (usually GitHub's hourly API limit), downloads go ahead
-    // without it until this time instead of asking again for every song
-    let remoteShaMapRetryAt = 0;
-    const SHA_MAP_COOLDOWN_MS = 10 * 60 * 1000;
+    // The soundtrack repository's files at one commit (path → git blob SHA), used to keep
+    // unchanged files, to check downloads, and to detect outdated box.def / default.png
+    let remoteIndex: SoundtrackIndex | null = null;
+    let remoteIndexFetch: Promise<SoundtrackIndex | null> | null = null;   // in-flight fetch, shared by downloads that start together
+    // Read again once this old, so a Hub left open picks up songs updated since. Asking
+    // again costs nothing against GitHub's hourly limit while nothing changed.
+    let remoteIndexReadAt = 0;
+    const INDEX_MAX_AGE_MS = 10 * 60 * 1000;
+    // After a failed fetch (usually GitHub's hourly API limit), downloads go ahead with
+    // the index they have, or without one, until this time instead of asking again for
+    // every song
+    let remoteIndexRetryAt = 0;
+    const INDEX_COOLDOWN_MS = 10 * 60 * 1000;
 
     // Songs found inside attached instances that can be moved to the shared library
     let migrationCandidates = $state<MigrationCandidate[]>([]);
@@ -747,7 +752,7 @@
         // the end rather than after each song
         const genres = new Set<string>();
         try {
-            await EnsureRemoteShaMap();
+            await EnsureRemoteIndex();
             // A few songs at a time (each downloads several files at once in the
             // backend): one after the other, a whole library took a request round trip
             // per file in sequence. Kept small so GitHub does not start refusing requests.
@@ -770,14 +775,16 @@
             FlushInstalled();
 
             const values = { count: done, total: pending.length, failed };
-            if (bulkCancelRequested) {
-                TriggerWarning(get(_)('bulk.cancelled', { values }));
-                return;
-            }
-            if (failed > 0) TriggerError(get(_)('bulk.failed', { values }));
+            const cancelled = bulkCancelRequested;
+            if (cancelled) TriggerWarning(get(_)('bulk.cancelled', { values }));
+            else if (failed > 0) TriggerError(get(_)('bulk.failed', { values }));
             else TriggerSuccess(get(_)('bulk.done', { values }));
 
-            const updated = await RefreshAllGenreMetadata(genres, job.id);
+            // The genre folders of the songs that did arrive get their box.def and art even
+            // after a cancel: the game shows a folder only when it has a box.def, and those
+            // songs were left ungrouped until another full run. It is a few small files, so
+            // they are fetched outside the cancelled job.
+            const updated = await RefreshAllGenreMetadata(genres, cancelled ? undefined : job.id);
             if (updated > 0) TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
         } finally {
             job.end();
@@ -803,27 +810,31 @@
         }
     }
 
-    // Fetches the soundtrack repository's git tree once so local box.def / default.png
-    // files can be compared against their upstream version by git blob SHA
-    const EnsureRemoteShaMap = async (): Promise<Map<string, string> | null> => {
-        if (remoteShaMap) return remoteShaMap;
-        if (Date.now() < remoteShaMapRetryAt) return null;
+    // Reads the soundtrack repository's index so local files can be compared against
+    // their upstream version by git blob SHA
+    const EnsureRemoteIndex = async (): Promise<SoundtrackIndex | null> => {
+        const now = Date.now();
+        if (remoteIndex && now - remoteIndexReadAt < INDEX_MAX_AGE_MS) return remoteIndex;
+        if (now < remoteIndexRetryAt) return remoteIndex;
         // Downloads started back to back share one request instead of each hitting the
         // GitHub API (rate limited) for the same tree
-        if (!remoteShaMapFetch) {
-            remoteShaMapFetch = (async () => {
+        if (!remoteIndexFetch) {
+            remoteIndexFetch = (async () => {
                 try {
-                    remoteShaMap = await FetchRemoteShaMap();
+                    remoteIndex = await FetchSoundtrackIndex();
+                    remoteIndexReadAt = Date.now();
                 } catch (error) {
+                    // The index already read stays usable: its files are fetched from its
+                    // own commit
                     console.error('Failed to fetch the soundtrack repository tree:', error);
-                    remoteShaMapRetryAt = Date.now() + SHA_MAP_COOLDOWN_MS;
+                    remoteIndexRetryAt = Date.now() + INDEX_COOLDOWN_MS;
                 } finally {
-                    remoteShaMapFetch = null;
+                    remoteIndexFetch = null;
                 }
-                return remoteShaMap;
+                return remoteIndex;
             })();
         }
-        return remoteShaMapFetch;
+        return remoteIndexFetch;
     }
 
     // Downloads box.def / default.png for a genre folder when it is missing or its git
@@ -853,10 +864,10 @@
         for (const fileName of ['box.def', 'default.png']) {
             const localGenre = scannedGenres[genrePath];
             const localSha = fileName === 'box.def' ? localGenre?.boxDefSha1 : localGenre?.preimageSha1;
-            const remoteSha = remoteShaMap?.get(`${genrePath}/${fileName}`);
+            const { url: _url, gitSha: remoteSha } = IndexedFile(`${genrePath}/${fileName}`, remoteIndex);
 
             let needsDownload: boolean;
-            if (remoteShaMap) {
+            if (remoteIndex) {
                 needsDownload = !!remoteSha && localSha !== remoteSha;
             } else if (fileName === 'box.def') {
                 needsDownload = !boxDefRefreshedBlind.has(genrePath);
@@ -866,7 +877,6 @@
             }
             if (!needsDownload) continue;
 
-            const _url = SoundtrackFileUrl(`${genrePath}/${fileName}`);
             try {
                 const report = await installFiles(genreFullPath, [{ url: _url, relPath: fileName, optional: !remoteSha }], undefined, job);
                 if (report.downloaded.length === 0) continue;
@@ -888,12 +898,13 @@
     }
 
     // The genres of the songs a bulk run downloaded, which the last scan may not know yet,
-    // and with the repository index every genre the scan found. Stops once cancelled.
-    const RefreshAllGenreMetadata = async (downloaded: Set<string>, job: string) => {
-        const genres = new Set([...(remoteShaMap ? Object.keys(scannedGenres) : []), ...downloaded]);
+    // and with the repository index every genre the scan found. Without a job (the run was
+    // cancelled) only the downloaded songs' genres, all of them.
+    const RefreshAllGenreMetadata = async (downloaded: Set<string>, job?: string) => {
+        const genres = job ? new Set([...(remoteIndex ? Object.keys(scannedGenres) : []), ...downloaded]) : downloaded;
         let updated = 0;
         for (const genrePath of genres) {
-            if (bulkCancelRequested) break;
+            if (job && bulkCancelRequested) break;
             if (await EnsureGenreMetadata(genrePath, job)) updated++;
         }
         return updated;
@@ -958,7 +969,7 @@
     }
 
     const RunDownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, quiet: boolean, job?: string): Promise<DownloadOutcome> => {
-        await EnsureRemoteShaMap();
+        await EnsureRemoteIndex();
 
         // Catalog paths decide where files are written, so a malformed one is refused
         // before anything is downloaded
@@ -976,7 +987,7 @@
         // side and only replaces anything once every file has arrived, so there is no
         // temporary copy to write and then copy again. A file whose git blob SHA matches
         // the repository is kept, so updating a chart does not download its audio again.
-        const entries = SongInstallEntries(songObj, remoteShaMap);
+        const entries = SongInstallEntries(songObj, remoteIndex);
 
         let totbyts = 0;
         try {

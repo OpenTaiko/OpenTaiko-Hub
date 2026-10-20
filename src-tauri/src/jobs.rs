@@ -52,6 +52,8 @@ pub struct Jobs {
     entries: Mutex<HashMap<String, Entry>>,
     prompt: Mutex<Option<ClosePrompt>>,
     asking: AtomicBool,
+    /// Set once the window is to close as soon as `in_flight` work is done.
+    closing: AtomicBool,
     /// Work under way that is waited for rather than cut off (see `InFlight`).
     in_flight: AtomicUsize,
 }
@@ -179,8 +181,18 @@ pub fn reset_jobs<R: Runtime>(app: AppHandle<R>) {
 /// close is held, and the user is asked whether to stop what is running and close.
 pub fn allow_close<R: Runtime>(window: &Window<R>) -> bool {
     let jobs = window.state::<Jobs>();
+    // Already closing: the window goes once the work under way is done. Letting this
+    // close through, as a second click on the button did, cut an install off midway.
+    if jobs.closing.load(Ordering::SeqCst) {
+        return false;
+    }
     if !jobs.entries().values().any(|e| e.active) {
-        return true;
+        if jobs.in_flight.load(Ordering::SeqCst) == 0 {
+            return true;
+        }
+        // Nothing to ask about, but files are still being moved
+        close_when_settled(window.clone());
+        return false;
     }
     // A second click on the close button while the question is open changes nothing
     if jobs.asking.swap(true, Ordering::SeqCst) {
@@ -202,22 +214,28 @@ pub fn allow_close<R: Runtime>(window: &Window<R>) -> bool {
         .show(move |close| {
             window.state::<Jobs>().asking.store(false, Ordering::SeqCst);
             if close {
-                // Closing used to destroy the window with everything still running: a
-                // build carried on without the Hub, and an install was cut off midway.
-                // Everything is cancelled, and the window closes once a build has been
-                // stopped and no files are being moved.
-                std::thread::spawn(move || {
-                    let jobs = window.state::<Jobs>();
-                    jobs.cancel_all();
-                    let until = Instant::now() + CLOSE_WAIT;
-                    while jobs.in_flight.load(Ordering::SeqCst) > 0 && Instant::now() < until {
-                        std::thread::sleep(Duration::from_millis(100));
-                    }
-                    let _ = window.destroy();
-                });
+                close_when_settled(window);
             }
         });
     false
+}
+
+/// Closing used to destroy the window with everything still running: a build carried on
+/// without the Hub, and an install was cut off midway. Everything is cancelled, and the
+/// window closes once a build has been stopped and no files are being moved.
+fn close_when_settled<R: Runtime>(window: Window<R>) {
+    if window.state::<Jobs>().closing.swap(true, Ordering::SeqCst) {
+        return;
+    }
+    std::thread::spawn(move || {
+        let jobs = window.state::<Jobs>();
+        jobs.cancel_all();
+        let until = Instant::now() + CLOSE_WAIT;
+        while jobs.in_flight.load(Ordering::SeqCst) > 0 && Instant::now() < until {
+            std::thread::sleep(Duration::from_millis(100));
+        }
+        let _ = window.destroy();
+    });
 }
 
 #[cfg(test)]

@@ -151,7 +151,7 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
             // folder itself is protected too: removing it, or moving it away, would take the
             // file with it, and the forbidden list is only checked against the path named.
             let scope = app.fs_scope();
-            let mut protect = vec![file.clone(), crate::writes::temp_path(&file)];
+            let mut protect = vec![file.clone()];
             protect.extend(file.parent().map(Path::to_path_buf));
             for path in protect {
                 let real = resolve_existing(&path);
@@ -456,13 +456,44 @@ fn is_stale(path: &Path, now: SystemTime) -> bool {
         .is_some_and(|age| age >= STALE_TMP)
 }
 
-fn remove_stale_in(dir: &Path, matches: fn(&str) -> bool, now: SystemTime) -> usize {
+fn has_hub_tmp_name(dir: &Path) -> bool {
+    dir.file_name().and_then(|n| n.to_str()).is_some_and(is_hub_tmp_name)
+}
+
+fn has_build_dir_name(dir: &Path) -> bool {
+    dir.file_name().and_then(|n| n.to_str()).is_some_and(is_build_dir_name)
+}
+
+/// What Hub 0.2 left in ~/Documents/tmp on Linux and macOS. That folder may be the user's
+/// own, and a name alone also matched folders such as `20240101`, so a folder there must
+/// also hold nothing but what the Hub put in it: archives, an extracted release
+/// (`OpenTaiko…`) and the folders of a build (`s`, `p`, `b`). Names are in lower case, as
+/// the Hub wrote them.
+fn is_old_hub_tmp(dir: &Path) -> bool {
+    let Some(name) = dir.file_name().and_then(|n| n.to_str()) else { return false };
+    if !is_hub_tmp_name(name) || name != name.to_ascii_lowercase() {
+        return false;
+    }
+    if name.starts_with("indev-") {
+        return true;
+    }
+    let Ok(entries) = std::fs::read_dir(dir) else { return false };
+    entries.flatten().all(|entry| {
+        let entry_name = entry.file_name().to_string_lossy().into_owned();
+        if entry.file_type().is_ok_and(|t| t.is_dir()) {
+            matches!(entry_name.as_str(), "s" | "p" | "b") || entry_name.starts_with("OpenTaiko")
+        } else {
+            entry_name.to_ascii_lowercase().ends_with(".zip")
+        }
+    })
+}
+
+fn remove_stale_in(dir: &Path, matches: impl Fn(&Path) -> bool, now: SystemTime) -> usize {
     let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
     let mut removed = 0;
     for entry in entries.flatten() {
-        let name = entry.file_name();
         let path = entry.path();
-        if !name.to_str().is_some_and(matches) || !path.is_dir() || !is_stale(&path, now) {
+        if !path.is_dir() || !is_stale(&path, now) || !matches(&path) {
             continue;
         }
         match std::fs::remove_dir_all(&path) {
@@ -515,13 +546,13 @@ pub fn sweep_leftovers(instances: Vec<PathBuf>, old_tmp: Option<PathBuf>) {
     let mut removed = 0;
     let mut cleaned = 0;
     if let Some(root) = crate::hub_root_dir() {
-        removed += remove_stale_in(&root.join("tmp"), is_hub_tmp_name, now);
+        removed += remove_stale_in(&root.join("tmp"), has_hub_tmp_name, now);
         cleaned += clean_stale_downloads(&root.join("Songs"), now) + clean_stale_downloads(&root.join("OpenTaiko"), now);
     }
     if let Some(old_tmp) = old_tmp {
-        removed += remove_stale_in(&old_tmp, is_hub_tmp_name, now);
+        removed += remove_stale_in(&old_tmp, is_old_hub_tmp, now);
     }
-    removed += remove_stale_in(&std::env::temp_dir(), is_build_dir_name, now);
+    removed += remove_stale_in(&std::env::temp_dir(), has_build_dir_name, now);
     for instance in &instances {
         cleaned += clean_stale_downloads(instance, now);
     }
@@ -581,12 +612,36 @@ mod tests {
             std::fs::create_dir(tmp.path().join(name)).unwrap();
         }
         // Nothing is old enough yet
-        assert_eq!(remove_stale_in(tmp.path(), is_hub_tmp_name, SystemTime::now()), 0);
+        assert_eq!(remove_stale_in(tmp.path(), has_hub_tmp_name, SystemTime::now()), 0);
         // Seen from seven hours later, only the Hub-named folder goes
         let later = SystemTime::now() + Duration::from_secs(7 * 60 * 60);
-        assert_eq!(remove_stale_in(tmp.path(), is_hub_tmp_name, later), 1);
+        assert_eq!(remove_stale_in(tmp.path(), has_hub_tmp_name, later), 1);
         assert!(!tmp.path().join("1a2b3c4d").exists());
         assert!(tmp.path().join("mine").exists());
+    }
+
+    // ~/Documents/tmp may be the user's own folder, where a name such as 20240101 is all
+    // hexadecimal digits too
+    #[test]
+    fn the_old_documents_tmp_loses_only_what_the_hub_left() {
+        let tmp = tempfile::tempdir().unwrap();
+        let hub_build = tmp.path().join("1a2b3c4d");
+        std::fs::create_dir_all(hub_build.join("s").join("OpenTaiko")).unwrap();
+        std::fs::write(hub_build.join("src.zip"), "PK").unwrap();
+        let hub_download = tmp.path().join("0f8fad5b-d9cb-469f-a165-70867728950e");
+        std::fs::create_dir_all(hub_download.join("OpenTaiko.Linux.x64")).unwrap();
+        std::fs::create_dir_all(tmp.path().join("indev-0f8fad5b-d9cb-469f-a165-70867728950e").join("anything")).unwrap();
+        let dated = tmp.path().join("20240101");
+        std::fs::create_dir_all(&dated).unwrap();
+        std::fs::write(dated.join("photo.jpg"), "mine").unwrap();
+        let upper = tmp.path().join("CAFEBABE");
+        std::fs::create_dir_all(upper.join("s")).unwrap();
+
+        let later = SystemTime::now() + Duration::from_secs(7 * 60 * 60);
+        assert_eq!(remove_stale_in(tmp.path(), is_old_hub_tmp, later), 3);
+        assert!(dated.join("photo.jpg").exists());
+        assert!(upper.exists());
+        assert!(!hub_build.exists() && !hub_download.exists());
     }
 
     #[test]

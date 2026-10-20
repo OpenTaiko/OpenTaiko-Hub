@@ -3,7 +3,9 @@
 // running. Each command here decides where it writes, and what.
 
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 use percent_encoding::percent_decode_str;
 use tauri::ipc::{InvokeBody, Request};
@@ -20,21 +22,30 @@ const SAVES_DB: &str = "Saves.db3";
 const BACKUP_DIR: &str = "SavesBackup";
 const KEEP_BACKUPS: usize = 20;
 
-/// Where `write_atomic` writes before renaming.
-pub(crate) fn temp_path(path: &Path) -> PathBuf {
+/// Where `write_atomic` writes before renaming: a name no other write uses. With one name
+/// per file, two writes of the same file at once (two saves of the instance list) wrote
+/// the same temporary file, and one of them failed or renamed the other's half into place.
+fn temp_path(path: &Path) -> PathBuf {
+    static NEXT: AtomicU64 = AtomicU64::new(0);
     let mut name = path.file_name().unwrap_or_default().to_os_string();
-    name.push(".tmp");
+    name.push(format!(".{}-{}.tmp", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
     path.with_file_name(name)
 }
 
 /// Writes next to `path` and renames over it, so a crash or a full disk mid-write leaves
-/// the previous content intact instead of a truncated file.
+/// the previous content intact instead of a truncated file. The content reaches the disk
+/// before the rename does: otherwise a power cut just after could leave an empty file.
 pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("Could not create {}: {}", parent.display(), e))?;
     }
     let tmp = temp_path(path);
-    let written = fs::write(&tmp, bytes).and_then(|()| fs::rename(&tmp, path));
+    let written = fs::File::create(&tmp)
+        .and_then(|mut file| {
+            file.write_all(bytes)?;
+            file.sync_all()
+        })
+        .and_then(|()| fs::rename(&tmp, path));
     written.map_err(|e| {
         let _ = fs::remove_file(&tmp);
         format!("Could not write {}: {}", path.display(), e)
@@ -208,7 +219,28 @@ mod tests {
         write_atomic(&file, b"one").unwrap();
         write_atomic(&file, b"two").unwrap();
         assert_eq!(fs::read(&file).unwrap(), b"two");
-        assert!(!temp_path(&file).exists());
+        let names: Vec<_> = fs::read_dir(file.parent().unwrap()).unwrap().map(|e| e.unwrap().file_name()).collect();
+        assert_eq!(names, ["a.json"]);
+    }
+
+    #[test]
+    fn writes_of_one_file_at_once_do_not_collide() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file = tmp.path().join("instances.json");
+        assert_ne!(temp_path(&file), temp_path(&file));
+        let writers: Vec<_> = (0..8)
+            .map(|i| {
+                let file = file.clone();
+                std::thread::spawn(move || write_atomic(&file, format!("{{\"n\":{i}}}").as_bytes()))
+            })
+            .collect();
+        for writer in writers {
+            // A rename onto a file another writer is renaming may be refused on Windows;
+            // what matters is that no write lands torn or under another's name
+            let _ = writer.join().unwrap();
+        }
+        let text = fs::read_to_string(&file).unwrap();
+        assert!(serde_json::from_str::<serde_json::Value>(&text).is_ok(), "{text}");
     }
 
     #[test]

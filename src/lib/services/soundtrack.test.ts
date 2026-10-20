@@ -25,10 +25,14 @@ describe('SongInstallEntries', () => {
         expect(entries[0].relPath).toBe('x.ogg');
     });
 
-    it('carries the git blob SHA of each file when the index is known', () => {
-        const shaMap = new Map([['01 Pop/Song/song.tja', 'abc']]);
-        const entries = SongInstallEntries(song('01 Pop\\Song', ['01 Pop\\Song\\song.tja', '01 Pop\\Song\\song.ogg']), shaMap);
+    it('downloads an indexed file from the commit its git blob SHA was read at', () => {
+        const commit = '0123456789abcdef0123456789abcdef01234567';
+        const index = { commit, shas: new Map([['01 Pop/Song/song.tja', 'abc']]) };
+        const entries = SongInstallEntries(song('01 Pop\\Song', ['01 Pop\\Song\\song.tja', '01 Pop\\Song\\song.ogg']), index);
         expect(entries.map((e) => e.gitSha)).toEqual(['abc', null]);
+        expect(entries[0].url).toBe(`https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/${commit}/01 Pop/Song/song.tja`);
+        // A file newer than the index comes from the branch, with nothing to check it against
+        expect(entries[1].url).toBe('https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/01 Pop/Song/song.ogg');
     });
 });
 

@@ -40,14 +40,22 @@ const normalizePath = (p: string | null | undefined): string => {
 };
 
 // Written by the backend, which replaces the file in one step: a crash mid-write used to
-// leave a truncated list that the next start took for no list at all
-const persist = async (): Promise<void> => {
-    const data: InstanceRegistry = {
-        version: 1,
-        activeId: get(activeInstanceId),
-        instances: get(instances)
-    };
-    await ipc.writeSettingsFile(REGISTRY_FILE, JSON.stringify(data, null, 2));
+// leave a truncated list that the next start took for no list at all. Saves run one
+// after the other, each with the list as it is when its turn comes: a first install saves
+// twice in a row, and the older list could land last.
+let persisting: Promise<void> = Promise.resolve();
+
+const persist = (): Promise<void> => {
+    const write = persisting.catch(() => {}).then(() => {
+        const data: InstanceRegistry = {
+            version: 1,
+            activeId: get(activeInstanceId),
+            instances: get(instances)
+        };
+        return ipc.writeSettingsFile(REGISTRY_FILE, JSON.stringify(data, null, 2));
+    });
+    persisting = write;
+    return write;
 };
 
 export interface ResolveInstancesInput {

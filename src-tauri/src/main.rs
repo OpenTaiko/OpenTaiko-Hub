@@ -32,6 +32,9 @@ use zip::ZipArchive;
 /// interpreter without letting a chatty process grow this unboundedly.
 const CHILD_STDERR_CAP: usize = 8 * 1024;
 
+/// How long the error output of a game that exited is still read.
+const STDERR_GRACE: std::time::Duration = std::time::Duration::from_secs(2);
+
 /// Payload of the `game-exited` event.
 #[derive(Clone, serde::Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -98,23 +101,32 @@ fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String
     // long as the Hub stayed open.
     std::thread::spawn(move || {
         let started = std::time::Instant::now();
-        let mut stderr_tail = String::new();
-        if let Some(mut stream) = child.stderr.take() {
-            // Keep the first CHILD_STDERR_CAP bytes but keep draining, so the child can
-            // never block writing into a full pipe.
-            let mut buf = [0u8; 4096];
-            let mut kept: Vec<u8> = Vec::new();
-            while let Ok(n) = stream.read(&mut buf) {
-                if n == 0 {
-                    break;
+        // Read in a thread of its own: the game is over when it exits, which is not when
+        // its error output closes. A program it started (a file manager it opened a
+        // folder in) keeps that open, and the game counted as running, its saves locked,
+        // until that program was closed too.
+        let kept = Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
+        let drained = child.stderr.take().map(|mut stream| {
+            let kept = kept.clone();
+            let (done, drained) = std::sync::mpsc::channel::<()>();
+            std::thread::spawn(move || {
+                // Keep the first CHILD_STDERR_CAP bytes but keep draining, so the child
+                // can never block writing into a full pipe.
+                let mut buf = [0u8; 4096];
+                while let Ok(n) = stream.read(&mut buf) {
+                    if n == 0 {
+                        break;
+                    }
+                    let mut kept = kept.lock().unwrap_or_else(|e| e.into_inner());
+                    if kept.len() < CHILD_STDERR_CAP {
+                        let room = CHILD_STDERR_CAP - kept.len();
+                        kept.extend_from_slice(&buf[..n.min(room)]);
+                    }
                 }
-                if kept.len() < CHILD_STDERR_CAP {
-                    let room = CHILD_STDERR_CAP - kept.len();
-                    kept.extend_from_slice(&buf[..n.min(room)]);
-                }
-            }
-            stderr_tail = String::from_utf8_lossy(&kept).trim().to_string();
-        }
+                let _ = done.send(());
+            });
+            drained
+        });
 
         let status = child.wait();
         let ran_for_secs = started.elapsed().as_secs();
@@ -124,6 +136,11 @@ fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String
                 running.remove(at);
             }
         }
+        // The last lines a crash wrote, without waiting on a program still holding the output
+        if let Some(drained) = drained {
+            let _ = drained.recv_timeout(STDERR_GRACE);
+        }
+        let stderr_tail = String::from_utf8_lossy(&kept.lock().unwrap_or_else(|e| e.into_inner())).trim().to_string();
         let code = status.as_ref().ok().and_then(|s| s.code());
         let success = status.as_ref().map(|s| s.success()).unwrap_or(false);
 
