@@ -1,5 +1,6 @@
 <script lang="ts">
     import { _ } from 'svelte-i18n';
+    import { isSkinCompatible } from '$lib/utils/versions';
 
     interface Props {
         LatestVersion?: string;
@@ -9,22 +10,9 @@
     }
 
     let { LatestVersion = "Unknown", CurrentVersion = "Unknown", Strictness = "Error" }: Props = $props();
-
-    const checkSkinCompatibility = (version1: string, version2: string): boolean => {
-        const regex = /^\d+\.\d+\.\d+\.\d+$/; // Match versions in the form <main>.<major>.<minor>.<patch>
-
-        if (!regex.test(version1) || !regex.test(version2)) {
-            return false;
-        }
-
-        const [main1, major1, minor1] = version1.split('.').map(Number);
-        const [main2, major2, minor2] = version2.split('.').map(Number);
-
-        return main1 === main2 && major1 === major2 && minor1 === minor2;
-    }
 </script>
 
-    {#if checkSkinCompatibility(CurrentVersion, LatestVersion)}
+    {#if isSkinCompatible(CurrentVersion, LatestVersion)}
         <p class="badge bg-green-100 text-green-800">{LatestVersion}</p>
     {:else}
         {#if Strictness === "Error"}

@@ -2,12 +2,13 @@
 // downloaded for one song. Kept apart from the Songs page so it can be tested on its own.
 import { fetchCachedJson } from '$lib/utils/download';
 import { ValidSoundtrack } from '$lib/utils/validate';
+import { SOUNDTRACK_REPO, apiUrl, rawUrl } from '$lib/repos';
 import type { InstallEntry } from '$lib/ipc';
 import type { SoundtrackEntry } from '$lib/types';
 
-const REPO_RAW = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main';
+const REPO_RAW = rawUrl(SOUNDTRACK_REPO);
 const CATALOG_URL = `${REPO_RAW}/soundtrack_info.json`;
-const TREE_URL = 'https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/main?recursive=1';
+const TREE_URL = `${apiUrl(SOUNDTRACK_REPO)}/git/trees/${SOUNDTRACK_REPO.branch}?recursive=1`;
 
 // Songs not offered in some regions
 const REGION_HIDDEN: Record<string, string[]> = {

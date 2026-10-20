@@ -12,8 +12,8 @@ use tauri_plugin_dialog::DialogExt;
 
 use crate::library::blocking;
 
-/// The Hub's own files in the app config folder.
-const SETTINGS_FILES: [&str; 4] = [INSTANCE_LIST, "theme.json", "thememode.json", "language.json"];
+/// The Hub's own files in the app config folder: the instance list and the preferences.
+const SETTINGS_FILES: [&str; 2] = [INSTANCE_LIST, "settings.json"];
 
 const SAVES_DB: &str = "Saves.db3";
 /// Copies of Saves.db3 taken before each change, in the instance folder.
@@ -41,7 +41,7 @@ pub(crate) fn write_atomic(path: &Path, bytes: &[u8]) -> Result<(), String> {
     })
 }
 
-/// Writes one of the Hub's settings files (the instance list, theme, mode, language).
+/// Writes one of the Hub's settings files (the instance list, or the preferences).
 #[tauri::command]
 pub async fn write_settings_file<R: Runtime>(app: AppHandle<R>, name: String, contents: String) -> Result<(), String> {
     if !SETTINGS_FILES.contains(&name.as_str()) {

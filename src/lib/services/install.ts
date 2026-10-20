@@ -36,16 +36,25 @@ export const WriteVersionJson = async (instancePath: string, version: string | n
     }
 };
 
+export interface ZipOptions {
+    /** The archive holds its files at its root (a skin package), not in one top folder
+     *  (a game release). */
+    flat?: boolean;
+    /** Drop the archive's Songs folder: songs live in the shared library. */
+    stripSongs?: boolean;
+}
+
 /**
- * Downloads a release zip and merges its content into the instance folder. Throws on any
- * failure, the download giving up included, or with "Cancelled" when the job was
- * cancelled before the files started moving into the instance. The caller reports it,
- * once.
+ * Downloads a zip and merges its content into `dest`, through a temporary folder of the
+ * Hub's. Throws on any failure, the download giving up included, or with "Cancelled"
+ * when the job was cancelled before the files started moving. The caller reports it,
+ * once. A game release and a skin package both install through here: the skin install
+ * used to repeat every step of it.
  */
-export const InstallReleaseZip = async (url: string, instancePath: string, job: string, hooks: InstallHooks): Promise<void> => {
+export const InstallZip = async (url: string, dest: string, job: string, hooks: InstallHooks, options: ZipOptions = {}): Promise<void> => {
     const tmpDir = await GetTmpPath(crypto.randomUUID());
     await mkdir(tmpDir, { recursive: true });
-    const zipPath = await path.join(tmpDir, 'OpenTaiko.zip');
+    const zipPath = await path.join(tmpDir, 'package.zip');
     try {
         hooks.onStage('download');
         await hooks.download(url, zipPath, hooks.onProgress);
@@ -54,15 +63,21 @@ export const InstallReleaseZip = async (url: string, instancePath: string, job: 
         hooks.onProgress(undefined);
         const extractProgress = new Channel<number>();
         extractProgress.onmessage = (percent) => hooks.onProgress(percent);
-        const sourceFolder = await ipc.unzip(zipPath, extractProgress, job);
+        const topFolder = await ipc.unzip(zipPath, extractProgress, job);
 
         hooks.onStage('install');
         hooks.onProgress(undefined);
         await remove(zipPath);
-        // Songs live in the shared library, so never install a build's own copies
-        await ipc.stripSongContent(await path.join(sourceFolder, 'Songs'));
-        await ipc.mergeMoveDir(sourceFolder, instancePath);
+        // A flat archive's files are the extraction folder's own content
+        const source = options.flat ? tmpDir : topFolder;
+        if (options.stripSongs) await ipc.stripSongContent(await path.join(source, 'Songs'));
+        await ipc.mergeMoveDir(source, dest);
     } finally {
+        // Already gone after a flat archive's move
         try { await remove(tmpDir, { recursive: true }); } catch {}
     }
 };
+
+/** A game release into an instance folder: a build's own songs are never installed. */
+export const InstallReleaseZip = (url: string, instancePath: string, job: string, hooks: InstallHooks): Promise<void> =>
+    InstallZip(url, instancePath, job, hooks, { stripSongs: true });

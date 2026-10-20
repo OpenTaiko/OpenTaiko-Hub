@@ -6,6 +6,7 @@
     // any kind are made — the file is read and rendered as is.
     import { exists, readTextFile, readFile, readDir } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
+    import { untrack } from 'svelte';
     import { _ } from 'svelte-i18n';
 
     import { activeInstance } from "../stores/instances";
@@ -16,7 +17,6 @@
     let notFound = $state(false);
     let loading = $state(false);
     let refreshToken = 0;
-    let renderedFor: string | null = null;   // bookkeeping only, never rendered
 
     // The built page is served to the iframe through a Blob URL rather than srcdoc. A
     // srcdoc document borrows the Hub's own URL as its base, so when the docs' router
@@ -175,11 +175,10 @@ ${SCRIPT_CLOSE}`;
     };
     // Only (re)build when the active instance actually changes — building inlines the
     // whole docs site, so avoid redundant rebuilds on unrelated store updates.
+    let instanceId = $derived($activeInstance?.id ?? null);
     $effect(() => {
-        if ($activeInstance && renderedFor !== $activeInstance.id) {
-            renderedFor = $activeInstance.id;
-            Refresh($activeInstance);
-        }
+        if (instanceId === null) return;
+        untrack(() => { if ($activeInstance) Refresh($activeInstance); });
     });
 </script>
 

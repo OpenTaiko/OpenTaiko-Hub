@@ -3,10 +3,9 @@
 // against GitHub's hourly limit for unauthenticated requests.
 import { fetchCachedJson } from './download';
 import { isVersionBelow } from './versions';
+import { ValidRelease, ValidReleaseList } from './validate';
+import { GAME_REPO, apiUrl } from '$lib/repos';
 import type { BuildOption, GitHubRelease } from '$lib/types';
-
-export const repoOwner = '0AuBSQ';//'OpenTaiko';
-export const repoName = 'OpenTaiko';//OpenTaiko-Dev-Mirror';
 
 interface IndevBuild {
     branch: string;
@@ -26,8 +25,14 @@ const INDEV_BUILDS: IndevBuild[] = [
 export const INDEV_BRANCH = INDEV_BUILDS[0].branch;
 export const INDEV_LABEL = INDEV_BUILDS[0].label;
 
+/** The version a branch build is recorded as until the built game's own can be read. */
+export const IndevVersion = (branch: string): string | null => {
+    const build = INDEV_BUILDS.find((b) => b.branch === branch);
+    return build ? `${build.version}.0` : null;
+};
+
 export const fetchLatestRelease = async (): Promise<GitHubRelease> => {
-    return await fetchCachedJson<GitHubRelease>(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
+    return ValidRelease(await fetchCachedJson<unknown>(`${apiUrl(GAME_REPO)}/releases/latest`));
 };
 
 // Experimental build sources: prereleases, plus any branch build whose target version
@@ -43,7 +48,7 @@ export const fetchExperimentalOptions = async (latestTag: string | null): Promis
         }
     }
     try {
-        const releases = await fetchCachedJson<GitHubRelease[]>(`https://api.github.com/repos/${repoOwner}/${repoName}/releases?per_page=15`);
+        const releases = ValidReleaseList(await fetchCachedJson<unknown>(`${apiUrl(GAME_REPO)}/releases?per_page=15`));
         const prerelease = releases.find((release) => release.prerelease && !release.draft);
         if (prerelease) {
             options.push({ kind: 'prerelease', tag: prerelease.tag_name, label: prerelease.tag_name });
@@ -55,10 +60,10 @@ export const fetchExperimentalOptions = async (latestTag: string | null): Promis
 };
 
 export const fetchReleaseByTag = async (tag: string): Promise<GitHubRelease> => {
-    return await fetchCachedJson<GitHubRelease>(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/tags/${encodeURIComponent(tag)}`);
+    return ValidRelease(await fetchCachedJson<unknown>(`${apiUrl(GAME_REPO)}/releases/tags/${encodeURIComponent(tag)}`));
 };
 
 export const fetchBranchHeadSha = async (branch: string): Promise<string | null> => {
-    const data = await fetchCachedJson<{ commit?: { sha?: string } }>(`https://api.github.com/repos/${repoOwner}/${repoName}/branches/${branch}`);
+    const data = await fetchCachedJson<{ commit?: { sha?: string } }>(`${apiUrl(GAME_REPO)}/branches/${branch}`);
     return data.commit?.sha ?? null;
 };

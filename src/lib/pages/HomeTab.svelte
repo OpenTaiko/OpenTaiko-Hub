@@ -2,12 +2,10 @@
     import { ipc } from '$lib/ipc';
     import { formatBytes } from '$lib/utils/format.svelte';
     import { InstallReleaseZip, IsInstallComplete, WriteVersionJson as WriteVersionFile } from '$lib/services/install';
+    import { BuildAndInstall, MissingDotnetSdk, type BuildStage } from '$lib/services/indev';
     import { getContext } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir, exists, remove } from '@tauri-apps/plugin-fs';
-    import { path } from '@tauri-apps/api';
-    import { Channel } from '@tauri-apps/api/core';
     import { listen } from '@tauri-apps/api/event';
     import { onMount } from 'svelte';
     import { _ } from 'svelte-i18n';
@@ -16,16 +14,15 @@
     import type { BuildOption, GitHubRelease, HubOS, IndevBuildInfo, Instance, ToastContext } from '$lib/types';
     const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
-    import { GetOS, GetBuildPath, GetBuildTarget, GetRootPath, OpenFolder } from "$lib/utils/path";
+    import { GetOS, GetBuildTarget, GetRootPath, OpenFolder } from "$lib/utils/path";
     import { startJob, isCancelled, InstanceInUse, type Job } from "$lib/stores/activity";
     import { download } from '$lib/utils/download';
     import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { openUrl } from '@tauri-apps/plugin-opener';
     import { confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
-    import { isVersionAtLeast } from "$lib/utils/versions";
+    import { isVersionAtLeast, isSkinCompatible } from "$lib/utils/versions";
     import {
-        repoOwner,
-        repoName,
+        IndevVersion,
         INDEV_BRANCH,
         INDEV_LABEL,
         fetchLatestRelease,
@@ -103,8 +100,6 @@
         buildFailed = false;
     };
 
-    type BuildStage = 'check_sdk' | 'fetch' | 'download' | 'extract' | 'build' | 'install';
-
     /** How much compiler output is kept on screen and written to the log on a failure. */
     const BUILD_LOG_LINES = 200;
 
@@ -174,19 +169,6 @@
             console.error('Failed to check the experimental branch:', error);
         }
     };
-
-    const checkSkinCompatibility = (version1: string | null, version2: string | null): boolean => {
-        const regex = /^\d+\.\d+\.\d+\.\d+$/; // Match versions in the form <main>.<major>.<minor>.<patch>
-
-        if (!version1 || !version2 || !regex.test(version1) || !regex.test(version2)) {
-            return false;
-        }
-
-        const [main1, major1, minor1] = version1.split('.').map(Number);
-        const [main2, major2, minor2] = version2.split('.').map(Number);
-
-        return main1 === main2 && major1 === major2 && minor1 === minor2;
-    }
 
     const TryFetchingLatestVersion = async () => {
         try {
@@ -403,7 +385,7 @@
     // An update that breaks the installed skins, and a reinstall of the same version,
     // used to start on a single click; the first was only flagged by red text beside it
     const UpdateStable = async () => {
-        if (checkSkinCompatibility(latestVersion, currentVersion) === false) {
+        if (isSkinCompatible(latestVersion, currentVersion) === false) {
             const go = await confirmDialog(get(_)('home.warn.skin_update_confirm'), { title: get(_)('home.button.update'), kind: 'warning' });
             if (!go) return;
         }
@@ -424,15 +406,15 @@
         };
     }, target);
 
-    // Fetches the experimental branch source at its current head commit, builds it with
-    // the .NET SDK and installs the publish output into the instance folder.
+    // Builds the experimental branch from source and installs it into the instance folder
+    // (services/indev.ts), showing its progress and its compiler output here.
     const DownloadIndev = async (option: { branch?: string; label?: string }, target?: Instance) => {
         // Capture the target so switching instances mid-download cannot retarget it
         const instance = target ?? current;
         if (!instance) return;
         const job = BeginInstall(instance);
         if (!job) return;
-        let tmpDir: string | null = null;
+        const branch = option.branch ?? INDEV_BRANCH;
 
         // MSBuild emits output far faster than the UI can paint it. Rebuilding a
         // 200-element array per line, each rebuild waking the auto-scroll effect, is
@@ -440,11 +422,7 @@
         // collected and folded in on a timer. A timer and not an animation frame, because
         // animation frames stop firing while the window is hidden and a build running in
         // the background would then display nothing at all.
-        //
-        // Declared out here rather than beside the build step so the failure path can
-        // drain whatever is still buffered: the last lines are the ones that say why.
         let pending: string[] = [];
-        const logChannel = new Channel<string[]>();
         let flushTimer: ReturnType<typeof setTimeout> | null = null;
         const flushBuildLog = () => {
             if (flushTimer !== null) {
@@ -457,114 +435,33 @@
         };
 
         try {
-            // 1. The build requires the .NET SDK 8 or later
-            buildStage = 'check_sdk';
-            progress = undefined;
-            const sdkLines: string[] = [];
-            // Output arrives in batches of lines
-            const sdkChannel = new Channel<string[]>();
-            sdkChannel.onmessage = (lines) => sdkLines.push(...lines);
-            let sdkExitCode = -1;
-            try {
-                sdkExitCode = await ipc.listDotnetSdks(sdkChannel, job.id);
-            } catch (error) {
-                if (isCancelled(error)) throw error;
-                sdkExitCode = -1;
-            }
-            // The game targets net8.0, which any SDK from 8 on can build
-            const hasSdk = sdkLines.some((line) => Number(line.trim().match(/^(\d+)\./)?.[1] ?? 0) >= 8);
-            if (sdkExitCode !== 0 || !hasSdk) {
-                TriggerError(get(_)('home.experimental.requires_dotnet'), {
-                    action: {
-                        label: get(_)('jobs.dotnet_page'),
-                        run: () => { openUrl('https://dotnet.microsoft.com/download/dotnet/8.0').catch(() => {}); }
+            const sha = await BuildAndInstall(instance.path, branch, optk_OS, job.id, {
+                onStage: (stage) => {
+                    buildStage = stage;
+                    // The files are being moved into the instance: stopping now would
+                    // leave it half old, half new
+                    if (stage === 'install') {
+                        cancellable = false;
+                        flushBuildLog();
                     }
-                });
-                return;
-            }
-
-            // 2. Resolve the branch head so the source and the update check are consistent
-            buildStage = 'fetch';
-            const branch = option.branch ?? INDEV_BRANCH;
-            const sha = await fetchBranchHeadSha(branch);
-            if (!sha) {
-                throw new Error(get(_)('home.error.branch_head'));
-            }
-
-            // 3. Download the source archive of that exact commit
-            buildStage = 'download';
-            progress = undefined;
-            transferred = 0;
-            transferRate = 0;
-            tmpDir = await GetBuildPath();
-            await mkdir(tmpDir, { recursive: true });
-            const srcZip = await path.join(tmpDir, 'src.zip');
-            await download(
-                `https://codeload.github.com/${repoOwner}/${repoName}/zip/${sha}`,
-                srcZip,
-                (pr) => {
-                    // codeload builds the archive on the fly and streams it chunked, so it
-                    // sends no Content-Length and `total` is 0. A percentage is impossible;
-                    // bytes and rate are the only way to tell this stage from a hang.
-                    // progressTotal is the plugin's own running count, so it also resets
-                    // correctly when a retry restarts the transfer.
-                    transferred = pr.progressTotal;
-                    transferRate = pr.transferSpeed;
-                    progress = pr.total ? 100 * (pr.progressTotal / pr.total) : undefined;
                 },
-                3,
-                job.id
-            );
-
-            // 4. Extract
-            buildStage = 'extract';
-            progress = 0;
-            const extractProgress = new Channel<number>();
-            extractProgress.onmessage = (percent) => progress = percent;
-            const extracted = await ipc.unzip(srcZip, extractProgress, job.id);
-            await remove(srcZip);
-            // The archive unpacks into `OpenTaiko-<40 character commit>`. Every character
-            // of that name counts against the Windows path limit for the whole build, so
-            // it is moved to a one-letter folder before the compiler sees it.
-            const srcFolder = await path.join(tmpDir, 's');
-            await ipc.mergeMoveDir(extracted, srcFolder);
-
-            // 5. Build (same command as the game's build scripts)
-            buildStage = 'build';
-            progress = undefined;
-            const rid = (await GetBuildTarget()).rid;
-            logChannel.onmessage = (lines) => {
-                pending.push(...lines);
-                // Bounded in case the flush is throttled while the window is hidden.
-                if (pending.length > BUILD_LOG_LINES * 2) {
-                    pending = pending.slice(-BUILD_LOG_LINES);
+                onProgress: (percent) => progress = percent,
+                onTransfer: (bytes, perSecond) => {
+                    transferred = bytes;
+                    transferRate = perSecond;
+                },
+                onOutput: (lines) => {
+                    pending.push(...lines);
+                    // Bounded in case the flush is throttled while the window is hidden.
+                    if (pending.length > BUILD_LOG_LINES * 2) {
+                        pending = pending.slice(-BUILD_LOG_LINES);
+                    }
+                    if (flushTimer === null) flushTimer = setTimeout(flushBuildLog, 100);
                 }
-                if (flushTimer === null) flushTimer = setTimeout(flushBuildLog, 100);
-            };
-            // The backend decides the command (procs.rs), and puts the game in `p` beside
-            // the source folder
-            const publishDir = await path.join(tmpDir, 'p');
-            const exitCode = await ipc.publishGame(srcFolder, rid, logChannel, job.id);
-            flushBuildLog();
-            if (exitCode !== 0) {
-                throw new Error(get(_)('home.error.build_exit', { values: { code: exitCode } }));
-            }
+            });
 
-            // 6. Install the publish output (and local docs when the branch ships them)
-            buildStage = 'install';
-            cancellable = false;
-            // A local publish carries the repository's whole Songs tree; drop those
-            // charts so the instance uses only the shared library
-            await ipc.stripSongContent(await path.join(publishDir, 'Songs'));
-            await ipc.mergeMoveDir(publishDir, instance.path);
-            await VerifyInstall(instance.path);
-            const docsDir = await path.join(srcFolder, 'OpenTaiko', 'docs');
-            if (await exists(docsDir)) {
-                await ipc.mergeMoveDir(docsDir, await path.join(instance.path, 'docs'));
-            }
-
-            // 7. Record build metadata for update checks and link the shared library
-            await WriteVersionJson(instance.path, '0.6.1.0');
+            // Record build metadata for update checks and link the shared library
+            await WriteVersionJson(instance.path, IndevVersion(branch));
             const updated = await updateInstance(instance.id, {
                 channel: 'experimental',
                 experimental: { kind: 'indev', branch, label: option.label ?? INDEV_LABEL, sha, builtAt: new Date().toISOString() }
@@ -576,10 +473,18 @@
 
             TriggerSuccess(get(_)('home.success.installed'));
         } catch (err) {
-            // Whatever is still buffered belongs in the report, and a failure that came
-            // from the invoke itself rather than a non-zero exit never reached the flush
-            // after the build step.
+            // Whatever is still buffered belongs in the report: the last lines are the
+            // ones that say why
             flushBuildLog();
+            if (err instanceof MissingDotnetSdk) {
+                TriggerError(get(_)('home.experimental.requires_dotnet'), {
+                    action: {
+                        label: get(_)('jobs.dotnet_page'),
+                        run: () => { openUrl('https://dotnet.microsoft.com/download/dotnet/8.0').catch(() => {}); }
+                    }
+                });
+                return;
+            }
             // Getting this far can take half an hour, and the compiler output is the only
             // record of why it failed. It lives in component state that the next run
             // clears, so write it to the log file first: console.error is mirrored there
@@ -596,15 +501,9 @@
             // build failure, and saying so would send the user to the wrong output.
             ReportInstallError(buildStage === 'build' ? 'home.error.build_failed' : 'home.error.download_failed', err);
         } finally {
-            // Lines a cancelled build still sends are dropped rather than written into the
-            // log after the run, or into the next run's
-            logChannel.onmessage = () => {};
             // No-op on the paths above that already flushed; it is here so no timer can
             // outlive the run and write into the log of the next one.
             flushBuildLog();
-            if (tmpDir) {
-                try { await remove(tmpDir, { recursive: true }); } catch {}
-            }
             EndInstall();
             buildStage = null;
         }
@@ -780,7 +679,7 @@
                         {:else if latestVersion !== null && latestVersion !== currentVersion}
                             <button type="button" onclick={LaunchOpenTaiko} disabled={launching} class="button-blue button-main"><i class="fa-solid {launching ? 'fa-spinner fa-spin' : 'fa-rocket'}"></i> {$_('home.button.launch')}</button>
                             <button type="button" onclick={UpdateStable} class="button-green button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.update')}</button>
-                            {#if checkSkinCompatibility(latestVersion, currentVersion) === false}
+                            {#if isSkinCompatible(latestVersion, currentVersion) === false}
                                 <span class="text-red-500">{$_('home.warn.skin_update')}</span>
                             {/if}
                         {:else}

@@ -11,6 +11,7 @@
     import { mkdir, exists, readFile } from '@tauri-apps/plugin-fs';
     import { OpenFolder, IsPlainRelPath } from '$lib/utils/path';
     import { SafeUrl } from '$lib/utils/sanitize';
+    import { SOUNDTRACK_REPO, rawUrl } from '$lib/repos';
     import { open, confirm } from '@tauri-apps/plugin-dialog';
     import { getCurrentWebview } from '@tauri-apps/api/webview';
     import { installFiles } from '$lib/utils/download';
@@ -164,7 +165,7 @@
         return find(library);
     });
 
-    const SOUNDTRACK_RAW = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main';
+    const SOUNDTRACK_RAW = rawUrl(SOUNDTRACK_REPO);
 
     // Genre art comes from the soundtrack repo, so a collection looks the same whether or
     // not it is installed. This is the same file EnsureGenreMetadata already downloads.

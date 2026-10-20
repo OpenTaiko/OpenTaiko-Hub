@@ -7,15 +7,13 @@
     import { Toast } from '@skeletonlabs/skeleton-svelte';
     import { ipc } from '$lib/ipc';
     import { error as logError, warn as logWarn } from '@tauri-apps/plugin-log';
-    import { readTextFile } from '@tauri-apps/plugin-fs';
-    import { path } from '@tauri-apps/api';
 
     import { setupI18n } from '$lib/i18n';
     import { _, isLoading, locale } from 'svelte-i18n';
 
-    import { GetPreferencesPath } from '$lib/utils/path';
     import { toaster } from '$lib/utils/toaster';
     import { SafeHtml } from '$lib/utils/sanitize';
+    import { LoadSettings } from '$lib/settings';
     import type { ErrorToastOptions, ToastContext } from '$lib/types';
 
     interface Props {
@@ -142,16 +140,9 @@ ${event.error?.stack ?? ''}`).catch(() => {});
         sendHeartbeat();
         heartbeat = setInterval(sendHeartbeat, 5000);
 
-        // Restore persisted locale
-        try {
-            const prefsDir = await GetPreferencesPath();
-            const langFilePath = await path.join(prefsDir, 'language.json');
-            const langFile = await readTextFile(langFilePath);
-            const { locale: savedLocale } = JSON.parse(langFile) as { locale?: string };
-            if (savedLocale) locale.set(savedLocale);
-        } catch {
-            // First launch or missing file — getLocaleFromNavigator() already applied
-        }
+        // Restore persisted locale; none saved yet keeps the system's, applied at setup
+        const { locale: savedLocale } = await LoadSettings();
+        if (savedLocale) locale.set(savedLocale);
     })
 </script>
 

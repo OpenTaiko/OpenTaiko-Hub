@@ -7,7 +7,7 @@
     // present it is MERGED into it (progress is never regressed); otherwise it is ADDED
     // as a new save. Imports are only accepted when the archive is the same version as,
     // or newer than, the instance's current save database.
-    import { getContext } from 'svelte';
+    import { getContext, untrack } from 'svelte';
     import { DescribeError, ErrorCause, ErrorText } from '$lib/utils/errors';
     import { readFile, exists } from '@tauri-apps/plugin-fs';
     import { open as openDialog, confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
@@ -33,7 +33,6 @@
     let loading = $state(false);
     let loadError = $state<string | null>(null);
     let busy = $state(false);
-    let loadedFor: string | null = null;   // bookkeeping only, never rendered
     let loadToken = 0; // guards against out-of-order reloads when switching instances
 
 
@@ -326,12 +325,13 @@
         }
     };
     let instance = $derived($activeInstance);
-    // Reload the save DB whenever the active instance changes (refresh on the spot).
+    // Reload the save DB whenever the active instance changes, and only then: the store
+    // also changes when anything else in the instance list does. The id, derived, changes
+    // only with the instance; the load itself is kept out of what the effect depends on.
+    let instanceId = $derived(instance?.id ?? null);
     $effect(() => {
-        if (instance && loadedFor !== instance.id) {
-            loadedFor = instance.id;
-            Load(instance);
-        }
+        if (instanceId === null) return;
+        untrack(() => { if (instance) Load(instance); });
     });
 </script>
 

@@ -3,6 +3,7 @@
 	import { _, locale } from 'svelte-i18n';
 	import type { SoundtrackEntry } from '$lib/types';
 	import { localizedTitle, localizedSubtitle } from '$lib/utils/titles';
+	import { SOUNDTRACK_REPO, rawUrl } from '$lib/repos';
 
 	interface Props {
 		/** The catalog entry, or null for a song of the user's own that the soundtrack
@@ -25,7 +26,7 @@
 	// A chart whose audio is on disk never streams it from the repository meanwhile
 	let source = $derived(
 		Src
-		?? (LoadSrc ? null : songInfo ? `https://github.com/OpenTaiko/OpenTaiko-Soundtrack/raw/refs/heads/main/${songInfo.chartAudioFilePath}` : null)
+		?? (LoadSrc ? null : songInfo ? rawUrl(SOUNDTRACK_REPO, songInfo.chartAudioFilePath) : null)
 	);
 
 	const TogglePlay = async () => {

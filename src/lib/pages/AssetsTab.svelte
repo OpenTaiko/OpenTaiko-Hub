@@ -2,22 +2,23 @@
     import { ipc } from '$lib/ipc';
     import { formatSize } from '$lib/utils/format.svelte';
     import { ValidAssetCatalog } from '$lib/utils/validate';
+    import { SKINS_REPO, pageUrl, rawUrl } from '$lib/repos';
     // Dependencies
     import { onMount } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir, remove } from '@tauri-apps/plugin-fs';
+    import { mkdir } from '@tauri-apps/plugin-fs';
+    import { InstallZip } from '$lib/services/install';
     import { download, installFiles, fetchCachedJson, type InstallEntry } from '$lib/utils/download';
     import { startJob, isCancelled, InstanceInUse, type Job } from '$lib/stores/activity';
     import { DescribeError, ErrorCause, ErrorText } from '$lib/utils/errors';
     import { path } from '@tauri-apps/api';
-    import { Channel } from '@tauri-apps/api/core';
     import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, Instance, LocalAsset, ToastContext } from '$lib/types';
 
     import { getContext } from 'svelte';
     const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
-    import { GetTmpPath, IsPlainRelPath } from "$lib/utils/path";
+    import { IsPlainRelPath } from "$lib/utils/path";
     import { activeInstance, instanceVersions } from "$lib/stores/instances";
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -54,7 +55,7 @@
     // Rescan whenever another instance becomes active
     let scannedInstanceId: string | null = null;   // bookkeeping only, never rendered
 
-    const assetsInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/assets_info.json';
+    const assetsInfoUrl = rawUrl(SKINS_REPO, 'assets_info.json');
     let assetsInfo = $state<AssetCatalog>(emptyCatalog());
     let currentAssets = $state<LocalAssets>(emptyByType<LocalAsset>());
     let assetScanning = $state(false);
@@ -264,44 +265,27 @@
 
         // Any failure below clears the progress row, says so, and records nothing: a
         // half-installed asset must not show as up to date
-        let assetDownloadFolder: string | null = null;
         try {
             await mkdir(assetFullPath, { recursive: true });
 
             if (assetType === "Skins") {
-                assetDownloadFolder = await GetTmpPath(crypto.randomUUID());
-                await mkdir(assetDownloadFolder, { recursive: true });
-
                 // Zip name: spaces → dots, parentheses stripped (matches release asset naming)
                 const zipName = assetRelpath.replace(/[()]/g, '').replace(/ /g, '.') + '.zip';
-                const zipUrl = `https://github.com/OpenTaiko/OpenTaiko-Skins/releases/download/system-assets/${zipName}`;
-                const zipPath = await path.join(assetDownloadFolder, 'skin.zip');
-
+                // Skin packages hold their files at the archive's root
                 let totbyts = 0;
-                await download(
-                    zipUrl,
-                    zipPath,
-                    (pr) => {
+                await InstallZip(pageUrl(SKINS_REPO, `releases/download/system-assets/${zipName}`), assetFullPath, job.id, {
+                    // The size comes from the catalog: the release server does not always send it
+                    download: (url, dest) => download(url, dest, (pr) => {
                         totbyts += pr.progress;
                         assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
+                    }, undefined, job.id),
+                    onStage: (stage) => {
+                        if (stage === 'extract') assetDLProgress[assetType][assetRelpath] = 0;
                     },
-                    undefined,
-                    job.id
-                );
-
-                assetDLProgress[assetType][assetRelpath] = 0;
-
-                const extractProgress = new Channel<number>();
-                extractProgress.onmessage = (percent) => assetDLProgress[assetType][assetRelpath] = percent;
-                await ipc.unzip(zipPath, extractProgress, job.id);
-
-                // All skin zips are flat (files/folders at zip root), so the extraction folder's
-                // content is moved straight into the skin folder. The move is done natively:
-                // copying a skin's thousands of files one call at a time from here was slow,
-                // and it skipped any file it failed to copy without saying so. The move also
-                // removes the extraction folder.
-                await remove(zipPath);
-                await ipc.mergeMoveDir(assetDownloadFolder, assetFullPath);
+                    onProgress: (percent) => {
+                        if (percent !== undefined) assetDLProgress[assetType][assetRelpath] = percent;
+                    }
+                }, { flat: true });
             } else {
                 // Characters and Puchicharas are separate files, downloaded straight into
                 // place a few at a time. The first folder of each catalog path is the
@@ -309,7 +293,7 @@
                 const subDir = "Global";
                 const baseDirPath = await path.join(res, baseDir);
                 const entries: InstallEntry[] = (assetObj as CharaInfo).charaFilesPath.map((filePath) => ({
-                    url: `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/${subDir}/${filePath.replace(/\\/g, '/')}`,
+                    url: rawUrl(SKINS_REPO, `${subDir}/${filePath.replace(/\\/g, '/')}`),
                     relPath: filePath.replace(/^[^\\]+\\/, '').replace(/\\/g, '/')
                 }));
 
@@ -330,10 +314,6 @@
             return 'failed';
         } finally {
             delete assetDLProgress[assetType][assetRelpath];
-            // Already gone after a successful move
-            if (assetDownloadFolder) {
-                try { await remove(assetDownloadFolder, { recursive: true }); } catch {}
-            }
         }
 
         if (!quiet) TriggerSuccess(get(_)('assets.success.download_complete'));

@@ -3,6 +3,7 @@
     import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { getVersion } from '@tauri-apps/api/app';
     import { fetchCachedJson } from '$lib/utils/download';
+    import { HUB_REPO, apiUrl, pageUrl } from '$lib/repos';
     import { openUrl } from '@tauri-apps/plugin-opener';
 
     import { getContext } from 'svelte';
@@ -25,13 +26,11 @@
         currentVersion !== null && latestVersion !== null && (compareVersions(latestVersion, currentVersion) ?? 0) > 0
     );
 
-    const repoOwner = 'OpenTaiko';
-    const repoName = 'OpenTaiko-Hub';
 
     const TryFetchingLatestVersion = async () => {
         latestVersionErrorFound = false;
         try {
-            const data = await fetchCachedJson<{ tag_name: string }>(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
+            const data = await fetchCachedJson<{ tag_name: string }>(`${apiUrl(HUB_REPO)}/releases/latest`);
             latestVersion = data.tag_name.replace(/^v/i, '');
             if (outdated) TriggerWarning(get(_)('hub.warn.outdated_toast'));
         } catch (err) {
@@ -46,7 +45,7 @@
     // hand the URL to the system browser
     const UpdateHub = async () => {
         try {
-            await openUrl("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest");
+            await openUrl(pageUrl(HUB_REPO, 'releases/latest'));
         } catch (err) {
             TriggerError(get(_)('hub.error.fetch', { values: { error: DescribeError(err) } }), { details: ErrorText(err) });
         }

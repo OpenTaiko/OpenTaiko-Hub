@@ -103,7 +103,7 @@ export const ipc = {
         invoke<number>('publish_game', { srcDir, rid, job, onOutput }),
 
     // Writing files (writes.rs): the page has no permission to write files itself
-    writeSettingsFile: (name: 'instances.json' | 'theme.json' | 'thememode.json' | 'language.json', contents: string) =>
+    writeSettingsFile: (name: 'instances.json' | 'settings.json', contents: string) =>
         invoke<void>('write_settings_file', { name, contents }),
     writeVersionJson: (instanceDir: string, version: string | null, build: string) =>
         invoke<void>('write_version_json', { instanceDir, version, build }),

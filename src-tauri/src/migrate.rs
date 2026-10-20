@@ -330,7 +330,6 @@ fn apply_plan(src: &Path, dest: &Path, decisions: &[MigrationDecision]) -> Resul
     Ok(summary)
 }
 
-/// True when the folder holds at least one .tja anywhere beneath it.
 /// True when both paths name the same folder on disk, following symlinks.
 ///
 /// A raw `==` is not enough: an instance whose Songs folder is a symlink (or a bind
@@ -349,6 +348,7 @@ pub(crate) fn is_same_dir(a: &Path, b: &Path) -> bool {
 /// handful of levels deep.
 const MAX_CHART_SCAN_DEPTH: usize = 24;
 
+/// True when the folder holds at least one .tja anywhere beneath it.
 pub(crate) fn contains_tja(dir: &Path) -> bool {
     contains_tja_within(dir, MAX_CHART_SCAN_DEPTH)
 }

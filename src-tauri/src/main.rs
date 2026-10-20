@@ -314,15 +314,6 @@ fn install_panic_hook() {
     }));
 }
 
-/// Raises the open-file soft limit to the hard limit on Linux.
-///
-/// WebKitGTK opens a lot of descriptors: its web and network processes inherit ours, and
-/// every media element on the page gets a GStreamer pipeline holding several. On the many
-/// distributions that still ship a 1024 soft limit, users hit
-/// `Failed to create shared memory: Too many open files` and the page process dies,
-/// leaving a blank window (reported on issues #4 and #15). Raising the soft limit is what
-/// those users did by hand with `ulimit -n`; doing it here, before any child process
-/// exists, means they inherit the higher limit too.
 /// Bundle identifier, which decides where the log file lives. Kept in step with
 /// tauri.conf.json by a test below.
 const APP_IDENTIFIER: &str = "com.opentaiko.hub";
@@ -448,7 +439,17 @@ fn open_folder(
         .map_err(|e| e.to_string())
 }
 
-/// Outcome of the descriptor-limit change, reported once the logger exists.
+/// Raises the open-file soft limit to the hard limit on Linux.
+///
+/// WebKitGTK opens a lot of descriptors: its web and network processes inherit ours, and
+/// every media element on the page gets a GStreamer pipeline holding several. On the many
+/// distributions that still ship a 1024 soft limit, users hit
+/// `Failed to create shared memory: Too many open files` and the page process dies,
+/// leaving a blank window (reported on issues #4 and #15). Raising the soft limit is what
+/// those users did by hand with `ulimit -n`; doing it here, before any child process
+/// exists, means they inherit the higher limit too.
+///
+/// Returns the outcome of the change, reported once the logger exists.
 #[cfg(target_os = "linux")]
 fn raise_open_file_limit() -> Option<String> {
     // SAFETY: plain libc calls on a stack-allocated struct; no pointers escape.
@@ -671,6 +672,15 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    /// The Hub's version is written in three places. The crate's one is the version
+    /// downloads announce (download.rs), and it was left at 0.1.0 while the others moved.
+    #[test]
+    fn the_version_is_the_same_everywhere() {
+        let expected = format!("\"version\": \"{}\"", env!("CARGO_PKG_VERSION"));
+        assert!(include_str!("../tauri.conf.json").contains(&expected), "Cargo.toml and tauri.conf.json disagree on the version");
+        assert!(include_str!("../../package.json").contains(&expected), "Cargo.toml and package.json disagree on the version");
+    }
+
     /// The log folder is resolved from this identifier, so a change in tauri.conf.json
     /// that is not mirrored here would silently write logs somewhere else.
     #[test]

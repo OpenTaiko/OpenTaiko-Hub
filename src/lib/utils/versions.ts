@@ -38,3 +38,14 @@ export const isVersionInSeries = (version: unknown, main: number, major: number,
     if (!parsed) return false;
     return parsed[0] === main && parsed[1] === major && parsed[2] === minor;
 }
+
+/**
+ * True when skins made for one version also fit the other: both are full four-part
+ * versions (<main>.<major>.<minor>.<patch>) with the same first three parts. Anything
+ * else, an unknown version included, counts as not compatible.
+ */
+export const isSkinCompatible = (a: string | null | undefined, b: string | null | undefined): boolean => {
+    const full = /^\d+\.\d+\.\d+\.\d+$/;
+    if (!a || !b || !full.test(a) || !full.test(b)) return false;
+    return a.split('.').slice(0, 3).join('.') === b.split('.').slice(0, 3).join('.');
+};

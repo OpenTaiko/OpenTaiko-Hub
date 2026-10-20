@@ -2,7 +2,7 @@
 // it. A malformed entry is dropped and logged instead of breaking the whole list, or of
 // sending a download to a path built from a missing field. Only the fields the Hub reads
 // are checked, so a catalog that grows new fields keeps working.
-import type { AssetCatalog, AssetInfo, AssetPrefix, AssetType, SoundtrackEntry } from '$lib/types';
+import type { AssetCatalog, AssetInfo, AssetPrefix, AssetType, GitHubAsset, GitHubRelease, SoundtrackEntry } from '$lib/types';
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isString = (v: unknown): v is string => typeof v === 'string';
@@ -50,4 +50,27 @@ export const ValidAssetCatalog = (raw: unknown): AssetCatalog => {
         );
     }
     return catalog;
+};
+
+// GitHub's release answers decide what is downloaded and installed. An answer that is not
+// a release (a rate-limit message, an error page) used to pass as one through a type cast.
+const asRelease = (raw: unknown): GitHubRelease | null => {
+    if (!isRecord(raw) || !isString(raw.tag_name) || !Array.isArray(raw.assets)) return null;
+    return {
+        tag_name: raw.tag_name,
+        prerelease: raw.prerelease === true,
+        draft: raw.draft === true,
+        assets: keepValid<GitHubAsset>('release asset', raw.assets, (a) => isString(a.name) && isString(a.browser_download_url))
+    };
+};
+
+export const ValidRelease = (raw: unknown): GitHubRelease => {
+    const release = asRelease(raw);
+    if (!release) throw new Error('The answer is not a GitHub release');
+    return release;
+};
+
+export const ValidReleaseList = (raw: unknown): GitHubRelease[] => {
+    if (!Array.isArray(raw)) throw new Error('The answer is not a list of GitHub releases');
+    return raw.map(asRelease).filter((release): release is GitHubRelease => release !== null);
 };

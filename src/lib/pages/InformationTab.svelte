@@ -9,6 +9,7 @@
     import { get } from 'svelte/store';
     import { OpenFolder } from '$lib/utils/path';
     import { SafeHtml } from '$lib/utils/sanitize';
+    import { GAME_REPO, HUB_REPO, pageUrl, rawUrl } from '$lib/repos';
 
     let currentInfo = $state(0);
 
@@ -34,11 +35,11 @@
     };
 
     // Information
-    const changelogUrl = 'https://raw.githubusercontent.com/0auBSQ/OpenTaiko/main/CHANGELOG.md';
+    const changelogUrl = rawUrl(GAME_REPO, 'CHANGELOG.md');
     let changelogContent = $state('');
-    const hubChangelogUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Hub/main/CHANGELOG.md';
+    const hubChangelogUrl = rawUrl(HUB_REPO, 'CHANGELOG.md');
     let hubChangelogContent = $state('');
-    const creditsUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Hub/main/CREDITS.md';
+    const creditsUrl = rawUrl(HUB_REPO, 'CREDITS.md');
     let creditsContent = $state('');
 
     // External links open in the system browser and pick up the app's link styling
@@ -183,7 +184,7 @@
         <p>{$_('info.troubleshoot.intro')}</p>
         <a href="https://discord.gg/5xfpGuwASU" target='_blank' class='underline'>{$_('info.troubleshoot.discord')}</a>
         <br />
-        <a href="https://github.com/0auBSQ/OpenTaiko/issues" target='_blank' class='underline'>{$_('info.troubleshoot.github')}</a>
+        <a href={pageUrl(GAME_REPO, 'issues')} target='_blank' class='underline'>{$_('info.troubleshoot.github')}</a>
         <p>{$_('info.troubleshoot.note')}</p>
 
         {#if logDir}

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ValidSoundtrack, ValidAssetCatalog } from './validate';
+import { ValidSoundtrack, ValidAssetCatalog, ValidRelease, ValidReleaseList } from './validate';
 
 const goodSong = {
     uniqueId: 'a', tjaFolderPath: 'Pop\\A', tjaFilesPath: ['Pop\\A\\a.tja'], tjaGenreFolder: 'Pop', tjaMD5: 'x',
@@ -38,5 +38,29 @@ describe('ValidAssetCatalog', () => {
 
     it('gives an empty list for a missing type', () => {
         expect(ValidAssetCatalog({ Skins: [skin] }).Characters).toEqual([]);
+    });
+});
+
+describe('ValidRelease', () => {
+    it('keeps a release and drops malformed assets', () => {
+        vi.spyOn(console, 'warn').mockImplementation(() => {});
+        const release = ValidRelease({
+            tag_name: '0.6.0.83',
+            prerelease: false,
+            assets: [
+                { name: 'OpenTaiko.Win.x64.zip', browser_download_url: 'https://github.com/x/y.zip' },
+                { name: 'broken' }
+            ]
+        });
+        expect(release.tag_name).toBe('0.6.0.83');
+        expect(release.draft).toBe(false);
+        expect(release.assets.map((a) => a.name)).toEqual(['OpenTaiko.Win.x64.zip']);
+    });
+
+    it('refuses an answer that is not a release', () => {
+        expect(() => ValidRelease({ message: 'API rate limit exceeded' })).toThrow();
+        expect(() => ValidRelease(null)).toThrow();
+        expect(ValidReleaseList([{ tag_name: 'a', assets: [] }, { message: 'x' }]).map((r) => r.tag_name)).toEqual(['a']);
+        expect(() => ValidReleaseList({ message: 'x' })).toThrow();
     });
 });

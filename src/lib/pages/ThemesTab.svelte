@@ -1,12 +1,7 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { readTextFile, mkdir } from '@tauri-apps/plugin-fs';
-    import { ipc } from '$lib/ipc';
-
-    import { GetPreferencesPath } from "$lib/utils/path";
+    import { LoadSettings, SaveSettings } from '$lib/settings';
     import { applyTheme, applyMode, getAppliedTheme, normalizeThemeName, DEFAULT_THEME, DEFAULT_MODE, type ThemeMode } from "$lib/utils/appearance";
-
-    import { path } from '@tauri-apps/api';
 
     import { SegmentedControl } from '@skeletonlabs/skeleton-svelte';
 
@@ -22,19 +17,10 @@
     let currentTheme = $state<string>(DEFAULT_THEME);
 
     const TryFetchingCurrentTheme = async () => {
-        const prefsDir = await GetPreferencesPath();
-        await mkdir(prefsDir, { recursive: true });
-        const themeFilePath = await path.join(prefsDir, 'theme.json');
-        try {
-            const fileContentTheme = await readTextFile(themeFilePath);
-            const jsonDataTheme = JSON.parse(fileContentTheme) as { theme?: string };
-            // Preferences written by older Hub versions use the Skeleton v2 preset names
-            currentTheme = normalizeThemeName(jsonDataTheme.theme);
-        } catch {
-            // File missing on first run — silently use default and write it
-            currentTheme = DEFAULT_THEME;
-            try { await ipc.writeSettingsFile('theme.json', JSON.stringify({ theme: currentTheme })); } catch {}
-        }
+        // Preferences written by older Hub versions use the Skeleton v2 preset names;
+        // none saved yet means the default
+        const { theme } = await LoadSettings();
+        currentTheme = theme ? normalizeThemeName(theme) : DEFAULT_THEME;
         applyTheme(currentTheme);
     }
 
@@ -43,7 +29,7 @@
         // Picking the theme already in use is not a mistake worth a warning
         if (getAppliedTheme() == themevalue) return;
 
-        await ipc.writeSettingsFile('theme.json', JSON.stringify({ theme: themevalue }));
+        await SaveSettings({ theme: themevalue });
 
         currentTheme = themevalue;
         applyTheme(themevalue);
@@ -53,36 +39,21 @@
     let currentThemeMode = $state<ThemeMode | 'Loading...'>('Loading...');
 
     const TryFetchingCurrentThemeMode = async () => {
-        const prefsDir = await GetPreferencesPath();
-        await mkdir(prefsDir, { recursive: true });
-        const modeFilePath = await path.join(prefsDir, 'thememode.json');
-        try {
-            const fileContentMode = await readTextFile(modeFilePath);
-            const jsonDataMode = JSON.parse(fileContentMode) as { thememode?: string };
-            currentThemeMode = jsonDataMode.thememode === 'light' ? 'light' : DEFAULT_MODE;
-        } catch {
-            // File missing on first run — silently use default and write it
-            currentThemeMode = DEFAULT_MODE;
-            try { await ipc.writeSettingsFile('thememode.json', JSON.stringify({ thememode: currentThemeMode })); } catch {}
-        }
-
+        const { mode } = await LoadSettings();
+        currentThemeMode = mode === 'light' ? 'light' : DEFAULT_MODE;
         applyMode(currentThemeMode);
     }
 
     const ThemeModeChanger = async (mode: string) => {
         currentThemeMode = mode === 'light' ? 'light' : 'dark';
-        await ipc.writeSettingsFile('thememode.json', JSON.stringify({ thememode: mode }));
+        await SaveSettings({ mode });
 
         applyMode(mode);
     }
 
     // Language persistence
     const SaveLocale = async (selectedLocale: string | null | undefined) => {
-        try {
-            await ipc.writeSettingsFile('language.json', JSON.stringify({ locale: selectedLocale }));
-        } catch (err) {
-            console.error('Failed to save locale:', err);
-        }
+        await SaveSettings({ locale: selectedLocale ?? undefined });
     }
 
     onMount(async () => {
