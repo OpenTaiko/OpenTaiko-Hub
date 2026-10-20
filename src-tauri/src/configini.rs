@@ -137,16 +137,23 @@ pub(crate) fn repoint_songs_entry(instance_dir: &Path, old: &Path, new: &Path) -
 /// With `include_local` false (experimental builds), the default local `Songs` entry is
 /// removed instead, so the game only reads the shared library; custom paths are kept.
 /// Returns the resulting TJAPath value.
+///
+/// The library is the Hub's own Songs folder, decided here: a path the page supplied was
+/// written into the file as it came, a line break and a network share included.
 #[tauri::command]
-pub async fn ensure_config_tjapath(
-    app: tauri::AppHandle,
-    instance_dir: String,
-    global_songs_path: String,
-    include_local: bool,
-) -> Result<String, String> {
-    crate::guard::checked(&app, &instance_dir)?;
+pub async fn ensure_config_tjapath(app: tauri::AppHandle, instance_dir: String, include_local: bool) -> Result<String, String> {
+    let dir = crate::guard::instance_dir(&app, &instance_dir)?;
+    let songs = crate::hub_root_dir().ok_or("The Hub folder could not be resolved")?.join("Songs");
     // A sync command runs on the main thread, which also drives the window
-    crate::library::blocking(move || write_tjapath(instance_dir, global_songs_path, include_local)).await
+    crate::library::blocking(move || {
+        write_tjapath(dir.to_string_lossy().into_owned(), songs.to_string_lossy().into_owned(), include_local)
+    })
+    .await
+}
+
+/// A TJAPath entry is one of a `;`-separated list on one line.
+fn fits_one_entry(path: &str) -> bool {
+    !path.chars().any(|c| c == ';' || c.is_control())
 }
 
 fn write_tjapath(
@@ -157,6 +164,9 @@ fn write_tjapath(
     let dir = PathBuf::from(&instance_dir);
     if !dir.is_dir() {
         return Err(format!("Instance folder not found: {}", instance_dir));
+    }
+    if !fits_one_entry(&global_songs_path) {
+        return Err(format!("The songs path cannot be written into Config.ini: {}", global_songs_path));
     }
 
     let sep = std::path::MAIN_SEPARATOR;
@@ -288,6 +298,16 @@ mod tests {
         assert!(text.contains("; 譜面フォルダ"), "comments must survive the rewrite");
         assert!(text.contains("E:\\custom\\"), "existing custom paths must survive");
         assert!(text.contains("FullScreen=0"), "other keys must survive");
+    }
+
+    #[test]
+    fn a_path_that_would_add_an_entry_or_a_line_is_refused() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().to_str().unwrap().to_string();
+        for songs in ["D:/Songs\r\nSkinPath=\\\\host\\share", "D:/a;\\\\host\\share", "D:/a\tb"] {
+            assert!(write_tjapath(dir.clone(), songs.into(), true).is_err(), "{songs:?}");
+        }
+        assert!(!tmp.path().join("Config.ini").exists());
     }
 
     #[test]

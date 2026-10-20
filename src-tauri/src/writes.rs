@@ -131,6 +131,13 @@ fn replace_saves(instance: &Path, backup_name: &str, bytes: &[u8]) -> Result<(),
     write_atomic(&db, bytes)
 }
 
+/// Every SQLite database starts with these bytes.
+const SQLITE_HEADER: &[u8] = b"SQLite format 3\0";
+
+fn is_sqlite_database(bytes: &[u8]) -> bool {
+    bytes.starts_with(SQLITE_HEADER)
+}
+
 /// Replaces an instance's Saves.db3. The bytes are the request body, and the instance
 /// folder and backup name come as headers (`instance` percent-encoded).
 #[tauri::command]
@@ -150,6 +157,9 @@ pub async fn write_saves<R: Runtime>(app: AppHandle<R>, request: Request<'_>) ->
         InvokeBody::Json(value) => serde_json::from_value::<Vec<u8>>(value.clone())
             .map_err(|_| "The save database must be sent as bytes".to_string())?,
     };
+    if !is_sqlite_database(&bytes) {
+        return Err("The save database is not an SQLite database".into());
+    }
     let dir = crate::guard::instance_dir(&app, &instance)?;
     // The game would write its own copy back on exit, undoing this one
     if crate::game_is_running(&app, &dir) {
@@ -168,6 +178,8 @@ pub async fn export_save<R: Runtime>(
     filter_name: String,
     contents: String,
 ) -> Result<Option<String>, String> {
+    // An exported save is JSON; the page also suggests the file name
+    serde_json::from_str::<serde_json::Value>(&contents).map_err(|e| format!("The exported save is not valid JSON: {}", e))?;
     let picked = blocking(move || {
         Ok(app
             .dialog()
@@ -197,6 +209,14 @@ mod tests {
         write_atomic(&file, b"two").unwrap();
         assert_eq!(fs::read(&file).unwrap(), b"two");
         assert!(!temp_path(&file).exists());
+    }
+
+    #[test]
+    fn only_an_sqlite_database_is_written_as_saves() {
+        assert!(is_sqlite_database(b"SQLite format 3\0\x10\x00rest"));
+        assert!(!is_sqlite_database(b"PK\x03\x04zip"));
+        assert!(!is_sqlite_database(b"SQLite format 3"));
+        assert!(!is_sqlite_database(b""));
     }
 
     #[test]

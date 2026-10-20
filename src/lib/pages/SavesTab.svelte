@@ -10,7 +10,7 @@
     import { getContext, untrack } from 'svelte';
     import { DescribeError, ErrorCause, ErrorText } from '$lib/utils/errors';
     import { readFile, exists } from '@tauri-apps/plugin-fs';
-    import { open as openDialog, confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
+    import { confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
     import { ipc } from '$lib/ipc';
     import { path } from '@tauri-apps/api';
     import { _ } from 'svelte-i18n';
@@ -207,10 +207,7 @@
         if (await GameRunning(inst)) return;
         let db: Database | null = null;
         try {
-            const src = await openDialog({
-                multiple: false,
-                filters: [{ name: get(_)('files.optk_save'), extensions: ['optksave', 'json'] }]
-            });
+            const [src] = await ipc.pickFiles('save', get(_)('files.optk_save'));
             if (!src) return;
 
             let portable: Partial<PortableSave>;

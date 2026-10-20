@@ -6,6 +6,7 @@
 // and progress is sent at most every PROGRESS_INTERVAL rather than once per network
 // chunk, each of which used to cost a script evaluation in the page.
 
+use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -87,19 +88,92 @@ fn host_allowed(url: &reqwest::Url, hosts: &[&str]) -> bool {
     url.scheme() == "https" && url.host_str().is_some_and(|h| hosts.contains(&h))
 }
 
-fn owner_allowed(url: &reqwest::Url) -> bool {
-    let on_github = url.host_str().is_some_and(|h| GITHUB_HOSTS.contains(&h));
-    !on_github
-        || url
-            .path_segments()
-            .and_then(|mut parts| parts.next())
-            .is_some_and(|owner| OWNERS.contains(&owner.to_ascii_lowercase().as_str()))
+fn is_owner(owner: &str) -> bool {
+    OWNERS.contains(&owner.to_ascii_lowercase().as_str())
+}
+
+fn segments(url: &reqwest::Url) -> Vec<&str> {
+    url.path_segments().map(|parts| parts.collect()).unwrap_or_default()
+}
+
+/// Commits seen as the head of a branch of one of OWNERS' repositories, as
+/// "owner/repository/commit" in lower case (see `remember_branch_head`).
+fn branch_heads() -> &'static Mutex<HashSet<String>> {
+    static HEADS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    HEADS.get_or_init(Default::default)
+}
+
+fn head_key(owner: &str, repo: &str, commit: &str) -> String {
+    format!("{}/{}/{}", owner, repo, commit).to_ascii_lowercase()
+}
+
+/// Records the commit a branch of one of OWNERS' repositories points at, from the API's
+/// answer for `/repos/<owner>/<repository>/branches/<branch>`. A branch name is looked up
+/// in that repository only, so the commit is one its owners published there.
+fn remember_branch_head(url: &reqwest::Url, body: &[u8]) {
+    let parts = segments(url);
+    if url.host_str() != Some("api.github.com")
+        || url.query().is_some()
+        || parts.len() < 5
+        || parts[0] != "repos"
+        || parts[3] != "branches"
+        || !is_owner(parts[1])
+    {
+        return;
+    }
+    let commit = serde_json::from_slice::<serde_json::Value>(body)
+        .ok()
+        .and_then(|json| json.pointer("/commit/sha")?.as_str().map(String::from));
+    if let Some(commit) = commit.filter(|c| c.len() == 40 && is_hex(c)) {
+        branch_heads().lock().unwrap().insert(head_key(parts[1], parts[2], &commit));
+    }
+}
+
+fn is_hex(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_hexdigit())
+}
+
+/// Whether a git reference, `rest` being the path from the reference on, names something
+/// the repository's owners published: a branch, a tag, or a commit recorded by
+/// `remember_branch_head`. GitHub serves every commit of a repository's forks under the
+/// repository's own name, `refs/pull/<n>/head` included, so a commit or a pull request
+/// reference in an OpenTaiko path may well be anyone's.
+fn reference_allowed(owner: &str, repo: &str, rest: &[&str]) -> bool {
+    let Some(first) = rest.first() else { return false };
+    if first.contains('%') {
+        return false;
+    }
+    if first.eq_ignore_ascii_case("refs") {
+        return rest.get(1).is_some_and(|kind| *kind == "heads" || *kind == "tags");
+    }
+    // Abbreviated commits are resolved too, so a branch named in hexadecimal is refused
+    // along with them
+    if first.len() >= 4 && is_hex(first) {
+        return first.len() == 40 && branch_heads().lock().unwrap().contains(&head_key(owner, repo, first));
+    }
+    true
+}
+
+/// Anything served from GITHUB_HOSTS must come from OWNERS, and from what they published.
+fn source_allowed(url: &reqwest::Url) -> bool {
+    let Some(host) = url.host_str().filter(|h| GITHUB_HOSTS.contains(h)) else { return true };
+    let parts = segments(url);
+    if parts.len() < 3 || !is_owner(parts[0]) {
+        return false;
+    }
+    match host {
+        // Release assets only: releases belong to the repository itself, unlike its archives
+        "github.com" => matches!(parts[2..], ["releases", "download", _, _, ..] | ["releases", "latest", "download", _, ..]),
+        "raw.githubusercontent.com" => parts.len() >= 4 && reference_allowed(parts[0], parts[1], &parts[2..]),
+        "codeload.github.com" => parts.len() >= 4 && parts[2] == "zip" && reference_allowed(parts[0], parts[1], &parts[3..]),
+        _ => false,
+    }
 }
 
 /// Where a request may be sent on to: anywhere a download or a read may start, under the
-/// same account rule, or where GitHub serves release assets from.
+/// same rules, or where GitHub serves release assets from.
 fn redirect_allowed(url: &reqwest::Url) -> bool {
-    [&DOWNLOAD_HOSTS[..], &READ_HOSTS[..], &ASSET_HOSTS[..]].iter().any(|hosts| host_allowed(url, hosts)) && owner_allowed(url)
+    [&DOWNLOAD_HOSTS[..], &READ_HOSTS[..], &ASSET_HOSTS[..]].iter().any(|hosts| host_allowed(url, hosts)) && source_allowed(url)
 }
 
 fn parse_url(url: &str, hosts: &[&str]) -> Result<reqwest::Url, String> {
@@ -113,10 +187,10 @@ fn parse_url(url: &str, hosts: &[&str]) -> Result<reqwest::Url, String> {
 
 fn parse_download_url(url: &str) -> Result<reqwest::Url, String> {
     let parsed = parse_url(url, &DOWNLOAD_HOSTS)?;
-    if owner_allowed(&parsed) {
+    if source_allowed(&parsed) {
         Ok(parsed)
     } else {
-        Err(format!("Refusing to download from {url}: not an OpenTaiko repository"))
+        Err(format!("Refusing to download from {url}: not published by OpenTaiko"))
     }
 }
 
@@ -491,9 +565,37 @@ pub async fn download_file<R: Runtime>(
         .await
         .map_err(failure_message)?;
     let _moving = crate::jobs::in_flight(&app);
-    crate::library::blocking(move || commit(&[(part, dest)])).await?;
+    let placed = dest.clone();
+    crate::library::blocking(move || commit(&[(part, placed)])).await?;
+    if is_archive(&dest) {
+        downloaded_archives().lock().unwrap().push(dest);
+    }
     progress.lock().unwrap().flush();
     Ok(())
+}
+
+fn is_archive(path: &Path) -> bool {
+    path.extension().is_some_and(|e| e.eq_ignore_ascii_case("zip"))
+}
+
+/// Archives `download_file` placed this session, which `take_downloaded_archive` hands out.
+fn downloaded_archives() -> &'static Mutex<Vec<PathBuf>> {
+    static ARCHIVES: OnceLock<Mutex<Vec<PathBuf>>> = OnceLock::new();
+    ARCHIVES.get_or_init(Default::default)
+}
+
+/// True, once, for an archive `download_file` placed this session. Only those are
+/// extracted: any file the page could reach used to be, and the page can have a save
+/// database written with whatever bytes it likes, a zip included.
+pub(crate) fn take_downloaded_archive(path: &Path) -> bool {
+    let mut archives = downloaded_archives().lock().unwrap();
+    match archives.iter().position(|a| crate::guard::same_path(a, path)) {
+        Some(index) => {
+            archives.swap_remove(index);
+            true
+        }
+        None => false,
+    }
 }
 
 #[derive(Deserialize)]
@@ -675,12 +777,18 @@ fn cache_paths(dir: &Path, url: &str) -> (PathBuf, PathBuf) {
 #[tauri::command]
 pub async fn fetch_cached<R: Runtime>(app: AppHandle<R>, url: String) -> Result<Response, String> {
     let parsed = parse_url(&url, &READ_HOSTS)?;
+    let body = read_cached(&app, &url, parsed.clone()).await?;
+    remember_branch_head(&parsed, &body);
+    Ok(Response::new(body))
+}
+
+async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest::Url) -> Result<Vec<u8>, String> {
     let dir = app
         .path()
         .app_cache_dir()
         .map_err(|e| e.to_string())?
         .join("http");
-    let (body_path, meta_path) = cache_paths(&dir, &url);
+    let (body_path, meta_path) = cache_paths(&dir, url);
 
     let cached_meta: Option<CacheMeta> = match (tokio::fs::read(&meta_path).await, body_path.exists()) {
         (Ok(bytes), true) => serde_json::from_slice(&bytes).ok(),
@@ -723,17 +831,16 @@ pub async fn fetch_cached<R: Runtime>(app: AppHandle<R>, url: String) -> Result<
     let (meta, body) = match fresh {
         Ok(Some(fresh)) => fresh,
         Ok(None) => {
-            let body = tokio::fs::read(&body_path)
+            return tokio::fs::read(&body_path)
                 .await
-                .map_err(|e| format!("Could not read the cached copy of {url}: {e}"))?;
-            return Ok(Response::new(body));
+                .map_err(|e| format!("Could not read the cached copy of {url}: {e}"));
         }
         Err((status, message)) => {
             let fall_back = status.map_or(true, |s| s == 403 || is_retryable_status(s));
             if fall_back && cached_meta.is_some() {
                 if let Ok(body) = tokio::fs::read(&body_path).await {
                     log::warn!("{message}; using the cached copy");
-                    return Ok(Response::new(body));
+                    return Ok(body);
                 }
             }
             return Err(message);
@@ -751,7 +858,7 @@ pub async fn fetch_cached<R: Runtime>(app: AppHandle<R>, url: String) -> Result<
             log::warn!("Could not cache {url}: {e}");
         }
     }
-    Ok(Response::new(body))
+    Ok(body)
 }
 
 /// Writes beside `path` under a name no other write uses, then renames over it: two
@@ -794,14 +901,60 @@ mod tests {
     fn downloads_come_only_from_opentaiko_repositories() {
         let ok = |u: &str| parse_download_url(u).is_ok();
         assert!(ok("https://github.com/OpenTaiko/OpenTaiko-Skins/releases/download/system-assets/a.zip"));
-        assert!(ok("https://codeload.github.com/0AuBSQ/OpenTaiko/zip/abc"));
+        assert!(ok("https://codeload.github.com/0AuBSQ/OpenTaiko/zip/refs/heads/main"));
         assert!(ok("https://raw.githubusercontent.com/opentaiko/OpenTaiko-Soundtrack/main/x.tja"));
+        assert!(ok("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/refs/tags/v1/x.tja"));
         assert!(ok("https://opentaiko.github.io/hof.db3"));
         assert!(!ok("https://raw.githubusercontent.com/someone/payload/main/OpenTaiko.exe"));
         assert!(!ok("https://github.com/someone/OpenTaiko/releases/download/v1/a.zip"));
-        assert!(!ok("https://codeload.github.com/OpenTaikoFork/OpenTaiko/zip/abc"));
+        assert!(!ok("https://codeload.github.com/OpenTaikoFork/OpenTaiko/zip/main"));
         // Signed asset links name no account, so they are only followed as redirects
         assert!(!ok("https://objects.githubusercontent.com/github-production-release-asset/1"));
+    }
+
+    // GitHub serves the commits of a repository's forks, and its pull requests, under the
+    // repository's own name: checked live, a fork's pull request head came back from
+    // raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/<commit>/README.md
+    #[test]
+    fn a_fork_commit_under_an_opentaiko_name_is_refused() {
+        let ok = |u: &str| parse_download_url(u).is_ok();
+        let commit = "0b6a51e1d2c3b4a5968778695a4b3c2d1e0f1a2b";
+        let raw = format!("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/{commit}/README.md");
+        let zip = format!("https://codeload.github.com/0AuBSQ/OpenTaiko/zip/{commit}");
+        assert!(!ok(&raw));
+        assert!(!ok(&zip));
+        assert!(!ok("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/0b6a51e/README.md"));
+        assert!(!ok("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/refs/pull/22/head/README.md"));
+        assert!(!ok("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/refs%2Fpull%2F22%2Fhead/README.md"));
+        assert!(!ok("https://codeload.github.com/OpenTaiko/OpenTaiko-Soundtrack/zip/refs/pull/22/head"));
+        assert!(!ok("https://github.com/OpenTaiko/OpenTaiko/archive/main.zip"));
+        assert!(!ok("https://github.com/OpenTaiko/OpenTaiko/raw/main/a.exe"));
+
+        // Once the API named it the head of one of the repository's branches, it is the
+        // repository's own, and only that repository's
+        let branch = reqwest::Url::parse("https://api.github.com/repos/0AuBSQ/OpenTaiko/branches/main").unwrap();
+        remember_branch_head(&branch, format!(r#"{{"name":"main","commit":{{"sha":"{commit}"}}}}"#).as_bytes());
+        assert!(ok(&zip));
+        assert!(!ok(&raw));
+
+        // Only a branch's answer counts: the commits endpoint resolves fork commits too
+        let other = "1111111111111111111111111111111111111111";
+        let commits = reqwest::Url::parse(&format!("https://api.github.com/repos/OpenTaiko/OpenTaiko/commits/{other}")).unwrap();
+        remember_branch_head(&commits, format!(r#"{{"commit":{{"sha":"{other}"}}}}"#).as_bytes());
+        assert!(!ok(&format!("https://codeload.github.com/OpenTaiko/OpenTaiko/zip/{other}")));
+    }
+
+    #[test]
+    fn only_downloaded_archives_are_handed_out_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let zip = tmp.path().join("package.zip");
+        std::fs::write(&zip, b"PK").unwrap();
+        assert!(!take_downloaded_archive(&zip));
+        downloaded_archives().lock().unwrap().push(zip.clone());
+        assert!(take_downloaded_archive(&zip));
+        assert!(!take_downloaded_archive(&zip));
+        assert!(is_archive(Path::new("a/Package.ZIP")));
+        assert!(!is_archive(Path::new("a/Saves.db3")));
     }
 
     #[test]
@@ -810,8 +963,8 @@ mod tests {
         assert!(ok("https://release-assets.githubusercontent.com/github-production-release-asset/1"));
         assert!(ok("https://objects.githubusercontent.com/github-production-release-asset/1"));
         assert!(ok("https://api.github.com/repositories/1/releases/latest"));
-        assert!(ok("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest"));
-        assert!(!ok("https://github.com/someone/OpenTaiko/releases/latest"));
+        assert!(ok("https://github.com/OpenTaiko/OpenTaiko-Hub/releases/latest/download/a.zip"));
+        assert!(!ok("https://github.com/someone/OpenTaiko/releases/latest/download/a.zip"));
         assert!(!ok("https://example.com/a.zip"));
         assert!(!ok("http://objects.githubusercontent.com/a"));
     }

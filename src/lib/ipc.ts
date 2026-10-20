@@ -80,11 +80,15 @@ export const ipc = {
     /** True while a game the Hub started from this instance runs. */
     gameRunning: (instanceDir: string) => invoke<boolean>('game_running', { instanceDir }),
     getGameVersion: (instanceDir: string) => invoke<string | null>('get_game_version', { instanceDir }),
-    ensureConfigTjapath: (instanceDir: string, globalSongsPath: string, includeLocal: boolean) =>
-        invoke<string>('ensure_config_tjapath', { instanceDir, globalSongsPath, includeLocal }),
+    /** Adds the Hub's Songs folder to the instance's Config.ini. */
+    ensureConfigTjapath: (instanceDir: string, includeLocal: boolean) =>
+        invoke<string>('ensure_config_tjapath', { instanceDir, includeLocal }),
     createInstanceDir: (folderName: string) => invoke<string>('create_instance_dir', { folderName }),
     /** Shows the folder dialog itself; null when it was closed without a choice. */
     attachInstanceDir: (title: string) => invoke<string | null>('attach_instance_dir', { title }),
+    /** Shows a file dialog for one kind of file; empty when it was closed without a choice. */
+    pickFiles: (kind: 'image' | 'chart_archive' | 'save', label: string, multiple = false) =>
+        invoke<string[]>('pick_files', { kind, label, multiple }),
     allowBuildDir: (path: string) => invoke<void>('allow_build_dir', { path }),
     openFolder: (path: string) => invoke<void>('open_folder', { path }),
     hubRoot: () => invoke<string>('hub_root'),

@@ -192,8 +192,13 @@ async fn unzip_and_get_first_folder(
     on_progress: tauri::ipc::Channel<f64>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
-    // The archive is extracted next to itself
-    guard::checked(&app_handle, &zip_path)?;
+    // The archive is extracted next to itself, so only one the Hub downloaded into a
+    // temporary folder of its own: extracting any file the page could reach let page
+    // script unpack a zip it had written as a save database over the game's executable.
+    let zip = guard::checked(&app_handle, &zip_path)?;
+    if !zip.parent().is_some_and(guard::is_hub_tmp_dir) || !download::take_downloaded_archive(&zip) {
+        return Err(format!("ERR: Refusing to extract {}: not an archive the Hub downloaded", zip_path));
+    }
     let cancel = jobs::token(&app_handle, &job);
     let zip_path_clone = zip_path.clone();
 
@@ -257,10 +262,12 @@ async fn unzip_and_get_first_folder(
                 }
 
                 // Buffered: unbuffered, a game build of a gigabyte and more was written in
-                // one system call per 8 KiB read from the archive
+                // one system call per 8 KiB read from the archive. Never over an existing
+                // file: the folder is a fresh one, and nothing in it is to be replaced.
+                let created = std::fs::OpenOptions::new().write(true).create_new(true).open(&out_path);
                 let mut out_file = std::io::BufWriter::with_capacity(
                     library::COPY_BUFFER,
-                    File::create(&out_path).map_err(|err| format!("ERR: Failed to create file: {}", err))?,
+                    created.map_err(|err| format!("ERR: Failed to create {}: {}", out_path.display(), err))?,
                 );
                 std::io::copy(&mut file, &mut out_file)
                     .and_then(|_| std::io::Write::flush(&mut out_file))
@@ -585,6 +592,7 @@ fn main() {
             guard::allow_build_dir,
             guard::create_instance_dir,
             guard::attach_instance_dir,
+            guard::pick_files,
             writes::write_settings_file,
             writes::write_version_json,
             writes::write_saves,

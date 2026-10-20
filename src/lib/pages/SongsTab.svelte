@@ -12,7 +12,7 @@
     import { OpenFolder, IsPlainRelPath } from '$lib/utils/path';
     import { SafeUrl } from '$lib/utils/sanitize';
     import { SOUNDTRACK_REPO, rawUrl } from '$lib/repos';
-    import { open, confirm } from '@tauri-apps/plugin-dialog';
+    import { confirm } from '@tauri-apps/plugin-dialog';
     import { getCurrentWebview } from '@tauri-apps/api/webview';
     import { installFiles } from '$lib/utils/download';
     import { startJob, isCancelled, type Job } from '$lib/stores/activity';
@@ -258,12 +258,9 @@
     });
 
     const PickSongPreimage = async (entry: LibraryEntry) => {
-        const picked = await open({
-            multiple: false,
-            filters: [{ name: get(_)('files.images'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
-        });
-        if (!picked || Array.isArray(picked)) return;
         try {
+            const [picked] = await ipc.pickFiles('image', get(_)('files.images'));
+            if (!picked) return;
             const base = globalSongsPath ?? await GetGlobalSongsPath();
             const name = await ipc.setSongPreimage(base, entry.relPath, picked);
             TriggerSuccess(get(_)('songs.box.jacket_saved', { values: { name } }));
@@ -352,12 +349,9 @@
     };
 
     const PickJacket = async (relPath: string) => {
-        const picked = await open({
-            multiple: false,
-            filters: [{ name: get(_)('files.images'), extensions: ['png', 'jpg', 'jpeg', 'webp'] }]
-        });
-        if (!picked || Array.isArray(picked)) return;
         try {
+            const [picked] = await ipc.pickFiles('image', get(_)('files.images'));
+            if (!picked) return;
             const base = await GetGlobalSongsPath();
             const name = await ipc.setFolderJacket(base, relPath, picked);
             TriggerSuccess(get(_)('songs.box.jacket_saved', { values: { name } }));
@@ -506,12 +500,14 @@
     };
 
     const PickArchives = async (relPath: string) => {
-        const picked = await open({
-            multiple: true,
-            filters: [{ name: get(_)('files.chart_archives'), extensions: ['zip'] }]
-        });
-        if (!picked) return;
-        await ImportArchives(relPath, Array.isArray(picked) ? picked : [picked]);
+        let picked: string[];
+        try {
+            picked = await ipc.pickFiles('chart_archive', get(_)('files.chart_archives'), true);
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.import_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+            return;
+        }
+        await ImportArchives(relPath, picked);
     };
 
     // Hall of Fame

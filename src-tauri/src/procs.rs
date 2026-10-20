@@ -196,6 +196,31 @@ fn publish_args(build_dir: &Path, rid: &str) -> Vec<String> {
     ]
 }
 
+/// Files MSBuild, NuGet and the SDK look for in every folder above a project. The game's
+/// repository has none of its own, so one above the source folder would be picked up by
+/// the build: an `<Exec>` in a Directory.Build.targets, or a package feed in a NuGet.Config.
+/// The Hub's tmp folder is one of those folders.
+const INHERITED_BUILD_FILES: [&str; 7] = [
+    "directory.build.props",
+    "directory.build.targets",
+    "directory.build.rsp",
+    "directory.packages.props",
+    "directory.solution.props",
+    "nuget.config",
+    "global.json",
+];
+
+/// The first file of INHERITED_BUILD_FILES in `build_dir` or a folder above it.
+fn inherited_build_file(build_dir: &Path) -> Option<PathBuf> {
+    build_dir.ancestors().find_map(|dir| {
+        std::fs::read_dir(dir).ok()?.flatten().map(|entry| entry.path()).find(|path| {
+            path.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| INHERITED_BUILD_FILES.contains(&n.to_ascii_lowercase().as_str()))
+        })
+    })
+}
+
 /// Lists the installed .NET SDKs, one per line, as `dotnet --list-sdks` prints them.
 #[tauri::command]
 pub async fn list_dotnet_sdks(
@@ -225,6 +250,12 @@ pub async fn publish_game(
     }
     let src = crate::guard::build_source_dir(&app, &src_dir)?;
     let build_dir = src.parent().ok_or("The build folder could not be resolved")?.to_path_buf();
+    if let Some(found) = inherited_build_file(&build_dir) {
+        return Err(format!(
+            "Refusing to build: {} would be read by the build. Remove it, or move the Hub elsewhere.",
+            found.display()
+        ));
+    }
     // Closing the window waits until a cancelled build is gone
     let _running = crate::jobs::in_flight(&app);
     run_dotnet(publish_args(&build_dir, &rid), Some(src), cancel, on_output).await
@@ -433,7 +464,7 @@ mod batch_tests {
 
 #[cfg(test)]
 mod arg_tests {
-    use super::{publish_args, RUNTIMES};
+    use super::{inherited_build_file, publish_args, RUNTIMES};
     use std::path::Path;
 
     #[test]
@@ -446,6 +477,22 @@ mod arg_tests {
         assert!(args.iter().any(|a| a.starts_with("-p:OutDir=") && a.contains("1a2b3c4d")));
         assert!(args.contains(&"-nodeReuse:false".to_string()));
         assert!(args.contains(&"-p:UseSharedCompilation=false".to_string()));
+    }
+
+    #[test]
+    fn a_build_file_above_the_source_stops_the_build() {
+        let tmp = tempfile::tempdir().unwrap();
+        let build = tmp.path().join("tmp").join("1a2b3c4d");
+        std::fs::create_dir_all(build.join("s").join("OpenTaiko")).unwrap();
+        // The repository's own files are not inherited ones
+        std::fs::write(build.join("s").join("NuGet.Config"), "<configuration/>").unwrap();
+        // Unrelated to anything above the temporary folder of this test
+        let found = inherited_build_file(&build).filter(|p| p.starts_with(tmp.path()));
+        assert_eq!(found, None);
+
+        let planted = tmp.path().join("tmp").join("Directory.Build.Targets");
+        std::fs::write(&planted, "<Project/>").unwrap();
+        assert_eq!(inherited_build_file(&build), Some(planted));
     }
 
     #[test]

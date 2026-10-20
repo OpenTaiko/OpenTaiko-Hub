@@ -1,10 +1,10 @@
 {
     "identifier": "fs",
-    "description": "Reading, creating folders and deleting, with no path granted here: guard.rs adds the Hub's folders and its instances at startup, and the dialog plugin adds what the user picks. The page cannot write, copy or rename files: whatever it put in an instance or a build folder, the game or the compiler could run, so every file it saves goes through a command in writes.rs. Rust commands check paths against the same scope.",
+    "description": "Reading, creating folders and deleting, with no path granted here: guard.rs adds the Hub's folders, its settings folder and its instances at startup, and the files the user picks in its own dialog. fs:default is not used: it opens every app folder to every command here, deleting included, and the folder holding the Hub's own list of instances is one of them. The page cannot write, copy or rename files: whatever it put in an instance or a build folder, the game or the compiler could run, so every file it saves goes through a command in writes.rs. Rust commands check paths against the same scope.",
     "local": true,
     "windows": ["main"],
     "permissions": [
-      "fs:default",
+      "fs:deny-default",
       "fs:allow-exists",
       "fs:allow-read-dir",
       "fs:allow-read-file",

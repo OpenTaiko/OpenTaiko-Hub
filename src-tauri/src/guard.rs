@@ -4,7 +4,7 @@
 // instances are added to the scope the fs plugin checks, and every command that
 // writes, deletes or launches something checks its paths against that same scope. A path
 // the page cannot reach through the fs plugin therefore cannot be reached through a
-// command either. Files and folders picked in a dialog are added by the dialog plugin.
+// command either. Files the user picks are added by `pick_files`, which shows the dialog.
 //
 // Which instance folders are allowed is decided here, not by the instance list the page
 // keeps: the page writes that list, so trusting it let page script grant itself any
@@ -66,19 +66,33 @@ fn root_spellings() -> Vec<PathBuf> {
     out
 }
 
+/// The instance folders a list names, or `None` when it is missing or cannot be read.
+fn read_instances(registry: &Path) -> Option<Vec<PathBuf>> {
+    let text = std::fs::read_to_string(registry).ok()?;
+    let json = serde_json::from_str::<serde_json::Value>(&text).ok()?;
+    Some(
+        json.get("instances")
+            .and_then(|list| list.as_array())
+            .map(|list| {
+                list.iter()
+                    .filter_map(|inst| inst.get("path")?.as_str())
+                    .map(PathBuf::from)
+                    .filter(|p| p.is_absolute())
+                    .collect()
+            })
+            .unwrap_or_default(),
+    )
+}
+
 fn registered_instances(registry: &Path) -> Vec<PathBuf> {
-    let Ok(text) = std::fs::read_to_string(registry) else { return Vec::new() };
-    let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else { return Vec::new() };
-    json.get("instances")
-        .and_then(|list| list.as_array())
-        .map(|list| {
-            list.iter()
-                .filter_map(|inst| inst.get("path")?.as_str())
-                .map(PathBuf::from)
-                .filter(|p| p.is_absolute())
-                .collect()
-        })
-        .unwrap_or_default()
+    read_instances(registry).unwrap_or_default()
+}
+
+/// The page's instance list, or the copy writes.rs keeps of it when it cannot be read: the
+/// page falls back on that copy too.
+fn page_instances(config: &Path) -> Option<Vec<PathBuf>> {
+    read_instances(&config.join(INSTANCE_REGISTRY))
+        .or_else(|| read_instances(&config.join(format!("{INSTANCE_REGISTRY}.bak"))))
 }
 
 fn roots_file<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
@@ -93,22 +107,33 @@ fn write_roots(file: &Path, roots: &[PathBuf]) -> Result<(), String> {
     crate::writes::write_atomic(file, json.to_string().as_bytes())
 }
 
-/// The instance folders the Hub may use, of those `registered` names. The first time,
-/// before the Hub kept a list of its own, the page's list is taken as it is.
-fn load_roots(file: &Path, registered: &[PathBuf]) -> Vec<PathBuf> {
+/// The instance folders the Hub may use, of those `registered` (the page's list) names.
+///
+/// The first time, before the Hub kept a list of its own, the folders the page's list
+/// names are taken over, except one holding the home folder, the Hub's folder or its
+/// settings (`protected`): a list the page had rewritten could otherwise grant it the whole
+/// disk. A page list that cannot be read takes over nothing and is not recorded, so a
+/// later start can still take it over; recording it as empty cut off every instance.
+fn load_roots(file: &Path, registered: Option<&[PathBuf]>, protected: &[PathBuf]) -> Vec<PathBuf> {
     if !file.exists() {
-        if let Err(e) = write_roots(file, registered) {
+        let Some(registered) = registered else { return Vec::new() };
+        let roots: Vec<PathBuf> = registered.iter().filter(|dir| !holds_any(dir, protected)).cloned().collect();
+        if let Err(e) = write_roots(file, &roots) {
             log::warn!("Could not record the instance folders: {}", e);
         }
-        return registered.to_vec();
+        return roots;
     }
+    let Some(saved) = read_instances(file) else {
+        log::warn!("Could not read {}; no instance folder is allowed this session", file.display());
+        return Vec::new();
+    };
     // Detaching an instance only edits the page's list, so a folder it no longer names is
     // not allowed this session. Nothing is removed from the file: the page's list cannot
     // be relied on, for instance after a crash while it was being written.
-    registered_instances(file)
-        .into_iter()
-        .filter(|root| registered.iter().any(|r| same_path(r, root)))
-        .collect()
+    match registered {
+        Some(registered) => saved.into_iter().filter(|root| registered.iter().any(|r| same_path(r, root))).collect(),
+        None => saved,
+    }
 }
 
 /// Called once from `setup`, before the page can make a request.
@@ -122,14 +147,21 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
     if let Ok(config) = app.path().app_config_dir() {
         allow_dir(app, &config);
         if let Some(file) = roots_file(app) {
-            // On macOS the app local data folder is the config folder the page may use
+            // On macOS the app local data folder is the config folder the page may use. The
+            // folder itself is protected too: removing it, or moving it away, would take the
+            // file with it, and the forbidden list is only checked against the path named.
             let scope = app.fs_scope();
-            for path in [file.clone(), crate::writes::temp_path(&file)] {
-                if let Err(e) = scope.forbid_file(&path) {
-                    log::warn!("Could not protect {}: {}", path.display(), e);
+            let mut protect = vec![file.clone(), crate::writes::temp_path(&file)];
+            protect.extend(file.parent().map(Path::to_path_buf));
+            for path in protect {
+                let real = resolve_existing(&path);
+                for spelling in [path, real] {
+                    if let Err(e) = scope.forbid_file(&spelling) {
+                        log::warn!("Could not protect {}: {}", spelling.display(), e);
+                    }
                 }
             }
-            roots = load_roots(&file, &registered_instances(&config.join(INSTANCE_REGISTRY)));
+            roots = load_roots(&file, page_instances(&config).as_deref(), &protected_dirs(app));
         }
     }
     for root in &roots {
@@ -193,6 +225,15 @@ pub fn build_source_dir<R: Runtime>(app: &AppHandle<R>, raw: &str) -> Result<Pat
     Ok(src)
 }
 
+/// A temporary folder the Hub named: one in its own tmp folder, or a build folder in the
+/// system temp folder (see `allow_build_dir`).
+pub fn is_hub_tmp_dir(dir: &Path) -> bool {
+    let name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let Some(container) = dir.parent() else { return false };
+    (is_hub_tmp_name(name) && root_spellings().iter().any(|root| same_path(&root.join("tmp"), container)))
+        || (is_build_dir_name(name) && same_path(&std::env::temp_dir(), container))
+}
+
 /// Spelled the way the disk has it, compared component by component, and without regard
 /// to case on Windows.
 fn path_key(path: &Path) -> Vec<String> {
@@ -205,7 +246,7 @@ fn path_key(path: &Path) -> Vec<String> {
         .collect()
 }
 
-fn same_path(a: &Path, b: &Path) -> bool {
+pub(crate) fn same_path(a: &Path, b: &Path) -> bool {
     path_key(a) == path_key(b)
 }
 
@@ -214,16 +255,26 @@ fn holds(dir: &Path, other: &Path) -> bool {
     path_key(other).starts_with(&path_key(dir))
 }
 
-/// A folder picked as an instance is opened to the page all the way down, so it may not be
-/// one that holds the user's home folder, the Hub's own folder or its settings.
-fn is_acceptable_instance_dir<R: Runtime>(app: &AppHandle<R>, dir: &Path) -> bool {
-    let protected = [
+/// Folders an instance folder may not hold: the user's home folder, the Hub's own folder
+/// and its settings. An instance folder is opened to the page all the way down.
+fn protected_dirs<R: Runtime>(app: &AppHandle<R>) -> Vec<PathBuf> {
+    [
         dirs::home_dir(),
         crate::hub_root_dir(),
         app.path().app_config_dir().ok(),
         app.path().app_local_data_dir().ok(),
-    ];
-    dir.is_absolute() && dir.is_dir() && !protected.iter().flatten().any(|p| holds(dir, p))
+    ]
+    .into_iter()
+    .flatten()
+    .collect()
+}
+
+fn holds_any(dir: &Path, protected: &[PathBuf]) -> bool {
+    protected.iter().any(|p| holds(dir, p))
+}
+
+fn is_acceptable_instance_dir<R: Runtime>(app: &AppHandle<R>, dir: &Path) -> bool {
+    dir.is_absolute() && dir.is_dir() && !holds_any(dir, &protected_dirs(app))
 }
 
 /// Asks the user for an existing instance folder, in a dialog the Hub shows itself, and
@@ -247,6 +298,61 @@ pub async fn attach_instance_dir<R: Runtime>(
     }
     remember_root(&app, &dir)?;
     Ok(Some(dir.to_string_lossy().into_owned()))
+}
+
+/// The files the page asks the user for, by kind: chart jackets, chart archives and
+/// exported saves.
+fn pick_extensions(kind: &str) -> Option<&'static [&'static str]> {
+    match kind {
+        "image" => Some(&["png", "jpg", "jpeg", "webp"]),
+        "chart_archive" => Some(&["zip"]),
+        "save" => Some(&["optksave", "json"]),
+        _ => None,
+    }
+}
+
+fn has_extension(path: &Path, extensions: &[&str]) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| extensions.iter().any(|x| x.eq_ignore_ascii_case(e)))
+}
+
+/// Asks the user for files of one kind, in a dialog the Hub shows itself, and allows them.
+/// The page only says which kind: with the dialog plugin's own commands it could open a
+/// folder dialog on the home folder, and one click put that whole folder within its reach.
+#[tauri::command]
+pub async fn pick_files<R: Runtime>(
+    app: AppHandle<R>,
+    window: tauri::Window<R>,
+    kind: String,
+    label: String,
+    multiple: bool,
+) -> Result<Vec<String>, String> {
+    let extensions = pick_extensions(&kind).ok_or_else(|| format!("Unknown kind of file: {}", kind))?;
+    let dialog_app = app.clone();
+    let picked = crate::library::blocking(move || {
+        let dialog = dialog_app.dialog().file().add_filter(label, extensions).set_parent(&window);
+        Ok(if multiple {
+            dialog.blocking_pick_files().unwrap_or_default()
+        } else {
+            dialog.blocking_pick_file().into_iter().collect()
+        })
+    })
+    .await?;
+    let mut paths = Vec::with_capacity(picked.len());
+    for file in picked {
+        let path = file.into_path().map_err(|e| format!("Unusable file: {}", e))?;
+        // A name typed into the dialog is not held to its filter
+        if !has_extension(&path, extensions) || !path.is_file() {
+            return Err(format!("{} cannot be used here", path.display()));
+        }
+        let scope = app.fs_scope();
+        for spelling in [path.clone(), resolve_existing(&path)] {
+            scope.allow_file(&spelling).map_err(|e| format!("Could not allow {}: {}", spelling.display(), e))?;
+        }
+        paths.push(path.to_string_lossy().into_owned());
+    }
+    Ok(paths)
 }
 
 /// Canonicalizes the deepest part of `path` that exists and appends the rest, so a path
@@ -530,14 +636,76 @@ mod tests {
         let file = tmp.path().join("data").join(INSTANCE_ROOTS);
         let (a, b, c) = (tmp.path().join("A"), tmp.path().join("B"), tmp.path().join("C"));
 
-        // The first start takes the page's list as it is, and records it
-        assert_eq!(load_roots(&file, &[a.clone(), b.clone()]), vec![a.clone(), b.clone()]);
+        let home = tmp.path().join("home");
+        std::fs::create_dir_all(&home).unwrap();
+        let protected = [home.clone()];
+
+        // The first start takes over the page's list, except a folder holding a protected
+        // one, and records it
+        let page = [a.clone(), b.clone(), tmp.path().to_path_buf(), home.clone()];
+        assert_eq!(load_roots(&file, Some(&page), &protected), vec![a.clone(), b.clone()]);
         assert_eq!(registered_instances(&file), vec![a.clone(), b.clone()]);
 
         // Later, a folder only the page's list names is not allowed, and one the page's
         // list dropped (a detached instance) is not allowed this session but kept on file
-        assert_eq!(load_roots(&file, &[a.clone(), c.clone(), tmp.path().to_path_buf()]), vec![a.clone()]);
-        assert_eq!(registered_instances(&file), vec![a, b]);
+        let page = [a.clone(), c.clone(), tmp.path().to_path_buf()];
+        assert_eq!(load_roots(&file, Some(&page), &protected), vec![a.clone()]);
+        assert_eq!(registered_instances(&file), vec![a.clone(), b.clone()]);
+
+        // A page list that cannot be read hides nothing the Hub recorded
+        assert_eq!(load_roots(&file, None, &protected), vec![a, b]);
+    }
+
+    #[test]
+    fn an_unreadable_list_records_nothing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file = tmp.path().join("data").join(INSTANCE_ROOTS);
+        // No page list to take over: nothing is recorded, so a later start still can
+        assert!(load_roots(&file, None, &[]).is_empty());
+        assert!(!file.exists());
+
+        // A damaged record allows nothing and is left for the user to look at
+        std::fs::create_dir_all(file.parent().unwrap()).unwrap();
+        std::fs::write(&file, "{ not json").unwrap();
+        assert!(load_roots(&file, Some(&[tmp.path().join("A")]), &[]).is_empty());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "{ not json");
+    }
+
+    #[test]
+    fn the_page_list_falls_back_on_its_copy() {
+        let tmp = tempfile::tempdir().unwrap();
+        let game = tmp.path().join("Game");
+        let list = serde_json::json!({ "instances": [ { "path": game } ] }).to_string();
+        std::fs::write(tmp.path().join(format!("{INSTANCE_REGISTRY}.bak")), &list).unwrap();
+        assert!(page_instances(&tmp.path().join("absent")).is_none());
+
+        std::fs::write(tmp.path().join(INSTANCE_REGISTRY), "{ cut short").unwrap();
+        assert_eq!(page_instances(tmp.path()), Some(vec![game.clone()]));
+        std::fs::write(tmp.path().join(INSTANCE_REGISTRY), list.replace("Game", "Other")).unwrap();
+        assert_eq!(page_instances(tmp.path()), Some(vec![tmp.path().join("Other")]));
+    }
+
+    #[test]
+    fn only_folders_the_hub_named_hold_archives_to_extract() {
+        let temp = std::env::temp_dir();
+        assert!(is_hub_tmp_dir(&temp.join("otk-1a2b3c4d")));
+        assert!(!is_hub_tmp_dir(&temp.join("1a2b3c4d")));
+        assert!(!is_hub_tmp_dir(&temp.join("otk-1a2b3c4d").join("x")));
+        if let Some(root) = crate::hub_root_dir() {
+            assert!(is_hub_tmp_dir(&root.join("tmp").join("0f8fad5b-d9cb-469f-a165-70867728950e")));
+            assert!(is_hub_tmp_dir(&root.join("tmp").join("1a2b3c4d")));
+            assert!(!is_hub_tmp_dir(&root.join("tmp").join("mine")));
+            assert!(!is_hub_tmp_dir(&root.join("OpenTaiko")));
+        }
+    }
+
+    #[test]
+    fn a_picked_file_must_have_an_offered_extension() {
+        let images = pick_extensions("image").unwrap();
+        assert!(has_extension(Path::new("/a/jacket.PNG"), images));
+        assert!(!has_extension(Path::new("/a/OpenTaiko.exe"), images));
+        assert!(!has_extension(Path::new("/a/png"), images));
+        assert!(pick_extensions("folder").is_none());
     }
 
     #[test]

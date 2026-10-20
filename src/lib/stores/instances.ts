@@ -284,7 +284,7 @@ export const linkGlobalSongs = async (instance: Instance | null | undefined): Pr
 
         const globalSongs = await GetGlobalSongsPath();
         await mkdir(globalSongs, { recursive: true });
-        await ipc.ensureConfigTjapath(instance.path, globalSongs, includeLocal);
+        await ipc.ensureConfigTjapath(instance.path, includeLocal);
     } catch (error) {
         console.error('Failed to link the global Songs folder:', error);
         // The one cause the user can act on, and that otherwise only shows as a game
