@@ -1,5 +1,6 @@
 <script lang="ts">
     import { onMount } from 'svelte';
+    import { listen } from '@tauri-apps/api/event';
     import { Navigation } from '@skeletonlabs/skeleton-svelte';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -94,7 +95,21 @@
         }
     };
 
+    // Closing waits for files still being moved (an install), with the window left open
+    // meanwhile: said, so the close button does not seem to have done nothing
+    onMount(() => {
+        const pending = listen('hub-closing', () => {
+            toaster.info({ id: 'hub-closing', description: get(_)('jobs.closing'), duration: Infinity });
+        });
+        return () => { pending.then((unlisten) => unlisten()); };
+    });
+
     onMount(async () => {
+        // The page and its tabs rendered: what fails from here on goes to the log, not to
+        // the box app.html shows when the app cannot start. Not from the layout, which
+        // mounts before the translations load and the page renders: an error while the
+        // page first rendered then left a blank window with nothing shown.
+        window.__hubStarted?.();
         try {
             await loadInstances();
 

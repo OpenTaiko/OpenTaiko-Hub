@@ -358,6 +358,7 @@
     "error": {
       "open_folder": "无法打开文件夹：{error}",
       "scanning": "正在扫描本地文件夹，无法下载歌曲",
+      "audio_failed": "无法读取这首歌的音频：{error}",
       "scan_failed": "扫描曲库失败：{error}"
     },
     "success": {
@@ -628,7 +629,8 @@
     "installing_into": "正在安装到 {name}",
     "install_cancelled": "安装已取消",
     "dotnet_page": "获取 .NET 8",
-    "instance_busy": "此实例正在进行安装"
+    "instance_busy": "此实例正在进行安装",
+    "closing": "正在移动的文件完成后即关闭…"
   },
   "toast": {
     "copy": "复制详情",

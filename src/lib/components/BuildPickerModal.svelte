@@ -10,7 +10,7 @@
     interface Props {
         Show?: boolean;
         OnClose?: () => void;
-        OnPick?: (build: BuildOption) => void;
+        OnPick?: (build: BuildOption) => void | Promise<void>;
     }
 
     let { Show = false, OnClose = () => {}, OnPick = () => {} }: Props = $props();
@@ -42,13 +42,18 @@
         loading = false;
     };
 
-    const Confirm = () => {
-        if (selected === 'stable') {
-            OnPick({ kind: 'stable' });
-        } else {
-            OnPick(experimentalOptions[selected]);
+    // Closed once the pick has been acted on: closed at once, focus went back to the
+    // first-run Install button just before it disappeared, and was lost
+    let picking = $state(false);
+    const Confirm = async () => {
+        if (picking) return;
+        picking = true;
+        try {
+            await OnPick(selected === 'stable' ? { kind: 'stable' } : experimentalOptions[selected]);
+        } finally {
+            picking = false;
+            OnClose();
         }
-        OnClose();
     };
     // Fetch the options each time the dialog opens
     $effect(() => {
@@ -116,7 +121,7 @@
 
         <div class="flex gap-3 justify-end">
             <button type="button" class="button-gray button-main" onclick={OnClose}>{$_('common.cancel')}</button>
-            <button type="button" class="button-green button-main" disabled={loading || fetchFailed} onclick={Confirm}>
+            <button type="button" class="button-green button-main" disabled={loading || fetchFailed || picking} onclick={Confirm}>
                 <i class="fa-solid fa-download"></i> {$_('instances.picker.install')}
             </button>
         </div>

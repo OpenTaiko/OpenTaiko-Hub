@@ -358,6 +358,7 @@
     "error": {
       "open_folder": "폴더를 열 수 없습니다: {error}",
       "scanning": "로컬 폴더 스캔 중에는 곡을 다운로드할 수 없습니다",
+      "audio_failed": "이 곡의 오디오를 읽을 수 없습니다: {error}",
       "scan_failed": "곡 라이브러리 스캔에 실패했습니다: {error}"
     },
     "success": {
@@ -606,7 +607,7 @@
     }
   },
   "lang": {
-    "label": "Language",
+    "label": "언어",
     "en": "English",
     "ja": "日本語",
     "zh_Hans": "中文 (简体)",
@@ -628,7 +629,8 @@
     "installing_into": "{name}에 설치 중",
     "install_cancelled": "설치를 취소했습니다",
     "dotnet_page": ".NET 8 받기",
-    "instance_busy": "이 인스턴스에서 설치가 진행 중입니다"
+    "instance_busy": "이 인스턴스에서 설치가 진행 중입니다",
+    "closing": "옮기는 중인 파일이 제자리에 놓이면 닫힙니다…"
   },
   "toast": {
     "copy": "세부 정보 복사",

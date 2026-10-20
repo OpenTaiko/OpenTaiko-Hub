@@ -358,6 +358,7 @@
     "error": {
       "open_folder": "フォルダーを開けませんでした: {error}",
       "scanning": "ローカルフォルダーのスキャン中は曲をダウンロードできません",
+      "audio_failed": "この曲の音声を読み込めませんでした: {error}",
       "scan_failed": "曲ライブラリのスキャンに失敗しました：{error}"
     },
     "success": {
@@ -628,7 +629,8 @@
     "installing_into": "{name} にインストール中",
     "install_cancelled": "インストールを中止しました",
     "dotnet_page": ".NET 8 を入手",
-    "instance_busy": "このインスタンスでインストールが実行中です"
+    "instance_busy": "このインスタンスでインストールが実行中です",
+    "closing": "移動中のファイルの処理が終わり次第、閉じます…"
   },
   "toast": {
     "copy": "詳細をコピー",

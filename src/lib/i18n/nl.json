@@ -358,6 +358,7 @@
     "error": {
       "open_folder": "Kon de map niet openen: {error}",
       "scanning": "Kan geen nummers downloaden terwijl lokale mappen worden gescand",
+      "audio_failed": "Kon de audio van dit nummer niet lezen: {error}",
       "scan_failed": "Scannen van de muziekbibliotheek mislukt: {error}"
     },
     "success": {
@@ -628,7 +629,8 @@
     "installing_into": "Installeren in {name}",
     "install_cancelled": "Installatie geannuleerd",
     "dotnet_page": ".NET 8 downloaden",
-    "instance_busy": "Er loopt een installatie in deze instantie"
+    "instance_busy": "Er loopt een installatie in deze instantie",
+    "closing": "Wordt gesloten zodra de bestanden die worden verplaatst op hun plek staan…"
   },
   "toast": {
     "copy": "Details kopiëren",

@@ -36,10 +36,24 @@
     // details when the message is a friendlier rewording of them. The same message again
     // updates the toast already shown instead of stacking another: retrying while offline
     // used to pile up identical errors to close one by one.
+    // A toast's id ends up in its aria attributes, where the spaces of a message (it used
+    // to be the id) split it into several references: a short key of the message is used
+    const MessageKey = (msg: string): string => {
+        let hash = 0x811c9dc5;
+        for (let i = 0; i < msg.length; i++) hash = Math.imul(hash ^ msg.charCodeAt(i), 0x01000193);
+        return (hash >>> 0).toString(36);
+    };
+    let toastCount = 0;
+    const shownErrors = new Map<string, string>();
+    const shownWarnings = new Map<string, string>();
+
     const TriggerError = (msg: string, options: ErrorToastOptions = {}) => {
         console.error(options.details ? `${msg} (${options.details})` : msg);
+        const shown = shownErrors.get(msg);
+        const id = shown && toaster.isVisible(shown) ? shown : `error-${MessageKey(msg)}-${++toastCount}`;
+        shownErrors.set(msg, id);
         toaster.error({
-            id: `error:${msg}`,
+            id,
             description: msg,
             duration: Infinity,
             meta: { details: options.details ?? PlainText(msg), action: options.action }
@@ -70,10 +84,16 @@
         setTimeout(() => { if (copiedToast === toastId) copiedToast = null; }, 1500);
     };
 
-    // Notices of something refused or stopped, not failures: they go away by themselves
+    // Notices of something refused or stopped, not failures: they go away by themselves.
+    // The same notice again replaces the one shown, so it stays its full time: updated in
+    // place, it went away on the first one's timer.
     const TriggerWarning = (msg: string) => {
         console.warn(msg);
-        toaster.warning({ id: `warning:${msg}`, description: msg, duration: 6000 });
+        const shown = shownWarnings.get(msg);
+        if (shown && toaster.isVisible(shown)) toaster.remove(shown);
+        const id = `warning-${MessageKey(msg)}-${++toastCount}`;
+        shownWarnings.set(msg, id);
+        toaster.warning({ id, description: msg, duration: 6000 });
     };
 
     const TriggerSuccess = (msg: string) => {
@@ -132,9 +152,6 @@ ${event.error?.stack ?? ''}`).catch(() => {});
 
     onMount(async () => {
         captureFrontendProblems();
-        // The app is up: what fails from here on goes to the log, not to the box app.html
-        // shows when the app cannot start
-        window.__hubStarted?.();
         window.addEventListener('error', (event) => console.error('Uncaught error:', event.error ?? event.message));
         window.addEventListener('unhandledrejection', (event) => console.error('Unhandled rejection:', event.reason));
         sendHeartbeat();

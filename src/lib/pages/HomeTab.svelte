@@ -15,7 +15,7 @@
     const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
     import { GetOS, GetBuildTarget, GetRootPath, OpenFolder } from "$lib/utils/path";
-    import { startJob, isCancelled, InstanceInUse, type Job } from "$lib/stores/activity";
+    import { startJob, isCancelled, InstanceInUse, busyInstanceIds, type Job } from "$lib/stores/activity";
     import { download } from '$lib/utils/download';
     import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { openUrl } from '@tauri-apps/plugin-opener';
@@ -132,10 +132,12 @@
         }
     });
 
-    // An instance created through the build picker carries its chosen build; start it
+    // An instance created through the build picker carries its chosen build; start it.
+    // Not while something else writes into that instance (skins being downloaded): the
+    // install was then refused, and the chosen build forgotten.
     let pendingStartedFor: string | null = null;      // bookkeeping only, never rendered
     $effect(() => {
-        if (current?.pendingInstall && !downloadBusy && pendingStartedFor !== current.id) {
+        if (current?.pendingInstall && !downloadBusy && !$busyInstanceIds.has(current.id) && pendingStartedFor !== current.id) {
             pendingStartedFor = current.id;
             StartPendingInstall(current);
         }
@@ -392,8 +394,15 @@
         await DownloadStable();
     };
 
+    // Started offline, the Hub does not know the latest release and offers Redownload for
+    // whatever the instance has; it then installed the latest release, a newer one perhaps,
+    // with no skin warning. That release is looked up first, and when it is a newer one
+    // nothing is installed: the overview now offers Update, with its warning.
     const RedownloadStable = async () => {
-        const go = await confirmDialog(get(_)('home.warn.redownload_confirm', { values: { version: latestVersion ?? currentVersion ?? '' } }), { title: get(_)('home.button.redownload') });
+        if (!latestRelease) await TryFetchingLatestVersion();
+        // The lookup has already said why it failed
+        if (!latestRelease || latestVersion !== currentVersion) return;
+        const go = await confirmDialog(get(_)('home.warn.redownload_confirm', { values: { version: latestVersion ?? '' } }), { title: get(_)('home.button.redownload') });
         if (go) await DownloadStable();
     };
 

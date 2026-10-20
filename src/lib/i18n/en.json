@@ -358,6 +358,7 @@
     "error": {
       "open_folder": "Could not open the folder: {error}",
       "scanning": "Cannot download songs while local folders are being scanned",
+      "audio_failed": "Could not read this song's audio: {error}",
       "scan_failed": "Failed to scan the songs library: {error}"
     },
     "success": {
@@ -628,7 +629,8 @@
     "installing_into": "Installing into {name}",
     "install_cancelled": "Install cancelled",
     "dotnet_page": "Get .NET 8",
-    "instance_busy": "An install is running in this instance"
+    "instance_busy": "An install is running in this instance",
+    "closing": "Closing once the files being moved are in place…"
   },
   "toast": {
     "copy": "Copy details",

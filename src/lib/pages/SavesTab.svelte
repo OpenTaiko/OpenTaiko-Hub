@@ -8,7 +8,7 @@
     // as a new save. Imports are only accepted when the archive is the same version as,
     // or newer than, the instance's current save database.
     import { getContext, untrack } from 'svelte';
-    import { DescribeError, ErrorCause, ErrorText } from '$lib/utils/errors';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { readFile, exists } from '@tauri-apps/plugin-fs';
     import { confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
     import { ipc } from '$lib/ipc';
@@ -119,6 +119,8 @@
         if (busy || !instance) return;
         const inst = instance;
         let db: Database | null = null;
+        // Held before anything is awaited, so a double click cannot start a second one
+        busy = true;
         try {
             const p = await dbPath(inst);
             if (!(await exists(p))) {
@@ -129,7 +131,6 @@
             db = new SQL.Database(await readFile(p));
             const portable = exportSave(db, entry.saveId);
             const suggested = `OpenTaiko-${entry.name}.optksave`.replace(/[\\/:*?"<>|]/g, '_');
-            busy = true;
             // The backend asks where to save and writes the file there
             const dest = await ipc.exportSave(suggested, get(_)('files.optk_save'), JSON.stringify(portable));
             if (!dest) return;
@@ -150,10 +151,12 @@
     const WithDb = async <T,>(action: (db: Database) => T | Promise<T>): Promise<T | null> => {
         if (busy || !instance) return null;
         const inst = instance;
-        if (await GameRunning(inst)) return null;
         let db: Database | null = null;
+        // Held before anything is awaited: set after the game check, a double click ran
+        // two writes, the second undoing the first while both said they succeeded
         busy = true;
         try {
+            if (await GameRunning(inst)) return null;
             const p = await dbPath(inst);
             if (!(await exists(p))) {
                 TriggerError(get(_)('saves.error.no_db'));
@@ -204,9 +207,11 @@
     const Import = async (entry: SaveSummary) => {
         if (busy || !instance) return;
         const inst = instance;
-        if (await GameRunning(inst)) return;
         let db: Database | null = null;
+        // Held before anything is awaited, so a double click cannot start a second import
+        busy = true;
         try {
+            if (await GameRunning(inst)) return;
             const [src] = await ipc.pickFiles('save', get(_)('files.optk_save'));
             if (!src) return;
 
@@ -235,7 +240,6 @@
             );
             if (!confirmed) return;
 
-            busy = true;
             const p = await dbPath(inst);
             if (!(await exists(p))) {
                 TriggerError(get(_)('saves.error.no_db'));
@@ -280,15 +284,16 @@
         // Read before anything is awaited: the event no longer has a target afterwards
         const select = event.currentTarget as HTMLSelectElement;
         const targetSlot = Number(select.value);
-        if (await GameRunning(inst)) {
-            // Nothing changed, so the selector goes back to where the save really is
-            select.value = entry.slot === null ? 'reserve' : String(entry.slot);
-            return;
-        }
         const fromSlot = entry.slot;
         let db: Database | null = null;
+        // Held before anything is awaited, so a second change cannot start a second write
         busy = true;
         try {
+            if (await GameRunning(inst)) {
+                // Nothing changed, so the selector goes back to where the save really is
+                select.value = entry.slot === null ? 'reserve' : String(entry.slot);
+                return;
+            }
             const p = await dbPath(inst);
             if (!(await exists(p))) {
                 TriggerError(get(_)('saves.error.no_db'));
@@ -360,9 +365,10 @@
             </button>
         </div>
 
-        <!-- The cause in plain words when it is a known one; the raw error is in the log -->
-        {#if loadError && ErrorCause(loadError)}
-            <p class="text-sm opacity-70">{DescribeError(loadError)}</p>
+        <!-- The cause in plain words when it is a known one, else the error as it came:
+             a timeout or a damaged file otherwise left nothing to go on -->
+        {#if loadError}
+            <p class="text-sm opacity-70 select-text">{DescribeError(loadError)}</p>
         {/if}
 
         {#if !loading && saves.length > 0}

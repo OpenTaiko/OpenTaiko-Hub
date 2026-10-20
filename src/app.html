@@ -31,7 +31,7 @@
 				};
 				window.addEventListener('error', onError);
 				window.addEventListener('unhandledrejection', onRejection);
-				// Called by the layout once the app is up: an error after that is not a
+				// Called by the page once the app is up: an error after that is not a
 				// failure to start, and used to print this box under the running app
 				window.__hubStarted = function () {
 					window.removeEventListener('error', onError);

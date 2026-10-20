@@ -190,6 +190,9 @@
     let songAudio = $state<string | null>(null);
     // The audio file found for the selected chart, read only once it is played
     let songAudioName = $state<string | null>(null);
+    // The read under way, shared by every click while it runs: a quick second click read
+    // the whole file again and left the first copy unreleased
+    let songAudioLoad: Promise<string | null> | null = null;
     let mediaFor = $state<string | null>(null);
 
     const ReleaseSongMedia = () => {
@@ -198,6 +201,7 @@
         songJacket = null;
         songAudio = null;
         songAudioName = null;
+        songAudioLoad = null;
     };
 
     const blobFor = async (base: string, relPath: string, name: string): Promise<string | null> => {
@@ -229,8 +233,13 @@
         }
     };
 
-    const LoadSongAudio = async (): Promise<string | null> => {
-        if (songAudio) return songAudio;
+    const LoadSongAudio = (): Promise<string | null> => {
+        if (songAudio) return Promise.resolve(songAudio);
+        songAudioLoad ??= ReadSongAudio();
+        return songAudioLoad;
+    };
+
+    const ReadSongAudio = async (): Promise<string | null> => {
         const forPath = mediaFor;
         const name = songAudioName;
         if (!forPath || !name) return null;
@@ -244,7 +253,11 @@
             songAudio = audio;
             return audio;
         } catch (error) {
-            console.error('Could not read the chart audio:', error);
+            // Play used to do nothing at all
+            if (mediaFor === forPath) {
+                songAudioLoad = null;
+                TriggerError(get(_)('songs.error.audio_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+            }
             return null;
         }
     };

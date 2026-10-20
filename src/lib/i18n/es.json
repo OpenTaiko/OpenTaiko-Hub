@@ -358,6 +358,7 @@
     "error": {
       "open_folder": "No se pudo abrir la carpeta: {error}",
       "scanning": "No se pueden descargar canciones mientras se escanean las carpetas locales",
+      "audio_failed": "No se pudo leer el audio de esta canción: {error}",
       "scan_failed": "No se pudo escanear la biblioteca de canciones: {error}"
     },
     "success": {
@@ -628,7 +629,8 @@
     "installing_into": "Instalando en {name}",
     "install_cancelled": "Instalación cancelada",
     "dotnet_page": "Obtener .NET 8",
-    "instance_busy": "Hay una instalación en curso en esta instancia"
+    "instance_busy": "Hay una instalación en curso en esta instancia",
+    "closing": "Se cerrará en cuanto los archivos que se están moviendo estén en su sitio…"
   },
   "toast": {
     "copy": "Copiar detalles",

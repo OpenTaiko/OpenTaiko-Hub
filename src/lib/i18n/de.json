@@ -358,6 +358,7 @@
     "error": {
       "open_folder": "Ordner konnte nicht geöffnet werden: {error}",
       "scanning": "Songs können nicht heruntergeladen werden, während lokale Ordner gescannt werden",
+      "audio_failed": "Das Audio dieses Songs konnte nicht gelesen werden: {error}",
       "scan_failed": "Die Song-Bibliothek konnte nicht gescannt werden: {error}"
     },
     "success": {
@@ -628,7 +629,8 @@
     "installing_into": "Installation in {name}",
     "install_cancelled": "Installation abgebrochen",
     "dotnet_page": ".NET 8 herunterladen",
-    "instance_busy": "In dieser Instanz läuft eine Installation"
+    "instance_busy": "In dieser Instanz läuft eine Installation",
+    "closing": "Wird geschlossen, sobald die verschobenen Dateien an ihrem Platz sind…"
   },
   "toast": {
     "copy": "Details kopieren",

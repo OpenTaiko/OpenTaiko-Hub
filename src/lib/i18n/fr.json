@@ -358,6 +358,7 @@
     "error": {
       "open_folder": "Impossible d'ouvrir le dossier : {error}",
       "scanning": "Impossible de télécharger des chansons pendant l'analyse des dossiers locaux",
+      "audio_failed": "Impossible de lire l'audio de ce morceau : {error}",
       "scan_failed": "Échec de l'analyse de la bibliothèque de chansons : {error}"
     },
     "success": {
@@ -628,7 +629,8 @@
     "installing_into": "Installation dans {name}",
     "install_cancelled": "Installation annulée",
     "dotnet_page": "Obtenir .NET 8",
-    "instance_busy": "Une installation est en cours dans cette instance"
+    "instance_busy": "Une installation est en cours dans cette instance",
+    "closing": "Fermeture dès que les fichiers en cours de déplacement sont en place…"
   },
   "toast": {
     "copy": "Copier les détails",

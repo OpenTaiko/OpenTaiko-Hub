@@ -15,7 +15,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
 use serde::Deserialize;
-use tauri::{AppHandle, Manager, Runtime, Window};
+use tauri::{AppHandle, Emitter, Manager, Runtime, Window};
 use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 
 /// Error text of a cancelled operation. The page matches it exactly.
@@ -23,6 +23,9 @@ pub const CANCELLED: &str = "Cancelled";
 
 /// How long "Close anyway" waits for work that must not be cut off (see `InFlight`).
 const CLOSE_WAIT: Duration = Duration::from_secs(60);
+
+/// Sent to the page when the window waits for that work before closing.
+const CLOSING_EVENT: &str = "hub-closing";
 
 /// The close question, in the page's language. Sent with every `begin_job`.
 #[derive(Deserialize, Clone)]
@@ -230,6 +233,11 @@ fn close_when_settled<R: Runtime>(window: Window<R>) {
     std::thread::spawn(move || {
         let jobs = window.state::<Jobs>();
         jobs.cancel_all();
+        // The window stays a moment longer: the page says why, rather than seeming to
+        // ignore the close
+        if jobs.in_flight.load(Ordering::SeqCst) > 0 {
+            let _ = window.emit(CLOSING_EVENT, ());
+        }
         let until = Instant::now() + CLOSE_WAIT;
         while jobs.in_flight.load(Ordering::SeqCst) > 0 && Instant::now() < until {
             std::thread::sleep(Duration::from_millis(100));
