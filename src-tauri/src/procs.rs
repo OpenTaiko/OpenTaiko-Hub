@@ -45,6 +45,19 @@ fn augmented_tool_path(base_path: &str, home: Option<&str>) -> String {
 /// A change to a child process's environment: `None` removes the variable.
 pub(crate) type EnvChange = (String, Option<String>);
 
+/// The Hub's environment, without variables that are not valid UTF-8: `std::env::vars`
+/// panics on one, which a session with an old Latin-1 locale path can carry, and took
+/// the Hub down on launching the game. Those variables still reach the child unchanged;
+/// only what is changed here is read.
+#[cfg_attr(not(unix), allow(dead_code))]
+pub(crate) fn utf8_env() -> HashMap<String, String> {
+    utf8_only(std::env::vars_os())
+}
+
+fn utf8_only(vars: impl Iterator<Item = (std::ffi::OsString, std::ffi::OsString)>) -> HashMap<String, String> {
+    vars.filter_map(|(key, value)| Some((key.into_string().ok()?, value.into_string().ok()?))).collect()
+}
+
 /// Undoes what an AppImage sets up for the Hub itself. The AppImage runtime and its
 /// GTK hook point library, schema and data paths into the mounted image (and force
 /// GDK_BACKEND=x11 for the Hub's window); a program the Hub starts would load those
@@ -126,12 +139,16 @@ fn kill_tree(child: &mut std::process::Child) {
     }
     #[cfg(unix)]
     {
-        // The child leads its own process group (see run_dotnet)
-        let _ = Command::new("kill")
-            .args(["-KILL", &format!("-{}", child.id())])
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+        // The child leads its own process group (see run_dotnet). Signalled directly: the
+        // `kill` program reads "-<pid>" as a process group or as a signal depending on
+        // which one is installed, and with the second only dotnet stopped while the
+        // compilers it started went on writing into the build folder.
+        if let Ok(group) = libc::pid_t::try_from(child.id()) {
+            // SAFETY: a system call taking two integers; nothing is borrowed
+            unsafe {
+                libc::killpg(group, libc::SIGKILL);
+            }
+        }
     }
     let _ = child.kill();
     let _ = child.wait();
@@ -290,7 +307,7 @@ async fn run_dotnet(
             // A group of its own, so cancelling stops the compilers it starts too
             use std::os::unix::process::CommandExt;
             cmd.process_group(0);
-            let env: HashMap<String, String> = std::env::vars().collect();
+            let env = utf8_env();
             let cleanup = appimage_cleanup(&env);
             // PATH as the AppImage cleanup leaves it, before adding the dotnet locations
             let base = match cleanup.iter().find(|(key, _)| key == "PATH") {
@@ -370,6 +387,28 @@ async fn run_dotnet(
 #[cfg(test)]
 mod env_tests {
     use super::*;
+
+    #[test]
+    fn a_variable_that_is_not_utf8_is_left_out_instead_of_panicking() {
+        use std::ffi::OsString;
+        #[cfg(unix)]
+        let invalid = {
+            use std::os::unix::ffi::OsStringExt;
+            OsString::from_vec(vec![b'/', 0xE9, b't', b'e'])
+        };
+        #[cfg(windows)]
+        let invalid = {
+            use std::os::windows::ffi::OsStringExt;
+            OsString::from_wide(&[0x2F, 0xD800, 0x74])
+        };
+        let vars = vec![
+            (OsString::from("PATH"), OsString::from("/usr/bin")),
+            (OsString::from("OLD_LOCALE_DIR"), invalid),
+        ];
+        let env = utf8_only(vars.into_iter());
+        assert_eq!(env.len(), 1);
+        assert_eq!(env.get("PATH").map(String::as_str), Some("/usr/bin"));
+    }
 
     fn env(pairs: &[(&str, &str)]) -> HashMap<String, String> {
         pairs.iter().map(|(k, v)| (k.to_string(), v.to_string())).collect()

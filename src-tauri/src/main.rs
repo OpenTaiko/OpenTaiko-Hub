@@ -89,7 +89,7 @@ fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String
     let mut command = Command::new(&full_path);
     command.current_dir(dir).stderr(Stdio::piped());
     #[cfg(target_os = "linux")]
-    procs::apply_env(&mut command, procs::game_env(&std::env::vars().collect(), &dir.to_string_lossy()));
+    procs::apply_env(&mut command, procs::game_env(&procs::utf8_env(), &dir.to_string_lossy()));
     let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to execute the app: {}", e))?;

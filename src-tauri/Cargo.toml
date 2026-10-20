@@ -40,9 +40,9 @@ dirs = "6"
 # writes.rs: the instance folder of a save write arrives as a percent-encoded header
 percent-encoding = "2"
 
-# Linux-only: raising RLIMIT_NOFILE needs libc. Keep this target-scoped so Windows and
-# macOS builds neither fetch nor compile it.
-[target.'cfg(target_os = "linux")'.dependencies]
+# Linux and macOS: stopping a build's whole process group, and on Linux raising
+# RLIMIT_NOFILE. Kept target-scoped so Windows builds neither fetch nor compile it.
+[target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [dev-dependencies]

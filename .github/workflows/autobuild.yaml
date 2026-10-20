@@ -26,6 +26,8 @@ jobs:
         runs-on: ${{ matrix.platform }}
         steps:
           - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+            with:
+              persist-credentials: false
 
           - name: install dependencies (ubuntu only)
             if: matrix.platform == 'ubuntu-22.04'
@@ -52,8 +54,11 @@ jobs:
             with:
               workspaces: './src-tauri -> target'
 
+          # Without install scripts: none of the packages needs one to work (es5-ext only
+          # prints a message, esbuild under svelte-i18n only checks its binary), and they
+          # are code from every dependency run with the job's token at hand
           - name: install frontend dependencies
-            run: npm ci
+            run: npm ci --ignore-scripts
 
           - name: type check
             run: npm run check
@@ -80,13 +85,15 @@ jobs:
             working-directory: src-tauri
             run: cargo test
 
-    # A push publishes only a version that has no release yet. The release step tags the
-    # version, and every later push to main used to replace the files of a release users
-    # had already downloaded. Bumping the version publishes; running the workflow by hand
-    # publishes the current version again.
+    # A push publishes only a version that has no complete release yet. The release step
+    # tags the version, and every later push to main used to replace the files of a
+    # release users had already downloaded. Bumping the version publishes; running the
+    # workflow by hand on main publishes the current version again.
     version:
         needs: check
-        if: github.event_name != 'pull_request'
+        # Run by hand on another branch, it replaced the live release's files with that
+        # branch's build, under a tag still pointing at main
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         permissions:
           contents: read
         runs-on: ubuntu-22.04
@@ -94,19 +101,44 @@ jobs:
           publish: ${{ steps.gate.outputs.publish }}
         steps:
           - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+            with:
+              persist-credentials: false
 
+          # A release counts once it holds the Windows installer and both Linux packages: a
+          # first publish whose Linux leg failed used to count as released, and its release
+          # never got them. A lookup that fails for any other reason than a missing release
+          # (the API unreachable, a rate limit) stops here: counted as unreleased, it
+          # published over a release users had already downloaded.
           - id: gate
+            env:
+              GH_TOKEN: ${{ github.token }}
             run: |
               version=$(jq -r .version src-tauri/tauri.conf.json)
               if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
                 echo "Publishing v$version on request"
                 echo "publish=true" >> "$GITHUB_OUTPUT"
-              elif git ls-remote --exit-code --tags origin "refs/tags/v$version" > /dev/null; then
-                echo "::notice::v$version is already released. Bump the version in src-tauri/tauri.conf.json and package.json to publish."
-                echo "publish=false" >> "$GITHUB_OUTPUT"
-              else
-                echo "Publishing v$version"
+                exit 0
+              fi
+              if ! assets=$(gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2> lookup-error.txt); then
+                if grep -qi "release not found" lookup-error.txt; then
+                  echo "Publishing v$version"
+                  echo "publish=true" >> "$GITHUB_OUTPUT"
+                  exit 0
+                fi
+                cat lookup-error.txt
+                echo "::error::Could not tell whether v$version is released"
+                exit 1
+              fi
+              missing=""
+              for suffix in -setup.exe .deb .AppImage; do
+                printf '%s\n' "$assets" | grep -q -- "${suffix}\$" || missing="$missing *$suffix"
+              done
+              if [ -n "$missing" ]; then
+                echo "::warning::v$version is released without$missing; publishing it again"
                 echo "publish=true" >> "$GITHUB_OUTPUT"
+              else
+                echo "::notice::v$version is already released. Bump the version in src-tauri/tauri.conf.json, src-tauri/Cargo.toml and package.json to publish."
+                echo "publish=false" >> "$GITHUB_OUTPUT"
               fi
 
     publish:
@@ -129,7 +161,11 @@ jobs:
 
         runs-on: ${{ matrix.platform }}
         steps:
+          # The release step gets its token from GITHUB_TOKEN below; none is left in
+          # .git/config for the dependency installs to read
           - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+            with:
+              persist-credentials: false
 
           - name: install dependencies (ubuntu only)
             if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
@@ -165,7 +201,8 @@ jobs:
             # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
             # `ci` installs exactly the locked versions. The Tauri CLI decides the deb's
             # dependency list, so an unpinned bump silently changes what the package requires.
-            run: npm ci
+            # No install scripts, as in the checks: this job can write releases.
+            run: npm ci --ignore-scripts
 
           - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
             env:
