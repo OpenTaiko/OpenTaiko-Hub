@@ -4,9 +4,9 @@
 use md5::{Digest, Md5};
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::time::{Instant, UNIX_EPOCH};
+use std::time::{Duration, Instant, UNIX_EPOCH};
 use tauri::ipc::Channel;
 use tauri::Manager;
 
@@ -212,27 +212,76 @@ struct CachedGenre {
 /// What the last scan of a library read from each song and genre folder, kept between
 /// starts. A scan reads and hashes only the folders whose files changed since: every
 /// start used to hash every chart and genre image of the library again.
+///
+/// Kept by the Hub version that wrote it, so a reading fixed in a new version reaches
+/// songs whose files did not change: CACHE_VERSION alone had to be remembered by hand.
+/// Sorted maps, so the same content is written the same way and an unchanged cache is
+/// not written again.
 #[derive(Serialize, Deserialize)]
 pub struct ScanCache {
     version: u32,
-    songs: HashMap<String, CachedSong>,
-    genres: HashMap<String, CachedGenre>,
+    #[serde(default)]
+    hub: String,
+    /// The library this cache is of, for removing the caches of libraries that are gone.
+    #[serde(default)]
+    root: Option<PathBuf>,
+    songs: BTreeMap<String, CachedSong>,
+    genres: BTreeMap<String, CachedGenre>,
 }
 
 impl Default for ScanCache {
     fn default() -> Self {
-        Self { version: CACHE_VERSION, songs: HashMap::new(), genres: HashMap::new() }
+        Self {
+            version: CACHE_VERSION,
+            hub: env!("CARGO_PKG_VERSION").to_string(),
+            root: None,
+            songs: BTreeMap::new(),
+            genres: BTreeMap::new(),
+        }
     }
 }
 
 impl ScanCache {
+    fn is_current(&self) -> bool {
+        self.version == CACHE_VERSION && self.hub == env!("CARGO_PKG_VERSION")
+    }
 
-    fn load(path: &Path) -> Self {
-        std::fs::read(path)
+    fn is_empty(&self) -> bool {
+        self.songs.is_empty() && self.genres.is_empty()
+    }
+
+    /// The cache on disk, and its bytes as they are, to tell whether it changed.
+    fn load(path: &Path) -> (Self, Vec<u8>) {
+        let bytes = std::fs::read(path).unwrap_or_default();
+        let cache = serde_json::from_slice::<ScanCache>(&bytes)
             .ok()
-            .and_then(|bytes| serde_json::from_slice::<ScanCache>(&bytes).ok())
-            .filter(|cache| cache.version == CACHE_VERSION)
-            .unwrap_or_default()
+            .filter(ScanCache::is_current)
+            .unwrap_or_default();
+        (cache, bytes)
+    }
+}
+
+/// Removes the scan caches of libraries that no longer exist (an old location after the
+/// library moved, a deleted instance) or that an older Hub wrote, and temporary files a
+/// crash left. Nothing used to remove any of them.
+pub fn prune_cache(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let stale = if name.ends_with(".tmp") {
+            crate::download::older_than(&path, Duration::from_secs(24 * 60 * 60))
+        } else if name.ends_with(".json") {
+            let (cache, _) = ScanCache::load(&path);
+            cache.root.as_deref().map_or(true, |root| !root.is_dir())
+        } else {
+            false
+        };
+        if stale {
+            if let Err(e) = std::fs::remove_file(&path) {
+                log::warn!("Could not remove {}: {}", path.display(), e);
+            }
+        }
     }
 }
 
@@ -589,6 +638,44 @@ mod tests {
         write(&tmp.path().join("02/B/b.tja"), "TITLE:B\n");
         assert_eq!(count_songs_in(tmp.path()), 2);
     }
+
+    #[test]
+    fn the_caches_of_libraries_that_are_gone_are_removed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = tmp.path().join("scan");
+        std::fs::create_dir_all(&dir).unwrap();
+        let library = tmp.path().join("Songs");
+        std::fs::create_dir_all(&library).unwrap();
+        let write = |name: &str, cache: &ScanCache| std::fs::write(dir.join(name), serde_json::to_vec(cache).unwrap()).unwrap();
+
+        write("kept.json", &ScanCache { root: Some(library.clone()), ..ScanCache::default() });
+        write("moved.json", &ScanCache { root: Some(tmp.path().join("Old Songs")), ..ScanCache::default() });
+        // Written by an older Hub, which recorded no library
+        write("old.json", &ScanCache { hub: "0.2.10".into(), root: Some(library.clone()), ..ScanCache::default() });
+        std::fs::write(dir.join("kept.json.1-1.tmp"), "half").unwrap();
+
+        prune_cache(&dir);
+        let mut left: Vec<String> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
+        left.sort();
+        // A temporary file only goes once it is a day old
+        assert_eq!(left, ["kept.json", "kept.json.1-1.tmp"]);
+    }
+
+    #[test]
+    fn a_cache_is_tied_to_the_hub_that_wrote_it() {
+        assert!(ScanCache::default().is_current());
+        assert!(!ScanCache { hub: "0.2.10".into(), ..ScanCache::default() }.is_current());
+        // The same content is written the same way, so an unchanged cache is not rewritten
+        let filled = |keys: &[&str]| {
+            let mut cache = ScanCache::default();
+            for key in keys {
+                let genre = ScannedGenre { rel_path: key.to_string(), title: None, box_def_sha1: None, preimage_sha1: None };
+                cache.genres.insert(key.to_string(), CachedGenre { stamps: Vec::new(), genre });
+            }
+            serde_json::to_vec(&cache).unwrap()
+        };
+        assert_eq!(filled(&["x", "y", "z"]), filled(&["z", "x", "y"]));
+    }
 }
 
 /// Where the scan cache of the library at `base` is kept.
@@ -599,8 +686,9 @@ fn cache_file(app: &tauri::AppHandle, base: &Path) -> Option<PathBuf> {
 }
 
 /// Scans the library at `base_dir`. Progress events carry the songs only when
-/// `stream_songs` is set, for a page that shows them as they are found; the result
-/// always carries them all.
+/// `stream_songs` is set, for a page that shows them as they are found, and the library
+/// has no cache yet: from the cache the scan ends in a moment, and every song was sent
+/// twice for rows nobody saw. The result always carries them all.
 #[tauri::command]
 pub async fn scan_songs(
     app: tauri::AppHandle,
@@ -620,15 +708,18 @@ pub async fn scan_songs(
             });
         }
 
-        let previous = cache_path.as_deref().map(ScanCache::load).unwrap_or_default();
-        let (songs, genres, cache) = collect_tree(&base, &previous, stream_songs.unwrap_or(true), &mut |event| {
+        let (previous, previous_bytes) = cache_path.as_deref().map(ScanCache::load).unwrap_or_default();
+        let stream = stream_songs.unwrap_or(true) && previous.is_empty();
+        let (songs, genres, mut cache) = collect_tree(&base, &previous, stream, &mut |event| {
             let _ = on_event.send(event);
         });
-        // Best effort: without it the next scan reads everything again, nothing worse
+        cache.root = Some(base.clone());
+        // Best effort: without it the next scan reads everything again, nothing worse.
+        // Written only when something changed: it was rewritten after every scan.
         if let Some(path) = cache_path {
-            let saved = serde_json::to_vec(&cache)
-                .map_err(|e| e.to_string())
-                .and_then(|bytes| crate::writes::write_atomic(&path, &bytes));
+            let saved = serde_json::to_vec(&cache).map_err(|e| e.to_string()).and_then(|bytes| {
+                if bytes == previous_bytes { Ok(()) } else { crate::writes::write_atomic(&path, &bytes) }
+            });
             if let Err(e) = saved {
                 log::warn!("Could not keep the scan cache: {}", e);
             }

@@ -26,8 +26,8 @@ export interface SoundtrackIndex {
     /** The commit read. A file it lists is downloaded from that same commit: from the
      *  branch, a push made since the index was read gave files that matched no SHA. */
     commit: string;
-    /** repository path → git blob SHA */
-    shas: Map<string, string>;
+    /** repository path → git blob SHA and size */
+    files: Map<string, { sha: string; size: number | null }>;
 }
 
 /** Every file of the soundtrack repository at the head of its branch. */
@@ -35,15 +35,18 @@ export const FetchSoundtrackIndex = async (): Promise<SoundtrackIndex> => {
     const branch = await fetchCachedJson<{ commit?: { sha?: string } }>(BRANCH_URL);
     const commit = branch.commit?.sha;
     if (!commit || !/^[0-9a-f]{40}$/i.test(commit)) throw new Error(`No commit in ${BRANCH_URL}`);
-    const data = await fetchCachedJson<{ tree?: { type: string; path: string; sha: string }[] }>(
+    const data = await fetchCachedJson<{ tree?: { type: string; path: string; sha: string; size?: number }[] }>(
         `${apiUrl(SOUNDTRACK_REPO)}/git/trees/${commit}?recursive=1`
     );
-    const shas = new Map(
+    const files = new Map(
         (data.tree ?? [])
             .filter((entry) => entry.type === 'blob')
-            .map((entry): [string, string] => [entry.path, entry.sha])
+            .map((entry): [string, { sha: string; size: number | null }] => [
+                entry.path,
+                { sha: entry.sha, size: typeof entry.size === 'number' ? entry.size : null }
+            ])
     );
-    return { commit, shas };
+    return { commit, files };
 };
 
 /** URL of a repository path, which the catalog writes with backslashes, on the branch or
@@ -51,11 +54,12 @@ export const FetchSoundtrackIndex = async (): Promise<SoundtrackIndex> => {
 export const SoundtrackFileUrl = (repoPath: string, commit: string | null = null): string =>
     `${commit ? rawUrl({ ...SOUNDTRACK_REPO, branch: commit }) : REPO_RAW}/${repoPath.replace(/\\/g, '/')}`;
 
-/** The git blob SHA of a repository path, and the URL to download that very file from. A
- *  path the index does not list (a song newer than it) comes from the branch, unchecked. */
-export const IndexedFile = (repoPath: string, index: SoundtrackIndex | null): { url: string; gitSha: string | null } => {
-    const gitSha = index?.shas.get(repoPath) ?? null;
-    return { url: SoundtrackFileUrl(repoPath, gitSha ? index!.commit : null), gitSha };
+/** The git blob SHA and size of a repository path, and the URL to download that very file
+ *  from. A path the index does not list (a song newer than it) comes from the branch,
+ *  unchecked. */
+export const IndexedFile = (repoPath: string, index: SoundtrackIndex | null): { url: string; gitSha: string | null; size: number | null } => {
+    const file = index?.files.get(repoPath);
+    return { url: SoundtrackFileUrl(repoPath, file ? index!.commit : null), gitSha: file?.sha ?? null, size: file?.size ?? null };
 };
 
 /**

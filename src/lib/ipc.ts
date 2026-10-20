@@ -44,6 +44,8 @@ export interface InstallEntry {
     relPath: string;
     /** Upstream git blob SHA: an identical local file is kept instead of downloaded. */
     gitSha?: string | null;
+    /** Upstream size: a local file of another size is not read to be compared. */
+    size?: number | null;
     /** May be missing upstream; a 404 lists it in `absent` instead of failing. */
     optional?: boolean;
 }

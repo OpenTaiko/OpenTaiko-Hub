@@ -284,11 +284,26 @@ fn pause_host(url: &reqwest::Url, pause: Duration) {
     *entry = (*entry).max(until);
 }
 
-async fn wait_for_host(url: &reqwest::Url, cancel: &CancelToken) -> Result<(), Failure> {
-    let until = url.host_str().and_then(|host| host_pauses().lock().unwrap_or_else(|e| e.into_inner()).get(host).copied());
-    match until.map(|until| until.saturating_duration_since(Instant::now())) {
-        Some(wait) if !wait.is_zero() => unless_cancelled(tokio::time::sleep(wait), cancel).await,
-        _ => Ok(()),
+/// How long the host still asks to be left alone, if it does.
+fn host_pause_left(url: &reqwest::Url) -> Option<Duration> {
+    let until = url.host_str().and_then(|host| host_pauses().lock().unwrap_or_else(|e| e.into_inner()).get(host).copied())?;
+    Some(until.saturating_duration_since(Instant::now())).filter(|wait| !wait.is_zero())
+}
+
+/// A transfer slot, taken once the host no longer asks for a pause. Checked again with the
+/// slot held: transfers that were waiting for one went straight to a host that had asked
+/// for a pause meanwhile, and were each refused in turn.
+async fn take_slot(url: &reqwest::Url, cancel: &CancelToken) -> Result<tokio::sync::SemaphorePermit<'static>, Failure> {
+    loop {
+        if let Some(wait) = host_pause_left(url) {
+            unless_cancelled(tokio::time::sleep(wait), cancel).await?;
+        }
+        let slot = unless_cancelled(transfer_slots().acquire(), cancel)
+            .await?
+            .map_err(|e| Failure::Fatal { status: None, message: e.to_string() })?;
+        if host_pause_left(url).is_none() {
+            return Ok(slot);
+        }
     }
 }
 
@@ -334,14 +349,17 @@ async fn unless_cancelled<T>(work: impl std::future::Future<Output = T>, cancel:
 }
 
 /// One attempt: streams `url` into `part`. `on_total` gets the announced size (0 when
-/// the server sends none), `on_bytes` every chunk.
+/// the server sends none), `on_bytes` every chunk. With `hash`, and a size announced (git's
+/// hash of a file starts with its size), returns the file's git blob hash, worked out as it
+/// arrived: each downloaded file used to be read back from disk to be checked.
 async fn fetch_once(
     url: &reqwest::Url,
     part: &Path,
     cancel: &CancelToken,
+    hash: bool,
     on_total: &mut (dyn FnMut(u64) + Send),
     on_bytes: &mut (dyn FnMut(i64) + Send),
-) -> Result<u64, Failure> {
+) -> Result<Option<String>, Failure> {
     let label = url.as_str();
     let request = client().map_err(|message| Failure::Fatal { status: None, message })?.get(url.clone()).send();
     let mut response = unless_cancelled(request, cancel)
@@ -354,7 +372,13 @@ async fn fetch_once(
     if !response.status().is_success() {
         return Err(status_failure(label, &response));
     }
-    on_total(response.content_length().unwrap_or(0));
+    let announced = response.content_length();
+    on_total(announced.unwrap_or(0));
+    let mut hasher = announced.filter(|_| hash).map(|len| {
+        let mut hasher = Sha1::new();
+        hasher.update(format!("blob {len}\0").as_bytes());
+        hasher
+    });
 
     let io_error = |e: std::io::Error| Failure::Fatal { status: None, message: format!("Could not write {}: {e}", part.display()) };
     let mut file = tokio::io::BufWriter::new(tokio::fs::File::create(part).await.map_err(io_error)?);
@@ -364,11 +388,17 @@ async fn fetch_once(
         .map_err(|e| Failure::Retry { after: None, message: format!("Download of {label} failed: {e}") })?
     {
         file.write_all(&chunk).await.map_err(io_error)?;
+        if let Some(hasher) = hasher.as_mut() {
+            hasher.update(&chunk);
+        }
         received += chunk.len() as u64;
         on_bytes(chunk.len() as i64);
     }
     file.flush().await.map_err(io_error)?;
-    Ok(received)
+    if announced.is_some_and(|len| len != received) {
+        return Err(Failure::Retry { after: None, message: format!("Download of {label} was cut short") });
+    }
+    Ok(hasher.map(|hasher| hex::encode(hasher.finalize())))
 }
 
 /// Downloads `url` to `<dest>.part`, retrying what can be retried. The partial file is
@@ -395,13 +425,10 @@ async fn fetch_to_part(
             on_bytes(n);
         };
         let fetched = async {
-            wait_for_host(url, cancel).await?;
             // Held for this attempt only, not through the pause before a retry
-            let _slot = unless_cancelled(transfer_slots().acquire(), cancel)
-                .await?
-                .map_err(|e| Failure::Fatal { status: None, message: e.to_string() })?;
-            fetch_once(url, &part, cancel, on_total, &mut count).await?;
-            verify(&part, git_sha, url).await
+            let _slot = take_slot(url, cancel).await?;
+            let hashed = fetch_once(url, &part, cancel, git_sha.is_some(), on_total, &mut count).await?;
+            verify(&part, git_sha, hashed.as_deref(), url).await
         }
         .await;
         match fetched {
@@ -432,12 +459,17 @@ async fn fetch_to_part(
 }
 
 /// A file whose git blob hash is known is checked before it replaces anything: one cut
-/// short or altered on the way is downloaded again rather than installed.
-async fn verify(part: &Path, git_sha: Option<&str>, url: &reqwest::Url) -> Result<(), Failure> {
+/// short or altered on the way is downloaded again rather than installed. `hashed` is the
+/// hash worked out during the download, when the server announced the size; otherwise the
+/// file is read back.
+async fn verify(part: &Path, git_sha: Option<&str>, hashed: Option<&str>, url: &reqwest::Url) -> Result<(), Failure> {
     let Some(sha) = git_sha else { return Ok(()) };
-    let matches = has_git_sha(part, sha)
-        .await
-        .map_err(|e| Failure::Fatal { status: None, message: format!("Could not read {}: {e}", part.display()) })?;
+    let matches = match hashed {
+        Some(hashed) => hashed.eq_ignore_ascii_case(sha),
+        None => has_git_sha(part, sha)
+            .await
+            .map_err(|e| Failure::Fatal { status: None, message: format!("Could not read {}: {e}", part.display()) })?,
+    };
     if matches {
         Ok(())
     } else {
@@ -510,13 +542,52 @@ fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
     }
 }
 
+fn touch(path: &Path) -> std::io::Result<()> {
+    std::fs::File::options().write(true).open(path)?.set_modified(SystemTime::now())
+}
+
 fn mark_set_aside(path: &Path) {
-    let dated = std::fs::File::options()
-        .write(true)
-        .open(path)
-        .and_then(|file| file.set_modified(SystemTime::now()));
-    if let Err(e) = dated {
+    if let Err(e) = touch(path) {
         log::warn!("Could not date {}: {e}", path.display());
+    }
+}
+
+/// True when `path` was last changed at least `age` ago.
+pub(crate) fn older_than(path: &Path, age: Duration) -> bool {
+    std::fs::metadata(path)
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|modified| modified.elapsed().ok())
+        .is_some_and(|elapsed| elapsed >= age)
+}
+
+/// A cached answer nothing asked for in this long is removed.
+const CACHE_UNUSED: Duration = Duration::from_secs(180 * 24 * 60 * 60);
+
+/// Removes cached answers no longer asked for (a release looked up once, the trees of
+/// commits long replaced), and temporary files a crash left. Nothing used to remove any.
+/// An answer in use is dated each time it is served again (see `read_cached`).
+pub fn prune_cache(dir: &Path) {
+    let Ok(entries) = std::fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let stale = if name.ends_with(".tmp") {
+            older_than(&path, Duration::from_secs(24 * 60 * 60))
+        } else if let Some(key) = name.strip_suffix(".json") {
+            let unused = older_than(&path, CACHE_UNUSED);
+            if unused {
+                let _ = std::fs::remove_file(dir.join(format!("{key}.body")));
+            }
+            unused
+        } else {
+            false
+        };
+        if stale {
+            if let Err(e) = std::fs::remove_file(&path) {
+                log::warn!("Could not remove {}: {}", path.display(), e);
+            }
+        }
     }
 }
 
@@ -582,6 +653,7 @@ pub async fn download_file<R: Runtime>(
     let parsed = parse_download_url(&url)?;
     let cancel = crate::jobs::token(&app, &job);
     let dest = crate::guard::checked(&app, &path)?;
+    let _claim = claim(&[&dest])?;
     let progress = Mutex::new(Progress::new(on_progress));
     let mut set_total = |total: u64| progress.lock().unwrap().total = total;
     let mut add = |n: i64| progress.lock().unwrap().add(n);
@@ -631,6 +703,10 @@ pub struct InstallEntry {
     /// The file's git blob SHA upstream, when known. A local file with the same content
     /// is left alone instead of being downloaded again.
     git_sha: Option<String>,
+    /// Its size upstream, when known: a local file of another size has changed, which
+    /// costs a look at its size rather than reading it whole to hash it.
+    #[serde(default)]
+    size: Option<u64>,
     /// A file that may not exist upstream (a genre's box.def or image). A 404 for it is
     /// reported in `absent` instead of failing the whole call.
     #[serde(default)]
@@ -671,9 +747,44 @@ async fn has_git_sha(path: &Path, sha: &str) -> std::io::Result<bool> {
         .map_err(std::io::Error::other)?
 }
 
-async fn is_unchanged(dest: &Path, git_sha: Option<&str>) -> bool {
+async fn is_unchanged(dest: &Path, git_sha: Option<&str>, size: Option<u64>) -> bool {
     let Some(sha) = git_sha else { return false };
+    if let Some(size) = size {
+        if !tokio::fs::metadata(dest).await.is_ok_and(|meta| meta.len() == size) {
+            return false;
+        }
+    }
     has_git_sha(dest, sha).await.unwrap_or(false)
+}
+
+/// Destinations being downloaded to, across every call.
+fn destinations_in_flight() -> &'static Mutex<HashSet<Vec<String>>> {
+    static DESTINATIONS: OnceLock<Mutex<HashSet<Vec<String>>>> = OnceLock::new();
+    DESTINATIONS.get_or_init(Default::default)
+}
+
+/// Destinations a call downloads to, released when it ends. Two downloads into one file
+/// shared its partial file, and the one that finished first committed what both had
+/// written into it.
+struct Claim(Vec<Vec<String>>);
+
+impl Drop for Claim {
+    fn drop(&mut self) {
+        let mut in_flight = destinations_in_flight().lock().unwrap_or_else(|e| e.into_inner());
+        for key in &self.0 {
+            in_flight.remove(key);
+        }
+    }
+}
+
+fn claim(dests: &[&Path]) -> Result<Claim, String> {
+    let keys: Vec<Vec<String>> = dests.iter().map(|dest| crate::guard::path_key(dest)).collect();
+    let mut in_flight = destinations_in_flight().lock().unwrap_or_else(|e| e.into_inner());
+    if let Some(taken) = keys.iter().position(|key| in_flight.contains(key)) {
+        return Err(format!("{} is already being downloaded", dests[taken].display()));
+    }
+    in_flight.extend(keys.iter().cloned());
+    Ok(Claim(keys))
 }
 
 enum Outcome {
@@ -704,27 +815,32 @@ pub async fn install_files<R: Runtime>(
         .await
         .map_err(|e| format!("Could not create {}: {e}", root.display()))?;
 
-    // Everything is validated before the first request
-    let mut jobs = Vec::with_capacity(entries.len());
+    // Everything is validated before the first request. A file listed twice is fetched
+    // once: two transfers would write the same partial file.
+    let mut jobs: Vec<(InstallEntry, reqwest::Url, PathBuf)> = Vec::with_capacity(entries.len());
+    let mut keys: HashSet<Vec<String>> = HashSet::new();
     for entry in entries {
         let url = parse_download_url(&entry.url)?;
         let dest = crate::library::resolve_entry_inside(&root, &entry.rel_path)?;
-        jobs.push((entry, url, dest));
+        if keys.insert(crate::guard::path_key(&dest)) {
+            jobs.push((entry, url, dest));
+        }
     }
+    let _claim = claim(&jobs.iter().map(|(_, _, dest)| dest.as_path()).collect::<Vec<_>>())?;
 
     let attempts = attempts.unwrap_or(DEFAULT_ATTEMPTS);
     let progress = Arc::new(Mutex::new(Progress::new(on_progress)));
     let permits = Arc::new(tokio::sync::Semaphore::new(FILE_CONCURRENCY));
     let mut tasks = tokio::task::JoinSet::new();
     for (index, (entry, url, dest)) in jobs.iter().enumerate() {
-        let (url, dest, git_sha, optional) = (url.clone(), dest.clone(), entry.git_sha.clone(), entry.optional);
+        let (url, dest, git_sha, size, optional) = (url.clone(), dest.clone(), entry.git_sha.clone(), entry.size, entry.optional);
         let progress = progress.clone();
         let permits = permits.clone();
         let cancel = cancel.clone();
         tasks.spawn(async move {
             let _permit = permits.acquire_owned().await.map_err(|e| e.to_string())?;
             cancel.check()?;
-            if is_unchanged(&dest, git_sha.as_deref()).await {
+            if is_unchanged(&dest, git_sha.as_deref(), size).await {
                 return Ok((index, Outcome::Unchanged));
             }
             if let Some(parent) = dest.parent() {
@@ -855,6 +971,8 @@ async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest:
     let (meta, body) = match fresh {
         Ok(Some(fresh)) => fresh,
         Ok(None) => {
+            // Still in use: kept by `prune_cache`
+            let _ = touch(&meta_path);
             return tokio::fs::read(&body_path)
                 .await
                 .map_err(|e| format!("Could not read the cached copy of {url}: {e}"));
@@ -1057,14 +1175,25 @@ mod tests {
         let url = reqwest::Url::parse("https://paused.example/a").unwrap();
         let other = reqwest::Url::parse("https://other.example/a").unwrap();
         pause_host(&url, Duration::from_millis(300));
+        assert!(host_pause_left(&other).is_none());
+        assert!(host_pause_left(&url).is_some());
         let token = CancelToken::default();
         runtime.block_on(async {
             let started = Instant::now();
-            wait_for_host(&other, &token).await.unwrap();
-            assert!(started.elapsed() < Duration::from_millis(100));
-            wait_for_host(&url, &token).await.unwrap();
+            drop(take_slot(&url, &token).await.unwrap());
             assert!(started.elapsed() >= Duration::from_millis(250));
+            assert!(host_pause_left(&url).is_none());
         });
+    }
+
+    #[test]
+    fn one_destination_is_downloaded_to_once_at_a_time() {
+        let tmp = tempfile::tempdir().unwrap();
+        let song = tmp.path().join("song.ogg");
+        let first = claim(&[&song]).unwrap();
+        assert!(claim(&[&tmp.path().join("other.ogg"), &song]).is_err());
+        drop(first);
+        assert!(claim(&[&song]).is_ok());
     }
 
     #[test]

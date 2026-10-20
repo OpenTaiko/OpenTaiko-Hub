@@ -55,8 +55,10 @@ const GAME_BINARY: &str = "OpenTaiko";
 /// Launches the game of an instance. Only the game binary of one of the Hub's instances
 /// starts: a path to launch used to be accepted from anywhere the page could write,
 /// including the Hub's temporary folder.
+// Async, so off the main thread: checking the instance reads the disk, which an instance
+// on a network drive that went away can hold up, with the window frozen meanwhile
 #[tauri::command]
-fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String> {
+async fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String> {
     let instance = guard::instance_dir(&app_handle, &instance_dir)?;
     let path = instance.join(GAME_BINARY);
     let full_path = if cfg!(windows) {
@@ -678,7 +680,15 @@ fn main() {
             let old_tmp = old_shared_root().map(|root| root.join("tmp"));
             #[cfg(any(debug_assertions, target_os = "windows"))]
             let old_tmp = None;
-            std::thread::spawn(move || guard::sweep_leftovers(instances, old_tmp));
+            let crashed = guard::begin_session(app.handle());
+            let cache_dir = app.path().app_cache_dir().ok();
+            std::thread::spawn(move || {
+                guard::sweep_leftovers(instances, old_tmp, crashed);
+                if let Some(dir) = cache_dir {
+                    scan::prune_cache(&dir.join("scan"));
+                    download::prune_cache(&dir.join("http"));
+                }
+            });
             Ok(())
         })
         .build(tauri::generate_context!());
@@ -686,7 +696,11 @@ fn main() {
     // A startup failure used to abort with a message only a terminal would show. Record
     // it, then tell the user something instead of vanishing.
     match app {
-        Ok(app) => app.run(|_app_handle, _event| {}),
+        Ok(app) => app.run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                guard::end_session(app_handle);
+            }
+        }),
         Err(error) => {
             log::error!("The Hub could not start: {}", error);
             eprintln!("The Hub could not start: {}", error);
