@@ -680,10 +680,23 @@ fn downloaded_archives() -> &'static Mutex<Vec<PathBuf>> {
     ARCHIVES.get_or_init(Default::default)
 }
 
+/// The archive at `zip_path`, if the Hub may extract it: one `download_file` placed this
+/// session in a temporary folder the Hub named, which is extracted beside it. Extracting any
+/// file the page could reach let page script unpack a zip it had written as a save
+/// database over the game's executable.
+pub(crate) fn archive_to_extract<R: Runtime>(app: &AppHandle<R>, zip_path: &str) -> Result<PathBuf, String> {
+    let zip = crate::guard::checked(app, zip_path)?;
+    if zip.parent().is_some_and(crate::guard::is_hub_tmp_dir) && take_downloaded_archive(&zip) {
+        Ok(zip)
+    } else {
+        Err(format!("Refusing to extract {zip_path}: not an archive the Hub downloaded"))
+    }
+}
+
 /// True, once, for an archive `download_file` placed this session. Only those are
 /// extracted: any file the page could reach used to be, and the page can have a save
 /// database written with whatever bytes it likes, a zip included.
-pub(crate) fn take_downloaded_archive(path: &Path) -> bool {
+fn take_downloaded_archive(path: &Path) -> bool {
     let mut archives = downloaded_archives().lock().unwrap();
     match archives.iter().position(|a| crate::guard::same_path(a, path)) {
         Some(index) => {
@@ -1102,6 +1115,34 @@ mod tests {
     }
 
     #[test]
+    fn only_an_archive_the_hub_downloaded_into_its_own_folder_is_extracted() {
+        let app = crate::guard::mock_app();
+        let id = format!("{:08x}", std::process::id() ^ 0x5a5a_5a5a);
+        let folder = std::env::temp_dir().join(format!("otk-{id}"));
+        std::fs::create_dir_all(&folder).unwrap();
+        let zip = folder.join("package.zip");
+        std::fs::write(&zip, b"PK").unwrap();
+        crate::guard::allow_for_test(app.handle(), &folder);
+        let path = zip.to_string_lossy().into_owned();
+
+        // In place, but not downloaded: a save database written as a zip, say
+        assert!(archive_to_extract(app.handle(), &path).is_err());
+        downloaded_archives().lock().unwrap().push(zip.clone());
+        assert!(archive_to_extract(app.handle(), &path).is_ok());
+        // Once only
+        assert!(archive_to_extract(app.handle(), &path).is_err());
+
+        // Downloaded, but into a folder that is not one of the Hub's temporary ones
+        let instance = tempfile::tempdir().unwrap();
+        let elsewhere = instance.path().join("Saves.zip");
+        std::fs::write(&elsewhere, b"PK").unwrap();
+        crate::guard::allow_for_test(app.handle(), instance.path());
+        downloaded_archives().lock().unwrap().push(elsewhere.clone());
+        assert!(archive_to_extract(app.handle(), &elsewhere.to_string_lossy()).is_err());
+        let _ = std::fs::remove_dir_all(&folder);
+    }
+
+    #[test]
     fn only_downloaded_archives_are_handed_out_once() {
         let tmp = tempfile::tempdir().unwrap();
         let zip = tmp.path().join("package.zip");
@@ -1184,6 +1225,91 @@ mod tests {
             assert!(started.elapsed() >= Duration::from_millis(250));
             assert!(host_pause_left(&url).is_none());
         });
+    }
+
+    /// A server on this machine standing in for GitHub: answers every request with
+    /// `status` and `body`, and counts the requests.
+    async fn serve(status: u16, body: &'static [u8]) -> (reqwest::Url, Arc<std::sync::atomic::AtomicUsize>) {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let url = reqwest::Url::parse(&format!("http://{}/file", listener.local_addr().unwrap())).unwrap();
+        let requests = Arc::new(AtomicUsize::new(0));
+        let counted = requests.clone();
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                counted.fetch_add(1, Ordering::SeqCst);
+                tokio::spawn(async move {
+                    let mut request = Vec::new();
+                    let mut buffer = [0u8; 1024];
+                    while !request.windows(4).any(|w| w == b"\r\n\r\n") {
+                        match socket.read(&mut buffer).await {
+                            Ok(0) | Err(_) => return,
+                            Ok(n) => request.extend_from_slice(&buffer[..n]),
+                        }
+                    }
+                    let head = format!("HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                    let _ = socket.write_all(head.as_bytes()).await;
+                    let _ = socket.write_all(body).await;
+                    let _ = socket.shutdown().await;
+                });
+            }
+        });
+        (url, requests)
+    }
+
+    fn git_sha_of(bytes: &[u8]) -> String {
+        let mut hasher = Sha1::new();
+        hasher.update(format!("blob {}\0", bytes.len()).as_bytes());
+        hasher.update(bytes);
+        hex::encode(hasher.finalize())
+    }
+
+    #[test]
+    fn a_download_matching_its_hash_is_kept_for_the_commit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = tmp.path().join("song.ogg");
+        let body: &'static [u8] = b"the audio of a song";
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let (url, requests) = runtime.block_on(serve(200, body));
+        let sha = git_sha_of(body);
+        let part = runtime.block_on(async {
+            let (mut total, mut bytes) = (|_: u64| {}, |_: i64| {});
+            fetch_to_part(&url, &dest, Some(&sha), 3, &CancelToken::default(), &mut total, &mut bytes).await
+        });
+        let part = part.unwrap_or_else(|f| panic!("{}", failure_message(f)));
+        assert_eq!(std::fs::read(&part).unwrap(), body);
+        assert_eq!(requests.load(std::sync::atomic::Ordering::SeqCst), 1);
+        assert!(!dest.exists(), "nothing is placed before the commit");
+    }
+
+    #[test]
+    fn a_download_not_matching_its_hash_is_tried_again_then_dropped() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = tmp.path().join("song.ogg");
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let (url, requests) = runtime.block_on(serve(200, b"another file"));
+        let failure = runtime.block_on(async {
+            let (mut total, mut bytes) = (|_: u64| {}, |_: i64| {});
+            fetch_to_part(&url, &dest, Some(&git_sha_of(b"the expected file")), 2, &CancelToken::default(), &mut total, &mut bytes).await
+        });
+        let message = failure_message(failure.expect_err("a mismatch must fail"));
+        assert!(message.contains("does not match"), "{message}");
+        assert_eq!(requests.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert!(!part_path(&dest).exists(), "the partial file is removed");
+    }
+
+    #[test]
+    fn a_missing_file_is_not_asked_for_again() {
+        let tmp = tempfile::tempdir().unwrap();
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let (url, requests) = runtime.block_on(serve(404, b"Not Found"));
+        let failure = runtime.block_on(async {
+            let (mut total, mut bytes) = (|_: u64| {}, |_: i64| {});
+            fetch_to_part(&url, &tmp.path().join("box.def"), None, 5, &CancelToken::default(), &mut total, &mut bytes).await
+        });
+        assert!(matches!(failure, Err(Failure::Fatal { status: Some(404), .. })));
+        assert_eq!(requests.load(std::sync::atomic::Ordering::SeqCst), 1);
     }
 
     #[test]

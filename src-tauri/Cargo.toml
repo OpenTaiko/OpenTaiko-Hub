@@ -47,6 +47,10 @@ libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
+# Tests of the commands that check paths, on Tauri's mock runtime
+tauri = { version = "~2.11.5", features = ["test"] }
+# A local server standing in for GitHub in the download tests
+tokio = { version = "1.51.1", features = ["net", "rt"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.

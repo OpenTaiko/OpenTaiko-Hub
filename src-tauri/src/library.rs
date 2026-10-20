@@ -720,15 +720,15 @@ mod tests {
         fs::create_dir_all(&library).unwrap();
         fs::create_dir_all(&outside).unwrap();
         // A junction needs no privilege, unlike a directory symlink
+        // Failing to make one is a failure: returning instead let the test pass without
+        // ever checking anything
         let made = std::process::Command::new("cmd")
             .args(["/C", "mklink", "/J"])
             .arg(library.join("link"))
             .arg(&outside)
             .output()
-            .is_ok_and(|o| o.status.success());
-        if !made {
-            return;
-        }
+            .unwrap();
+        assert!(made.status.success(), "mklink /J failed: {}", String::from_utf8_lossy(&made.stdout));
         assert!(resolve_inside(&library, "link\\box.def").is_err());
         assert!(resolve_entry_inside(&library, "link").is_err());
         assert!(resolve_inside(&library, "real\\box.def").is_ok());

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { isCancelled } from './stores/activity';
+import { IsSongsPathUnstorable } from './utils/errors';
 
 // The backend's errors are plain text, and the page recognises two of them by their
 // words. A change of wording on one side would go unnoticed until the page misread a
@@ -16,8 +17,14 @@ describe('error texts the page relies on', () => {
     });
 
     it('a library path Config.ini cannot hold', () => {
-        // instances.ts looks for this word to explain the failure
-        expect(rust('configini.rs')).toMatch(/cannot be stored in Config\.ini \(Shift_JIS\)/);
-        expect(readFileSync(new URL('./stores/instances.ts', import.meta.url), 'utf8')).toContain("includes('Shift_JIS')");
+        // Every message the backend words for it, filled in as the backend would
+        const messages = [...rust('configini.rs').matchAll(/"([^"]*cannot be stored in Config\.ini[^"]*)"/g)].map((m) => m[1]);
+        expect(messages.length).toBeGreaterThanOrEqual(2);
+        for (const message of messages) {
+            expect(IsSongsPathUnstorable(message.replace('{}', 'D:\\Généreux\\Songs'))).toBe(true);
+            expect(IsSongsPathUnstorable(new Error(message.replace('{}', '/home/rené/Songs')))).toBe(true);
+        }
+        // Other failures to link the library are not explained as this one
+        expect(IsSongsPathUnstorable('Instance folder not found: D:\\Games\\OpenTaiko')).toBe(false);
     });
 });

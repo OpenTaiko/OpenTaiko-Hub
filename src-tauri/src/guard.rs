@@ -615,9 +615,72 @@ pub fn instance_roots<R: Runtime>(app: &AppHandle<R>) -> Vec<PathBuf> {
     app.state::<InstanceRoots>().0.lock().unwrap_or_else(|e| e.into_inner()).clone()
 }
 
+/// An app on Tauri's mock runtime with the fs plugin, for tests of the commands that check
+/// paths. No folder is allowed and no instance registered until a test says so.
+#[cfg(test)]
+pub(crate) fn mock_app() -> tauri::App<tauri::test::MockRuntime> {
+    let app = tauri::test::mock_builder()
+        .plugin(tauri_plugin_fs::init())
+        .build(tauri::test::mock_context(tauri::test::noop_assets()))
+        .expect("the mock app");
+    app.manage(InstanceRoots::default());
+    app
+}
+
+#[cfg(test)]
+pub(crate) fn allow_for_test<R: Runtime>(app: &AppHandle<R>, dir: &Path) {
+    allow_dir(app, dir);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_a_registered_folder_is_an_instance() {
+        let app = mock_app();
+        let tmp = tempfile::tempdir().unwrap();
+        let (registered, other) = (tmp.path().join("A"), tmp.path().join("B"));
+        std::fs::create_dir_all(&registered).unwrap();
+        std::fs::create_dir_all(&other).unwrap();
+        let text = |p: &Path| p.to_string_lossy().into_owned();
+
+        // Registered but outside every allowed folder
+        app.state::<InstanceRoots>().0.lock().unwrap().push(registered.clone());
+        assert!(instance_dir(app.handle(), &text(&registered)).is_err());
+
+        allow_dir(app.handle(), tmp.path());
+        assert!(instance_dir(app.handle(), &text(&registered)).is_ok());
+        // Allowed (a temporary folder, the library) but not an instance
+        assert!(instance_dir(app.handle(), &text(&other)).is_err());
+        assert!(instance_dir(app.handle(), &text(&registered.join("..").join("B"))).is_err());
+    }
+
+    #[test]
+    fn only_the_source_folder_of_a_build_the_hub_named_is_built() {
+        let app = mock_app();
+        let id = format!("{:08x}", std::process::id() ^ 0xa5a5_a5a5);
+        let build = std::env::temp_dir().join(format!("otk-{id}"));
+        let project = build.join("s").join("OpenTaiko");
+        std::fs::create_dir_all(&project).unwrap();
+        allow_dir(app.handle(), &build);
+        let src = build.join("s").to_string_lossy().into_owned();
+
+        // No project in it yet
+        assert!(build_source_dir(app.handle(), &src).is_err());
+        std::fs::write(project.join("OpenTaiko.csproj"), "<Project/>").unwrap();
+        assert!(build_source_dir(app.handle(), &src).is_ok());
+        // Not the `s` folder itself
+        assert!(build_source_dir(app.handle(), &project.to_string_lossy()).is_err());
+
+        // The same layout in a folder the Hub did not name
+        let other = tempfile::tempdir().unwrap();
+        std::fs::create_dir_all(other.path().join("s").join("OpenTaiko")).unwrap();
+        std::fs::write(other.path().join("s").join("OpenTaiko").join("OpenTaiko.csproj"), "<Project/>").unwrap();
+        allow_dir(app.handle(), other.path());
+        assert!(build_source_dir(app.handle(), &other.path().join("s").to_string_lossy()).is_err());
+        let _ = std::fs::remove_dir_all(&build);
+    }
 
     #[test]
     fn only_folders_named_by_the_hub_count_as_temporary() {

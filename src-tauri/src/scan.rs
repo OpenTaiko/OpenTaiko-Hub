@@ -584,6 +584,36 @@ mod tests {
         assert!(!genre_paths.iter().any(|p| p.contains("Adulation")));
     }
 
+    // Through the file on disk, as from one start to the next: the stamps must come back
+    // exactly, or every start reads everything again
+    #[test]
+    fn a_cache_kept_on_disk_is_used_and_a_changed_date_is_noticed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path().join("Songs");
+        let chart = base.join("01 Pop/A/a.tja");
+        write(&chart, "TITLE:A\n");
+        let written = std::fs::metadata(&chart).unwrap().modified().unwrap();
+
+        let (_, _, cache) = collect_tree(&base, &ScanCache::default(), false, &mut |_| {});
+        let file = tmp.path().join("cache.json");
+        std::fs::write(&file, serde_json::to_vec(&cache).unwrap()).unwrap();
+        let (loaded, bytes) = ScanCache::load(&file);
+        assert!(!loaded.is_empty());
+        assert_eq!(bytes, serde_json::to_vec(&loaded).unwrap(), "reloaded, the cache would be written again");
+
+        // Same size and date: taken from the cache, not read
+        let set_date = |date: std::time::SystemTime| std::fs::File::options().write(true).open(&chart).unwrap().set_modified(date).unwrap();
+        write(&chart, "TITLE:Z\n");
+        set_date(written);
+        let (songs, _, _) = collect_tree(&base, &loaded, false, &mut |_| {});
+        assert_eq!(songs[0].title.as_deref(), Some("A"));
+
+        // Another date: read again
+        set_date(written + Duration::from_secs(60));
+        let (songs, _, _) = collect_tree(&base, &loaded, false, &mut |_| {});
+        assert_eq!(songs[0].title.as_deref(), Some("Z"));
+    }
+
     #[test]
     fn a_folder_unchanged_since_the_last_scan_is_not_read_again() {
         let tmp = tempfile::tempdir().unwrap();
@@ -629,13 +659,33 @@ mod tests {
         }
     }
 
+    /// Keeps `path` from being read for as long as the returned value lives.
+    fn unreadable(path: &Path) -> std::fs::File {
+        #[cfg(windows)]
+        {
+            use std::os::windows::fs::OpenOptionsExt;
+            // Opened with no sharing: nothing else can open it meanwhile
+            std::fs::File::options().read(true).share_mode(0).open(path).unwrap()
+        }
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o000)).unwrap();
+            // Nothing to undo: the temporary folder is removed with what it holds
+            std::fs::File::open("/dev/null").unwrap()
+        }
+    }
+
     #[test]
     fn songs_are_counted_without_being_read() {
         let tmp = tempfile::tempdir().unwrap();
-        write(&tmp.path().join("Loose.tja"), "TITLE:Root\n");
-        write(&tmp.path().join("01 Pop/A/a.tja"), "TITLE:A\n");
-        write(&tmp.path().join("01 Pop/A/extra/x.tja"), "TITLE:X\n");
-        write(&tmp.path().join("02/B/b.tja"), "TITLE:B\n");
+        let charts = ["Loose.tja", "01 Pop/A/a.tja", "01 Pop/A/extra/x.tja", "02/B/b.tja"].map(|rel| tmp.path().join(rel));
+        for chart in &charts {
+            write(chart, "TITLE:Song\n");
+        }
+        // A count that read the charts, as the hashing scan it replaced did, fails now
+        let _locked: Vec<_> = charts.iter().map(|chart| unreadable(chart)).collect();
+        assert!(std::fs::read(&charts[1]).is_err(), "the charts must be unreadable for this test to mean anything");
         assert_eq!(count_songs_in(tmp.path()), 2);
     }
 

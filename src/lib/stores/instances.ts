@@ -8,6 +8,7 @@ import { ipc } from '$lib/ipc';
 import { GetPreferencesPath, GetGlobalSongsPath, GetLegacyInstancePath } from '../utils/path';
 import { isVersionInSeries } from '../utils/versions';
 import { toaster } from '$lib/utils/toaster';
+import { IsSongsPathUnstorable } from '$lib/utils/errors';
 import { _ } from 'svelte-i18n';
 import type { Instance, InstanceRegistry } from '$lib/types';
 
@@ -298,7 +299,7 @@ export const linkGlobalSongs = async (instance: Instance | null | undefined): Pr
         // The one cause the user can act on, and that otherwise only shows as a game
         // without songs. A missing instance folder fails here too, on every start, and
         // is left to the log.
-        if (String(error).includes('Shift_JIS')) {
+        if (IsSongsPathUnstorable(error)) {
             toaster.error({
                 description: get(_)('errors.songs_link_failed', { values: { name: instance.name } }),
                 duration: Infinity,

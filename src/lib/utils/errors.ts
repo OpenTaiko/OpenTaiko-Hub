@@ -36,6 +36,11 @@ export const ErrorCause = (error: unknown, windows = RUNS_ON_WINDOWS): string | 
     return OS_CODES[windows ? 'windows' : 'unix'].find(([codes]) => codes.includes(code))?.[1] ?? null;
 };
 
+/** The backend could not write the library's path into an instance's Config.ini, which the
+ *  game reads as Shift_JIS (configini.rs). The one cause of a game without songs that the
+ *  user can act on. */
+export const IsSongsPathUnstorable = (error: unknown): boolean => ErrorText(error).includes('Shift_JIS');
+
 /** A message for the user: a plain explanation when the cause is known, else the raw text. */
 export const DescribeError = (error: unknown): string => {
     const cause = ErrorCause(error);

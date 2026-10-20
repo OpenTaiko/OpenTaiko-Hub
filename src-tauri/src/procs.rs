@@ -493,7 +493,8 @@ mod batch_tests {
             batches
         });
         tx.send("first".to_string()).unwrap();
-        std::thread::sleep(Duration::from_millis(200));
+        // Fifty intervals: a busy test machine can be slow to run the batching thread
+        std::thread::sleep(Duration::from_millis(1000));
         tx.send("second".to_string()).unwrap();
         drop(tx);
         let batches = handle.join().unwrap();

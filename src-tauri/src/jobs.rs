@@ -75,6 +75,61 @@ impl Jobs {
             entry.active = false;
         }
     }
+
+    /// The token of operation `id`, registering it as running if this is the first word
+    /// of it. An operation that has ended keeps its entry, and its token.
+    fn token(&self, id: &str) -> CancelToken {
+        self.entries().entry(id.to_string()).or_insert_with(Entry::active).token.clone()
+    }
+
+    fn begin(&self, id: &str) {
+        self.entries().entry(id.to_string()).or_insert_with(Entry::active);
+    }
+
+    /// Cancels operation `id`, unless it has already ended: a late cancel must not touch
+    /// a token an ended operation's commands may still hold.
+    fn cancel(&self, id: &str) {
+        let mut entries = self.entries();
+        let entry = entries.entry(id.to_string()).or_insert_with(Entry::active);
+        if entry.active {
+            entry.token.cancel();
+        }
+    }
+
+    fn end(&self, id: &str) {
+        if let Some(entry) = self.entries().get_mut(id) {
+            entry.active = false;
+        }
+    }
+
+    /// What a close request does now.
+    fn on_close(&self) -> CloseDecision {
+        if self.closing.load(Ordering::SeqCst) {
+            return CloseDecision::Hold;
+        }
+        if self.entries().values().any(|e| e.active) {
+            return CloseDecision::Ask;
+        }
+        if self.in_flight.load(Ordering::SeqCst) == 0 {
+            CloseDecision::Close
+        } else {
+            CloseDecision::CloseWhenSettled
+        }
+    }
+}
+
+/// How a close request is answered.
+#[derive(Debug, PartialEq)]
+enum CloseDecision {
+    /// Nothing is running.
+    Close,
+    /// Already closing: the window goes once the work under way is done. Letting this
+    /// close through, as a second click on the button did, cut an install off midway.
+    Hold,
+    /// Nothing to ask about, but files are still being moved.
+    CloseWhenSettled,
+    /// An operation is running: the user is asked first.
+    Ask,
 }
 
 #[derive(Default)]
@@ -127,7 +182,7 @@ impl CancelToken {
 /// so its first command can arrive before `begin_job` and registers it here instead.
 pub fn token<R: Runtime>(app: &AppHandle<R>, job: &Option<String>) -> CancelToken {
     let Some(id) = job else { return CancelToken::default() };
-    app.state::<Jobs>().entries().entry(id.clone()).or_insert_with(Entry::active).token.clone()
+    app.state::<Jobs>().token(id)
 }
 
 /// Work that closing the window waits for instead of cutting off: a build process still
@@ -150,26 +205,19 @@ impl<R: Runtime> Drop for InFlight<R> {
 #[tauri::command]
 pub fn begin_job<R: Runtime>(app: AppHandle<R>, job: String, prompt: ClosePrompt) {
     let jobs = app.state::<Jobs>();
-    jobs.entries().entry(job).or_insert_with(Entry::active);
+    jobs.begin(&job);
     *jobs.prompt.lock().unwrap_or_else(|e| e.into_inner()) = Some(prompt);
 }
 
 #[tauri::command]
 pub fn cancel_job<R: Runtime>(app: AppHandle<R>, job: String) {
-    let jobs = app.state::<Jobs>();
-    let mut entries = jobs.entries();
-    let entry = entries.entry(job).or_insert_with(Entry::active);
-    if entry.active {
-        entry.token.cancel();
-    }
+    app.state::<Jobs>().cancel(&job);
 }
 
 /// Called by the page once an operation is over.
 #[tauri::command]
 pub fn end_job<R: Runtime>(app: AppHandle<R>, job: String) {
-    if let Some(entry) = app.state::<Jobs>().entries().get_mut(&job) {
-        entry.active = false;
-    }
+    app.state::<Jobs>().end(&job);
 }
 
 /// Called by a page that has just loaded: operations an earlier page started have nobody
@@ -184,18 +232,14 @@ pub fn reset_jobs<R: Runtime>(app: AppHandle<R>) {
 /// close is held, and the user is asked whether to stop what is running and close.
 pub fn allow_close<R: Runtime>(window: &Window<R>) -> bool {
     let jobs = window.state::<Jobs>();
-    // Already closing: the window goes once the work under way is done. Letting this
-    // close through, as a second click on the button did, cut an install off midway.
-    if jobs.closing.load(Ordering::SeqCst) {
-        return false;
-    }
-    if !jobs.entries().values().any(|e| e.active) {
-        if jobs.in_flight.load(Ordering::SeqCst) == 0 {
-            return true;
+    match jobs.on_close() {
+        CloseDecision::Close => return true,
+        CloseDecision::Hold => return false,
+        CloseDecision::CloseWhenSettled => {
+            close_when_settled(window.clone());
+            return false;
         }
-        // Nothing to ask about, but files are still being moved
-        close_when_settled(window.clone());
-        return false;
+        CloseDecision::Ask => {}
     }
     // A second click on the close button while the question is open changes nothing
     if jobs.asking.swap(true, Ordering::SeqCst) {
@@ -284,21 +328,56 @@ mod tests {
     #[test]
     fn an_ended_job_stays_ended() {
         let jobs = Jobs::default();
-        jobs.entries().insert("a".into(), Entry::active());
-        jobs.entries().get_mut("a").unwrap().active = false;
-        // A late command or cancel finds the ended entry instead of starting a new one
-        let entries = jobs.entries();
-        assert!(!entries.values().any(|e| e.active));
+        jobs.begin("a");
+        let token = jobs.token("a");
+        jobs.end("a");
+        assert_eq!(jobs.on_close(), CloseDecision::Close);
+        // A late command finds the ended entry instead of starting the job again, and a
+        // late cancel leaves its token alone
+        let late = jobs.token("a");
+        jobs.cancel("a");
+        assert_eq!(jobs.on_close(), CloseDecision::Close);
+        assert!(!token.is_cancelled() && !late.is_cancelled());
+    }
+
+    #[test]
+    fn a_command_arriving_before_its_job_registers_it() {
+        let jobs = Jobs::default();
+        let token = jobs.token("a");
+        assert_eq!(jobs.on_close(), CloseDecision::Ask);
+        jobs.begin("a");
+        jobs.cancel("a");
+        assert!(token.is_cancelled());
     }
 
     #[test]
     fn cancelling_everything_stops_and_ends_each_job() {
         let jobs = Jobs::default();
-        jobs.entries().insert("a".into(), Entry::active());
-        jobs.entries().insert("b".into(), Entry::active());
-        let token = jobs.entries()["a"].token.clone();
+        jobs.begin("a");
+        jobs.begin("b");
+        let token = jobs.token("a");
         jobs.cancel_all();
         assert!(token.is_cancelled());
-        assert!(!jobs.entries().values().any(|e| e.active));
+        assert_eq!(jobs.on_close(), CloseDecision::Close);
+    }
+
+    // "Close anyway" cancels every job, so a second click on the close button found
+    // nothing running and closed the window while an install was still moving files
+    #[test]
+    fn a_close_under_way_holds_every_later_one() {
+        let jobs = Jobs::default();
+        jobs.begin("install");
+        assert_eq!(jobs.on_close(), CloseDecision::Ask);
+        jobs.in_flight.fetch_add(1, Ordering::SeqCst);
+        jobs.closing.store(true, Ordering::SeqCst);
+        jobs.cancel_all();
+        assert_eq!(jobs.on_close(), CloseDecision::Hold);
+
+        // Files still moving with no job left to ask about: closed once they are in place
+        let jobs = Jobs::default();
+        jobs.in_flight.fetch_add(1, Ordering::SeqCst);
+        assert_eq!(jobs.on_close(), CloseDecision::CloseWhenSettled);
+        jobs.in_flight.fetch_sub(1, Ordering::SeqCst);
+        assert_eq!(jobs.on_close(), CloseDecision::Close);
     }
 }

@@ -212,12 +212,8 @@ async fn unzip_and_get_first_folder(
     app_handle: AppHandle,
 ) -> Result<String, String> {
     // The archive is extracted next to itself, so only one the Hub downloaded into a
-    // temporary folder of its own: extracting any file the page could reach let page
-    // script unpack a zip it had written as a save database over the game's executable.
-    let zip = guard::checked(&app_handle, &zip_path)?;
-    if !zip.parent().is_some_and(guard::is_hub_tmp_dir) || !download::take_downloaded_archive(&zip) {
-        return Err(format!("ERR: Refusing to extract {}: not an archive the Hub downloaded", zip_path));
-    }
+    // temporary folder of its own (see archive_to_extract)
+    download::archive_to_extract(&app_handle, &zip_path).map_err(|e| format!("ERR: {}", e))?;
     let cancel = jobs::token(&app_handle, &job);
     let zip_path_clone = zip_path.clone();
 
