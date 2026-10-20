@@ -401,7 +401,12 @@
     const RedownloadStable = async () => {
         if (!latestRelease) await TryFetchingLatestVersion();
         // The lookup has already said why it failed
-        if (!latestRelease || latestVersion !== currentVersion) return;
+        if (!latestRelease) return;
+        if (latestVersion !== currentVersion) {
+            // Said, rather than the button simply turning into Update
+            TriggerWarning(get(_)('home.warn.newer_release', { values: { version: latestVersion ?? '', button: get(_)('home.button.update') } }));
+            return;
+        }
         const go = await confirmDialog(get(_)('home.warn.redownload_confirm', { values: { version: latestVersion ?? '' } }), { title: get(_)('home.button.redownload') });
         if (go) await DownloadStable();
     };

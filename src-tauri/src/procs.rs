@@ -20,6 +20,35 @@ fn augmented_tool_path(base_path: &str, home: Option<&str>) -> String {
         .map(|s| s.to_string())
         .collect();
 
+    for candidate in tool_dirs(home) {
+        if !dirs.iter().any(|dir| dir == &candidate) {
+            dirs.push(candidate);
+        }
+    }
+    dirs.join(":")
+}
+
+/// The value of `key` when it is set but not valid UTF-8. `utf8_env` leaves such a value
+/// out, so a path list built from it would lose the user's own entries: it is extended as
+/// it is instead.
+#[cfg(unix)]
+pub(crate) fn non_utf8_var(key: &str) -> Option<std::ffi::OsString> {
+    std::env::var_os(key).filter(|value| value.to_str().is_none())
+}
+
+/// `list` with `dirs` added after it, kept as raw bytes.
+#[cfg(unix)]
+fn extend_raw_path(mut list: std::ffi::OsString, dirs: &[String]) -> std::ffi::OsString {
+    for dir in dirs {
+        list.push(":");
+        list.push(dir);
+    }
+    list
+}
+
+/// Where the .NET SDK is installed, beyond what a desktop session's PATH holds.
+#[cfg(unix)]
+fn tool_dirs(home: Option<&str>) -> Vec<String> {
     let mut candidates = vec![
         "/usr/local/bin".to_string(),
         "/usr/share/dotnet".to_string(),
@@ -33,13 +62,7 @@ fn augmented_tool_path(base_path: &str, home: Option<&str>) -> String {
     if let Some(home) = home {
         candidates.push(format!("{}/.dotnet", home));
     }
-
-    for candidate in candidates {
-        if !dirs.iter().any(|dir| dir == &candidate) {
-            dirs.push(candidate);
-        }
-    }
-    dirs.join(":")
+    candidates
 }
 
 /// A change to a child process's environment: `None` removes the variable.
@@ -317,7 +340,12 @@ async fn run_dotnet(
                 None => env.get("PATH").cloned().unwrap_or_default(),
             };
             apply_env(&mut cmd, cleanup);
-            cmd.env("PATH", augmented_tool_path(&base, env.get("HOME").map(String::as_str)));
+            let home = env.get("HOME").map(String::as_str);
+            match non_utf8_var("PATH") {
+                // Kept as it is: read as missing, the dotnet locations alone replaced it
+                Some(raw) => cmd.env("PATH", extend_raw_path(raw, &tool_dirs(home))),
+                None => cmd.env("PATH", augmented_tool_path(&base, home)),
+            };
         }
 
         let mut child = cmd
@@ -389,6 +417,17 @@ async fn run_dotnet(
 #[cfg(test)]
 mod env_tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_path_that_is_not_utf8_keeps_its_entries() {
+        use std::os::unix::ffi::{OsStrExt, OsStringExt};
+        let raw = std::ffi::OsString::from_vec(b"/home/ren\xe9/bin:/usr/bin".to_vec());
+        let path = extend_raw_path(raw, &tool_dirs(Some("/home/user")));
+        let bytes = path.as_bytes();
+        assert!(bytes.starts_with(b"/home/ren\xe9/bin:/usr/bin:"));
+        assert!(bytes.ends_with(b":/home/user/.dotnet"));
+    }
 
     #[test]
     fn a_variable_that_is_not_utf8_is_left_out_instead_of_panicking() {

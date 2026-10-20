@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { getContext } from 'svelte';
+    import { getContext, tick } from 'svelte';
     import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -59,6 +59,10 @@
 
     // Creating an instance asks which build to install (Stable / Experimental);
     // the download starts automatically on the Home tab once the instance is created.
+    // This dialog closes after the picker has, so focus goes back through the picker to
+    // this dialog's button and then to the Manage button: closed first, focus was left on
+    // the page itself.
+    let created = false;
     const DoCreate = async (build: BuildOption) => {
         try {
             const instance = await createInstance(newInstanceName);
@@ -68,7 +72,7 @@
                 pendingInstall: build
             });
             TriggerSuccess(get(_)('instances.success.created', { values: { name: instance.name } }));
-            OnClose();
+            created = true;
         } catch (error) {
             TriggerError(get(_)('instances.error.create_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
@@ -159,7 +163,14 @@
 </Modal>
 {/if}
 
-<BuildPickerModal Show={showBuildPicker} OnClose={() => showBuildPicker = false} OnPick={DoCreate} />
+<BuildPickerModal Show={showBuildPicker} OnClose={async () => {
+    showBuildPicker = false;
+    if (!created) return;
+    created = false;
+    // The picker's own focus goes back first
+    await tick();
+    OnClose();
+}} OnPick={DoCreate} />
 
 <style>
     .modal-body {

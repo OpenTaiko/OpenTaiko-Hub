@@ -92,6 +92,7 @@
       "change_build": "Versie wijzigen"
     },
     "warn": {
+      "newer_release": "OpenTaiko {version} is beschikbaar: installeer het met ‘{button}’.",
       "skin_update": "(Na het bijwerken is ook een skin-update nodig)",
       "skin_update_confirm": "Daarna moeten ook je geïnstalleerde skins worden bijgewerkt. OpenTaiko nu bijwerken?",
       "redownload_confirm": "OpenTaiko {version} opnieuw downloaden en in deze instantie opnieuw installeren?"
@@ -171,6 +172,7 @@
       "deleted": "Save \"{name}\" verwijderd."
     },
     "error": {
+      "timeout": "Het lezen van de save-database duurde te lang.",
       "no_db": "Deze instantie heeft nog geen save-database.",
       "game_running": "Sluit OpenTaiko voordat je de saves wijzigt: het spel zou de wijziging bij het afsluiten overschrijven.",
       "load": "Kon de save-database niet lezen.",
@@ -630,7 +632,7 @@
     "install_cancelled": "Installatie geannuleerd",
     "dotnet_page": ".NET 8 downloaden",
     "instance_busy": "Er loopt een installatie in deze instantie",
-    "closing": "Wordt gesloten zodra de bestanden die worden verplaatst op hun plek staan…"
+    "closing": "Wordt gesloten zodra de huidige stap klaar is…"
   },
   "toast": {
     "copy": "Details kopiëren",

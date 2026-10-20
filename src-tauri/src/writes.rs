@@ -32,6 +32,34 @@ fn temp_path(path: &Path) -> PathBuf {
     path.with_file_name(name)
 }
 
+/// True for a name `temp_path` gives: `<file>.<pid>-<n>.tmp`.
+fn is_temp_name(name: &str) -> bool {
+    let Some((_, id)) = name.strip_suffix(".tmp").and_then(|rest| rest.rsplit_once('.')) else { return false };
+    let Some((pid, n)) = id.split_once('-') else { return false };
+    [pid, n].iter().all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+}
+
+/// How old a temporary file of `write_atomic` must be before it is taken for a leftover.
+const STALE_TEMP: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);
+
+/// Removes what writes cut off by a crash or a power cut left in `dir`. Each write uses a
+/// name of its own, so unlike the single name used before, nothing ever replaced them: a
+/// copy of the save database could pile up beside the game once per crash.
+pub fn remove_stale_temps(dir: &Path) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        let leftover = entry.file_name().to_str().is_some_and(is_temp_name)
+            && entry.file_type().is_ok_and(|t| t.is_file())
+            && crate::download::older_than(&path, STALE_TEMP);
+        if leftover {
+            if let Err(e) = fs::remove_file(&path) {
+                log::warn!("Could not remove {}: {}", path.display(), e);
+            }
+        }
+    }
+}
+
 /// Writes next to `path` and renames over it, so a crash or a full disk mid-write leaves
 /// the previous content intact instead of a truncated file. The content reaches the disk
 /// before the rename does: otherwise a power cut just after could leave an empty file.
@@ -235,12 +263,37 @@ mod tests {
             })
             .collect();
         for writer in writers {
-            // A rename onto a file another writer is renaming may be refused on Windows;
-            // what matters is that no write lands torn or under another's name
-            let _ = writer.join().unwrap();
+            // A rename onto a file another writer is renaming may be refused on Windows.
+            // A temporary file gone from under its writer may not: with one name for all,
+            // another writer had renamed it away, or replaced it with its own content
+            if let Err(e) = writer.join().unwrap() {
+                assert!(!e.contains("(os error 2)"), "{e}");
+            }
         }
         let text = fs::read_to_string(&file).unwrap();
         assert!(serde_json::from_str::<serde_json::Value>(&text).is_ok(), "{text}");
+    }
+
+    #[test]
+    fn only_old_temporary_files_of_atomic_writes_are_removed() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file = tmp.path().join("Saves.db3");
+        let temp = temp_path(&file);
+        assert!(is_temp_name(&temp.file_name().unwrap().to_string_lossy()));
+        for name in ["Saves.db3", "notes.tmp", "Saves.db3.tmp", "Saves.db3.12-x.tmp", "a.1-2.tmp.bak"] {
+            assert!(!is_temp_name(name), "{name}");
+        }
+        let left = tmp.path().join("Saves.db3.4321-7.tmp");
+        for path in [&file, &temp, &left, &tmp.path().join("notes.tmp")] {
+            fs::write(path, "x").unwrap();
+        }
+        let day_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(25 * 60 * 60);
+        for path in [&left, &file, &tmp.path().join("notes.tmp")] {
+            fs::File::options().write(true).open(path).unwrap().set_modified(day_ago).unwrap();
+        }
+        remove_stale_temps(tmp.path());
+        // A recent one may belong to a write under way
+        assert!(!left.exists() && temp.exists() && file.exists() && tmp.path().join("notes.tmp").exists());
     }
 
     #[test]

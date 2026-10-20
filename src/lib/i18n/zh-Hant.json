@@ -92,6 +92,7 @@
       "change_build": "更換版本"
     },
     "warn": {
+      "newer_release": "OpenTaiko {version} 已發布：請透過「{button}」安裝。",
       "skin_update": "（更新後需要在「主題」頁面更新主題）",
       "skin_update_confirm": "此更新之後，已安裝的主題也需要更新。現在更新 OpenTaiko 嗎？",
       "redownload_confirm": "重新下載 OpenTaiko {version} 並在此實例中重新安裝嗎？"
@@ -171,6 +172,7 @@
       "deleted": "已刪除存檔「{name}」。"
     },
     "error": {
+      "timeout": "讀取存檔資料庫耗時過長。",
       "no_db": "此實例尚無存檔資料庫。",
       "game_running": "變更存檔前請先關閉 OpenTaiko：遊戲結束時會覆寫這些變更。",
       "load": "無法讀取存檔資料庫。",
@@ -630,7 +632,7 @@
     "install_cancelled": "安裝已取消",
     "dotnet_page": "取得 .NET 8",
     "instance_busy": "此實例正在進行安裝",
-    "closing": "正在移動的檔案完成後即關閉…"
+    "closing": "目前步驟完成後即關閉…"
   },
   "toast": {
     "copy": "複製詳細資訊",

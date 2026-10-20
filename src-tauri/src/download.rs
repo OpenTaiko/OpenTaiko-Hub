@@ -195,7 +195,12 @@ fn client() -> Result<&'static reqwest::Client, String> {
     if let Some(client) = CLIENT.get() {
         return Ok(client);
     }
-    let client = reqwest::Client::builder()
+    let builder = reqwest::Client::builder();
+    // The tests talk to a server on this machine, which a proxy set for the machine would
+    // not reach
+    #[cfg(test)]
+    let builder = builder.no_proxy();
+    let client = builder
         .user_agent(concat!("OpenTaiko-Hub/", env!("CARGO_PKG_VERSION")))
         // Without these a connection that died without closing (Wi-Fi gone, the PC
         // asleep) kept a download waiting forever. A timed-out attempt is retried.
@@ -487,6 +492,15 @@ async fn sleep_unless_cancelled(delay: Duration, cancel: &CancelToken) -> bool {
 fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
     let mut placed: Vec<(&Path, Option<PathBuf>)> = Vec::new();
     let mut failure = None;
+    // A file that cannot be put back (held open by an antivirus, say) keeps its .hubold
+    // copy, and is named in the error rather than left for nobody to notice
+    let mut not_restored = Vec::new();
+    let mut restore = |undone: std::io::Result<()>, dest: &Path| {
+        if let Err(e) = undone {
+            log::error!("Could not put {} back after a failed update: {e}", dest.display());
+            not_restored.push(dest.display().to_string());
+        }
+    };
     for (part, dest) in files {
         let old = dest.exists().then(|| with_suffix(dest, OLD_SUFFIX));
         if let Some(old) = &old {
@@ -500,7 +514,7 @@ fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
         }
         if let Err(e) = std::fs::rename(part, dest) {
             if let Some(old) = &old {
-                let _ = std::fs::rename(old, dest);
+                restore(std::fs::rename(old, dest), dest);
             }
             failure = Some(format!("Could not write {}: {e}", dest.display()));
             break;
@@ -513,18 +527,12 @@ fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
         }
         return Ok(());
     };
-    // A file that cannot be put back (held open by an antivirus, say) keeps its .hubold
-    // copy, and is named in the error rather than left for nobody to notice
-    let mut not_restored = Vec::new();
     for (dest, old) in placed.into_iter().rev() {
         let undone = match old {
             Some(old) => std::fs::rename(old, dest),
             None => std::fs::remove_file(dest),
         };
-        if let Err(e) = undone {
-            log::error!("Could not put {} back after a failed update: {e}", dest.display());
-            not_restored.push(dest.display().to_string());
-        }
+        restore(undone, dest);
     }
     for (part, _) in files {
         let _ = std::fs::remove_file(part);
@@ -536,7 +544,7 @@ fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
     }
 }
 
-fn touch(path: &Path) -> std::io::Result<()> {
+pub(crate) fn touch(path: &Path) -> std::io::Result<()> {
     std::fs::File::options().write(true).open(path)?.set_modified(SystemTime::now())
 }
 
@@ -655,6 +663,12 @@ pub async fn download_file<R: Runtime>(
         .await
         .map_err(failure_message)?;
     let _moving = crate::jobs::in_flight(&app);
+    // Checked once counted in flight: a close that cancelled everything and found nothing
+    // in flight is not followed by files being placed while the Hub exits
+    if let Err(e) = cancel.check() {
+        let _ = tokio::fs::remove_file(&part).await;
+        return Err(e);
+    }
     let placed = dest.clone();
     crate::library::blocking(move || commit(&[(part, placed)])).await?;
     if is_archive(&dest) {
@@ -901,6 +915,13 @@ pub async fn install_files<R: Runtime>(
         }
     }
     let _moving = crate::jobs::in_flight(&app);
+    // As in download_file: cancelled by a close meanwhile, nothing is placed
+    if let Err(e) = cancel.check() {
+        for (part, _) in &arrived {
+            let _ = tokio::fs::remove_file(part).await;
+        }
+        return Err(e);
+    }
     crate::library::blocking(move || commit(&arrived)).await?;
     progress.lock().unwrap().flush();
     Ok(report)
@@ -910,37 +931,71 @@ pub async fn install_files<R: Runtime>(
 struct CacheMeta {
     etag: Option<String>,
     last_modified: Option<String>,
+    /// The URL the copy is of, for an entry kept under another key (see `cache_key`).
+    #[serde(default)]
+    url: Option<String>,
 }
 
-fn cache_paths(dir: &Path, url: &str) -> (PathBuf, PathBuf) {
-    let key = hex::encode(Sha1::digest(url.as_bytes()));
+/// What a cached copy is kept under. A tree read at a commit never changes, and is kept
+/// once per repository, the newest asked for: kept per URL, one per upstream commit added
+/// up to tens of megabytes.
+fn cache_key(url: &reqwest::Url) -> Option<String> {
+    let parts = segments(url);
+    match parts.as_slice() {
+        ["repos", owner, repo, "git", "trees", commit] if url.host_str() == Some("api.github.com") && commit.len() == 40 && is_hex(commit) => {
+            Some(format!("tree:{owner}/{repo}").to_ascii_lowercase())
+        }
+        _ => None,
+    }
+}
+
+fn cache_paths(dir: &Path, key: &str) -> (PathBuf, PathBuf) {
+    let key = hex::encode(Sha1::digest(key.as_bytes()));
     (dir.join(format!("{key}.body")), dir.join(format!("{key}.json")))
 }
 
 /// Fetches a catalog, a database or a GitHub API response, keeping a copy on disk with
 /// its ETag. The next request for the same URL is conditional, and a "not modified"
-/// answer is served from that copy: nothing is downloaded again, and GitHub does not count
-/// such requests against its hourly API limit. The body is returned as raw bytes.
+/// answer is served from that copy, so nothing is downloaded again. GitHub still counts
+/// such a request against its hourly limit for requests without a token: a tree read at a
+/// commit, which cannot change, is served from its copy without asking at all. The body
+/// is returned as raw bytes.
+///
+/// Offline or refused, the copy kept from before is served instead, unless `current` asks
+/// for GitHub's answer of now: what the head of a branch is, read from a copy days old,
+/// had songs updated to files that were already out of date, reported as a success.
 #[tauri::command]
-pub async fn fetch_cached<R: Runtime>(app: AppHandle<R>, url: String) -> Result<Response, String> {
+pub async fn fetch_cached<R: Runtime>(app: AppHandle<R>, url: String, current: Option<bool>) -> Result<Response, String> {
     let parsed = parse_url(&url, &READ_HOSTS)?;
-    let body = read_cached(&app, &url, parsed.clone()).await?;
-    remember_branch_head(&parsed, &body);
+    let (body, from_before) = read_cached(&app, &url, parsed.clone(), current.unwrap_or(false)).await?;
+    if !from_before {
+        remember_branch_head(&parsed, &body);
+    }
     Ok(Response::new(body))
 }
 
-async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest::Url) -> Result<Vec<u8>, String> {
+/// The body, and whether it is the copy kept from before rather than GitHub's answer now.
+async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest::Url, current: bool) -> Result<(Vec<u8>, bool), String> {
     let dir = app
         .path()
         .app_cache_dir()
         .map_err(|e| e.to_string())?
         .join("http");
-    let (body_path, meta_path) = cache_paths(&dir, url);
+    let immutable = cache_key(&parsed);
+    let (body_path, meta_path) = cache_paths(&dir, immutable.as_deref().unwrap_or(url));
 
     let cached_meta: Option<CacheMeta> = match (tokio::fs::read(&meta_path).await, body_path.exists()) {
-        (Ok(bytes), true) => serde_json::from_slice(&bytes).ok(),
+        (Ok(bytes), true) => serde_json::from_slice::<CacheMeta>(&bytes)
+            .ok()
+            .filter(|meta| immutable.is_none() || meta.url.as_deref() == Some(url)),
         _ => None,
     };
+    if immutable.is_some() && cached_meta.is_some() {
+        let _ = touch(&meta_path);
+        if let Ok(body) = tokio::fs::read(&body_path).await {
+            return Ok((body, false));
+        }
+    }
 
     let mut request = client()?.get(parsed);
     if let Some(meta) = &cached_meta {
@@ -969,6 +1024,7 @@ async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest:
         let meta = CacheMeta {
             etag: header(reqwest::header::ETAG),
             last_modified: header(reqwest::header::LAST_MODIFIED),
+            url: Some(url.to_string()),
         };
         let body = response.bytes().await.map_err(|e| (None, format!("Request to {url} failed: {e}")))?;
         Ok(Some((meta, body.to_vec())))
@@ -982,14 +1038,15 @@ async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest:
             let _ = touch(&meta_path);
             return tokio::fs::read(&body_path)
                 .await
+                .map(|body| (body, false))
                 .map_err(|e| format!("Could not read the cached copy of {url}: {e}"));
         }
         Err((status, message)) => {
-            let fall_back = status.map_or(true, |s| s == 403 || is_retryable_status(s));
+            let fall_back = !current && status.map_or(true, |s| s == 403 || is_retryable_status(s));
             if fall_back && cached_meta.is_some() {
                 if let Ok(body) = tokio::fs::read(&body_path).await {
                     log::warn!("{message}; using the cached copy");
-                    return Ok(body);
+                    return Ok((body, true));
                 }
             }
             return Err(message);
@@ -997,7 +1054,7 @@ async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest:
     };
 
     // Caching is best-effort: a failure here costs the next request, never this one
-    if meta.etag.is_some() || meta.last_modified.is_some() {
+    if meta.etag.is_some() || meta.last_modified.is_some() || immutable.is_some() {
         let store = async {
             tokio::fs::create_dir_all(&dir).await?;
             write_replacing(&body_path, &body).await?;
@@ -1007,7 +1064,7 @@ async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest:
             log::warn!("Could not cache {url}: {e}");
         }
     }
-    Ok(body)
+    Ok((body, false))
 }
 
 /// Writes beside `path` under a name no other write uses, then renames over it: two
@@ -1118,9 +1175,8 @@ mod tests {
     #[test]
     fn only_an_archive_the_hub_downloaded_into_its_own_folder_is_extracted() {
         let app = crate::guard::mock_app();
-        let id = format!("{:08x}", std::process::id() ^ 0x5a5a_5a5a);
-        let folder = std::env::temp_dir().join(format!("otk-{id}"));
-        std::fs::create_dir_all(&folder).unwrap();
+        let temp = crate::guard::TempBuildDir::new();
+        let folder = temp.0.clone();
         let zip = folder.join("package.zip");
         std::fs::write(&zip, b"PK").unwrap();
         crate::guard::allow_for_test(app.handle(), &folder);
@@ -1140,7 +1196,6 @@ mod tests {
         crate::guard::allow_for_test(app.handle(), instance.path());
         downloaded_archives().lock().unwrap().push(elsewhere.clone());
         assert!(archive_to_extract(app.handle(), &elsewhere.to_string_lossy()).is_err());
-        let _ = std::fs::remove_dir_all(&folder);
     }
 
     #[test]
@@ -1231,6 +1286,11 @@ mod tests {
     /// A server on this machine standing in for GitHub: answers every request with
     /// `status` and `body`, and counts the requests.
     async fn serve(status: u16, body: &'static [u8]) -> (reqwest::Url, Arc<std::sync::atomic::AtomicUsize>) {
+        serve_announcing(status, body, body.len()).await
+    }
+
+    /// `serve`, announcing `announced` bytes whatever the body holds.
+    async fn serve_announcing(status: u16, body: &'static [u8], announced: usize) -> (reqwest::Url, Arc<std::sync::atomic::AtomicUsize>) {
         use std::sync::atomic::{AtomicUsize, Ordering};
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
@@ -1249,7 +1309,7 @@ mod tests {
                             Ok(n) => request.extend_from_slice(&buffer[..n]),
                         }
                     }
-                    let head = format!("HTTP/1.1 {status} Test\r\nContent-Length: {}\r\nConnection: close\r\n\r\n", body.len());
+                    let head = format!("HTTP/1.1 {status} Test\r\nContent-Length: {announced}\r\nConnection: close\r\n\r\n");
                     let _ = socket.write_all(head.as_bytes()).await;
                     let _ = socket.write_all(body).await;
                     let _ = socket.shutdown().await;
@@ -1284,6 +1344,40 @@ mod tests {
         assert!(!dest.exists(), "nothing is placed before the commit");
     }
 
+    // The hash worked out as the file arrives is the one verification uses: checked here
+    // directly, since a download that matches would pass even if it were never worked out
+    // (the file is then read back)
+    #[test]
+    fn a_file_is_hashed_as_it_arrives() {
+        let tmp = tempfile::tempdir().unwrap();
+        let part = tmp.path().join("song.ogg.hubpart");
+        let body: &'static [u8] = b"the audio of a song, hashed on the way";
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let (url, _) = runtime.block_on(serve(200, body));
+        let hashed = runtime.block_on(async {
+            let (mut total, mut bytes) = (|_: u64| {}, |_: i64| {});
+            fetch_once(&url, &part, &CancelToken::default(), true, &mut total, &mut bytes).await
+        });
+        assert_eq!(hashed.ok().flatten(), Some(git_sha_of(body)));
+        assert_eq!(std::fs::read(&part).unwrap(), body);
+    }
+
+    #[test]
+    fn a_download_cut_short_is_tried_again_then_dropped() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dest = tmp.path().join("song.ogg");
+        let body: &'static [u8] = b"half a song";
+        let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+        let (url, requests) = runtime.block_on(serve_announcing(200, body, body.len() + 100));
+        let failure = runtime.block_on(async {
+            let (mut total, mut bytes) = (|_: u64| {}, |_: i64| {});
+            fetch_to_part(&url, &dest, None, 2, &CancelToken::default(), &mut total, &mut bytes).await
+        });
+        assert!(matches!(failure, Err(Failure::Retry { .. })), "a short file must not be kept");
+        assert_eq!(requests.load(std::sync::atomic::Ordering::SeqCst), 2);
+        assert!(!part_path(&dest).exists());
+    }
+
     #[test]
     fn a_download_not_matching_its_hash_is_tried_again_then_dropped() {
         let tmp = tempfile::tempdir().unwrap();
@@ -1311,6 +1405,20 @@ mod tests {
         });
         assert!(matches!(failure, Err(Failure::Fatal { status: Some(404), .. })));
         assert_eq!(requests.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_tree_at_a_commit_is_kept_once_per_repository() {
+        let key = |u: &str| cache_key(&reqwest::Url::parse(u).unwrap());
+        let commit = "0123456789abcdef0123456789abcdef01234567";
+        let other = "89abcdef0123456789abcdef0123456789abcdef";
+        let tree = key(&format!("https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/{commit}?recursive=1"));
+        assert_eq!(tree.as_deref(), Some("tree:opentaiko/opentaiko-soundtrack"));
+        // Another commit of the same repository replaces it
+        assert_eq!(key(&format!("https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/{other}?recursive=1")), tree);
+        // A branch's tree changes, and is asked for again like any other answer
+        assert_eq!(key("https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/main?recursive=1"), None);
+        assert_eq!(key("https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/branches/main"), None);
     }
 
     #[test]

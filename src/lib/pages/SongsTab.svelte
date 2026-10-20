@@ -101,8 +101,9 @@
     // unchanged files, to check downloads, and to detect outdated box.def / default.png
     let remoteIndex: SoundtrackIndex | null = null;
     let remoteIndexFetch: Promise<SoundtrackIndex | null> | null = null;   // in-flight fetch, shared by downloads that start together
-    // Read again once this old, so a Hub left open picks up songs updated since. Asking
-    // again costs nothing against GitHub's hourly limit while nothing changed.
+    // Read again once this old, so a Hub left open picks up songs updated since. Each time
+    // costs one request against GitHub's hourly limit (two when the songs changed): GitHub
+    // counts a "not modified" answer too.
     let remoteIndexReadAt = 0;
     const INDEX_MAX_AGE_MS = 10 * 60 * 1000;
     // After a failed fetch (usually GitHub's hourly API limit), downloads go ahead with
@@ -250,6 +251,8 @@
                 if (audio) URL.revokeObjectURL(audio);
                 return null;
             }
+            // Deleted since the scan: said, and looked for again on the next click
+            if (!audio) throw new Error(`${name} is no longer in ${forPath}`);
             songAudio = audio;
             return audio;
         } catch (error) {
@@ -795,10 +798,22 @@
 
             // The genre folders of the songs that did arrive get their box.def and art even
             // after a cancel: the game shows a folder only when it has a box.def, and those
-            // songs were left ungrouped until another full run. It is a few small files, so
-            // they are fetched outside the cancelled job.
-            const updated = await RefreshAllGenreMetadata(genres, cancelled ? undefined : job.id);
-            if (updated > 0) TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
+            // songs were left ungrouped until another full run. After a cancel this runs as
+            // a job of its own, which Cancel stops too: on the bad connection the run was
+            // cancelled for, its retries could keep the tab busy for minutes.
+            let metadataJob = job;
+            if (cancelled) {
+                job.end();
+                metadataJob = startJob('songs');
+                bulkJob = metadataJob;
+                bulkCancelRequested = false;
+            }
+            try {
+                const updated = await RefreshAllGenreMetadata(genres, metadataJob.id, !cancelled);
+                if (updated > 0) TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
+            } finally {
+                metadataJob.end();
+            }
         } finally {
             job.end();
             bulkJob = null;
@@ -834,7 +849,7 @@
         if (!remoteIndexFetch) {
             remoteIndexFetch = (async () => {
                 try {
-                    remoteIndex = await FetchSoundtrackIndex();
+                    remoteIndex = await FetchSoundtrackIndex(remoteIndex);
                     remoteIndexReadAt = Date.now();
                 } catch (error) {
                     // The index already read stays usable: its files are fetched from its
@@ -877,7 +892,7 @@
         for (const fileName of ['box.def', 'default.png']) {
             const localGenre = scannedGenres[genrePath];
             const localSha = fileName === 'box.def' ? localGenre?.boxDefSha1 : localGenre?.preimageSha1;
-            const { url: _url, gitSha: remoteSha } = IndexedFile(`${genrePath}/${fileName}`, remoteIndex);
+            const { url: _url, gitSha: remoteSha, size: remoteSize } = IndexedFile(`${genrePath}/${fileName}`, remoteIndex);
 
             let needsDownload: boolean;
             if (remoteIndex) {
@@ -891,7 +906,9 @@
             if (!needsDownload) continue;
 
             try {
-                const report = await installFiles(genreFullPath, [{ url: _url, relPath: fileName, optional: !remoteSha }], undefined, job);
+                // Checked against the index like a song's files, when it lists them
+                const entry = { url: _url, relPath: fileName, optional: !remoteSha, gitSha: remoteSha, size: remoteSize };
+                const report = await installFiles(genreFullPath, [entry], undefined, job);
                 if (report.downloaded.length === 0) continue;
                 changed = true;
                 if (remoteSha) {
@@ -911,13 +928,13 @@
     }
 
     // The genres of the songs a bulk run downloaded, which the last scan may not know yet,
-    // and with the repository index every genre the scan found. Without a job (the run was
-    // cancelled) only the downloaded songs' genres, all of them.
-    const RefreshAllGenreMetadata = async (downloaded: Set<string>, job?: string) => {
-        const genres = job ? new Set([...(remoteIndex ? Object.keys(scannedGenres) : []), ...downloaded]) : downloaded;
+    // and with `everyGenre` and the repository index every genre the scan found (after a
+    // cancel, only the downloaded songs' genres). Stops once cancelled.
+    const RefreshAllGenreMetadata = async (downloaded: Set<string>, job: string, everyGenre: boolean) => {
+        const genres = everyGenre ? new Set([...(remoteIndex ? Object.keys(scannedGenres) : []), ...downloaded]) : downloaded;
         let updated = 0;
         for (const genrePath of genres) {
-            if (job && bulkCancelRequested) break;
+            if (bulkCancelRequested) break;
             if (await EnsureGenreMetadata(genrePath, job)) updated++;
         }
         return updated;

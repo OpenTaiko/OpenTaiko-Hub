@@ -92,6 +92,7 @@
       "change_build": "빌드 변경"
     },
     "warn": {
+      "newer_release": "OpenTaiko {version}이(가) 나왔습니다. ‘{button}’으로 설치하세요.",
       "skin_update": "(업데이트하면 스킨 업데이트가 필요합니다)",
       "skin_update_confirm": "이 업데이트 후에는 설치된 스킨도 업데이트해야 합니다. 지금 OpenTaiko를 업데이트할까요?",
       "redownload_confirm": "OpenTaiko {version}을(를) 다시 내려받아 이 인스턴스에 다시 설치할까요?"
@@ -171,6 +172,7 @@
       "deleted": "세이브 \"{name}\"을(를) 삭제했습니다."
     },
     "error": {
+      "timeout": "세이브 데이터베이스를 읽는 데 너무 오래 걸렸습니다.",
       "no_db": "이 인스턴스에는 아직 세이브 데이터베이스가 없습니다.",
       "game_running": "세이브를 바꾸기 전에 OpenTaiko를 종료하세요. 게임이 종료될 때 변경 내용을 덮어씁니다.",
       "load": "세이브 데이터베이스를 읽을 수 없습니다.",
@@ -630,7 +632,7 @@
     "install_cancelled": "설치를 취소했습니다",
     "dotnet_page": ".NET 8 받기",
     "instance_busy": "이 인스턴스에서 설치가 진행 중입니다",
-    "closing": "옮기는 중인 파일이 제자리에 놓이면 닫힙니다…"
+    "closing": "현재 단계가 끝나면 닫힙니다…"
   },
   "toast": {
     "copy": "세부 정보 복사",

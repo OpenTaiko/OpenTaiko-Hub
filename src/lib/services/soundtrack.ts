@@ -30,11 +30,18 @@ export interface SoundtrackIndex {
     files: Map<string, { sha: string; size: number | null }>;
 }
 
-/** Every file of the soundtrack repository at the head of its branch. */
-export const FetchSoundtrackIndex = async (): Promise<SoundtrackIndex> => {
-    const branch = await fetchCachedJson<{ commit?: { sha?: string } }>(BRANCH_URL);
+/**
+ * Every file of the soundtrack repository at the head of its branch. The head is GitHub's
+ * answer of now, never a copy kept from before: refused (the hourly limit), the index
+ * read from an old copy had updates install files already out of date, as a success.
+ * The tree is asked for only when the head moved from `previous`: GitHub counts every
+ * request, a "not modified" one included.
+ */
+export const FetchSoundtrackIndex = async (previous: SoundtrackIndex | null = null): Promise<SoundtrackIndex> => {
+    const branch = await fetchCachedJson<{ commit?: { sha?: string } }>(BRANCH_URL, true);
     const commit = branch.commit?.sha;
     if (!commit || !/^[0-9a-f]{40}$/i.test(commit)) throw new Error(`No commit in ${BRANCH_URL}`);
+    if (previous?.commit === commit) return previous;
     const data = await fetchCachedJson<{ tree?: { type: string; path: string; sha: string; size?: number }[] }>(
         `${apiUrl(SOUNDTRACK_REPO)}/git/trees/${commit}?recursive=1`
     );
@@ -66,18 +73,26 @@ export const IndexedFile = (repoPath: string, index: SoundtrackIndex | null): { 
  * The files of a song, placed relative to its folder. A file listed outside the song's
  * own folder keeps only its name, so it can never land elsewhere. With the repository
  * index, each file carries its git blob SHA so an unchanged local copy is kept.
+ *
+ * A song the index does not list whole (one changed upstream since it was read) comes
+ * whole from the branch: with its listed files from the index's commit and the others
+ * from the branch, one song could mix two versions, a chart naming an audio file renamed
+ * since.
  */
-export const SongInstallEntries = (song: SoundtrackEntry, index: SoundtrackIndex | null): InstallEntry[] =>
-    song.tjaFilesPath.map((filePath) => {
+export const SongInstallEntries = (song: SoundtrackEntry, index: SoundtrackIndex | null): InstallEntry[] => {
+    const repoPaths = song.tjaFilesPath.map((filePath) => filePath.replace(/\\/g, '/'));
+    const usable = index && repoPaths.every((repoPath) => index.files.has(repoPath)) ? index : null;
+    return song.tjaFilesPath.map((filePath, i) => {
         const insideFolder = filePath.startsWith(song.tjaFolderPath + '\\') || filePath.startsWith(song.tjaFolderPath + '/');
         const localFilePath = insideFolder
             ? filePath.slice(song.tjaFolderPath.length + 1)
             : filePath.split('\\').pop() ?? filePath;
         return {
-            ...IndexedFile(filePath.replace(/\\/g, '/'), index),
+            ...IndexedFile(repoPaths[i], usable),
             relPath: localFilePath.replace(/\\/g, '/')
         };
     });
+};
 
 /** Every genre folder above a song, outermost first ("A", "A/B"). */
 export const SongGenrePaths = (song: SoundtrackEntry): string[] =>

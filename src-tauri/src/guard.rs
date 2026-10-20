@@ -11,6 +11,7 @@
 // folder, the whole drive included, from the next start on.
 
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
@@ -84,6 +85,7 @@ fn read_instances(registry: &Path) -> Option<Vec<PathBuf>> {
     )
 }
 
+#[cfg(test)]
 fn registered_instances(registry: &Path) -> Vec<PathBuf> {
     read_instances(registry).unwrap_or_default()
 }
@@ -226,7 +228,13 @@ fn remember_root<R: Runtime>(app: &AppHandle<R>, dir: &Path) -> Result<(), Strin
     // Held from reading the file to writing it: an attach and a create at the same time
     // each wrote the file as they had read it, and one of the two folders was lost
     let mut roots = state.0.lock().unwrap_or_else(|e| e.into_inner());
-    let mut saved = registered_instances(&file);
+    // A damaged file is left as it is: read as empty, it was written over with this one
+    // folder, and every instance it recorded was lost
+    let mut saved = match read_instances(&file) {
+        Some(saved) => saved,
+        None if file.exists() => return Err(format!("{} cannot be read; the Hub's list of instance folders is left as it is", file.display())),
+        None => Vec::new(),
+    };
     if !saved.iter().any(|p| same_path(p, dir)) {
         saved.push(dir.to_path_buf());
         write_roots(&file, &saved)?;
@@ -541,44 +549,54 @@ fn is_stale(path: &Path, now: SystemTime) -> bool {
         .is_some_and(|age| age >= STALE_TMP)
 }
 
-fn has_hub_tmp_name(dir: &Path) -> bool {
-    dir.file_name().and_then(|n| n.to_str()).is_some_and(is_hub_tmp_name)
+/// Names Hub 0.2 gave its temporary folders in ~/Documents/tmp, in lower case as it wrote
+/// them.
+fn is_old_hub_tmp_name(name: &str) -> bool {
+    is_hub_tmp_name(name) && name == name.to_ascii_lowercase()
 }
 
-fn has_build_dir_name(dir: &Path) -> bool {
-    dir.file_name().and_then(|n| n.to_str()).is_some_and(is_build_dir_name)
-}
+/// Archives Hub 0.2 downloaded into its temporary folders.
+const OLD_HUB_ARCHIVES: [&str; 3] = ["OpenTaiko.zip", "src.zip", "skin.zip"];
 
 /// What Hub 0.2 left in ~/Documents/tmp on Linux and macOS. That folder may be the user's
-/// own, and a name alone also matched folders such as `20240101`, so a folder there must
-/// also hold nothing but what the Hub put in it: archives, an extracted release
-/// (`OpenTaiko…`) and the folders of a build (`s`, `p`, `b`). Names are in lower case, as
-/// the Hub wrote them.
+/// own, where a name alone also matched folders such as `20240101`, so a folder there must
+/// also hold something of the Hub's (the archives it downloaded, an extracted release
+/// `OpenTaiko…`, the folders of a build `s`, `p`, `b`) and nothing else. An empty folder,
+/// or one holding only the user's own archives, used to pass.
 fn is_old_hub_tmp(dir: &Path) -> bool {
     let Some(name) = dir.file_name().and_then(|n| n.to_str()) else { return false };
-    if !is_hub_tmp_name(name) || name != name.to_ascii_lowercase() {
-        return false;
-    }
     if name.starts_with("indev-") {
         return true;
     }
     let Ok(entries) = std::fs::read_dir(dir) else { return false };
-    entries.flatten().all(|entry| {
-        let entry_name = entry.file_name().to_string_lossy().into_owned();
-        if entry.file_type().is_ok_and(|t| t.is_dir()) {
-            matches!(entry_name.as_str(), "s" | "p" | "b") || entry_name.starts_with("OpenTaiko")
-        } else {
-            entry_name.to_ascii_lowercase().ends_with(".zip")
-        }
-    })
+    let mut entries = entries.flatten().peekable();
+    entries.peek().is_some()
+        && entries.all(|entry| {
+            let entry_name = entry.file_name().to_string_lossy().into_owned();
+            if entry.file_type().is_ok_and(|t| t.is_dir()) {
+                matches!(entry_name.as_str(), "s" | "p" | "b") || entry_name.starts_with("OpenTaiko")
+            } else {
+                OLD_HUB_ARCHIVES.contains(&entry_name.as_str())
+            }
+        })
 }
 
-fn remove_stale_in(dir: &Path, matches: impl Fn(&Path) -> bool, now: SystemTime) -> usize {
+fn no_more_checks(_: &Path) -> bool {
+    true
+}
+
+/// Removes the folders of `dir` older than STALE_TMP that `name_ok` accepts and then
+/// `content_ok`. The name is looked at first: the system temp folder holds thousands of
+/// entries, and each used to be looked up on disk before its name was even read.
+fn remove_stale_in(dir: &Path, name_ok: fn(&str) -> bool, content_ok: fn(&Path) -> bool, now: SystemTime) -> usize {
     let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
     let mut removed = 0;
     for entry in entries.flatten() {
+        if !entry.file_name().to_str().is_some_and(name_ok) || !entry.file_type().is_ok_and(|t| t.is_dir()) {
+            continue;
+        }
         let path = entry.path();
-        if !path.is_dir() || !is_stale(&path, now) || !matches(&path) {
+        if !is_stale(&path, now) || !content_ok(&path) {
             continue;
         }
         match std::fs::remove_dir_all(&path) {
@@ -591,19 +609,21 @@ fn remove_stale_in(dir: &Path, matches: impl Fn(&Path) -> bool, now: SystemTime)
 
 /// What a download left beside the files it was replacing (download.rs), when a crash,
 /// a forced quit or a power cut stopped it: partial files, removed, and old files set
-/// aside, put back when their replacement never arrived. Symbolic links are not followed.
-fn clean_stale_downloads(dir: &Path, now: SystemTime) -> usize {
+/// aside, put back when their replacement never arrived. Only files last changed
+/// `before` (this run's start): anything later belongs to a download under way. Symbolic
+/// links are not followed.
+fn clean_stale_downloads(dir: &Path, before: SystemTime) -> usize {
     let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
     let mut cleaned = 0;
     for entry in entries.flatten() {
         let Ok(kind) = entry.file_type() else { continue };
         let path = entry.path();
         if kind.is_dir() {
-            cleaned += clean_stale_downloads(&path, now);
+            cleaned += clean_stale_downloads(&path, before);
             continue;
         }
         let name = entry.file_name().to_string_lossy().into_owned();
-        let stale = || kind.is_file() && is_stale(&path, now);
+        let stale = || kind.is_file() && entry.metadata().and_then(|m| m.modified()).is_ok_and(|modified| modified < before);
         let done = if name.ends_with(crate::download::PART_SUFFIX) && stale() {
             std::fs::remove_file(&path).is_ok()
         } else if let Some(original) = name.strip_suffix(crate::download::OLD_SUFFIX).filter(|_| stale()) {
@@ -627,22 +647,25 @@ fn clean_stale_downloads(dir: &Path, now: SystemTime) -> usize {
 /// such a download leaves is cleaned up as well. `old_tmp` is where Linux and macOS kept
 /// tmp before the Hub had a folder of its own, which nothing would empty any more.
 ///
-/// Downloads leave something behind only when the Hub did not end normally (`deep`): the
-/// library and every instance were otherwise walked file by file at every start, over
-/// twenty thousand entries on a modest install, to find nothing.
-pub fn sweep_leftovers(instances: Vec<PathBuf>, old_tmp: Option<PathBuf>, deep: bool) {
+/// Downloads leave something behind only when the Hub did not end normally: the library
+/// and every instance were otherwise walked file by file at every start, over twenty
+/// thousand entries on a modest install, to find nothing. After such an end,
+/// `deep_before` is this run's start, and what downloads left before it is cleaned up,
+/// however recent: with the 6-hour rule of the temporary folders, a restart soon after a
+/// crash found nothing old enough, and nothing ever swept again.
+pub fn sweep_leftovers(instances: Vec<PathBuf>, old_tmp: Option<PathBuf>, deep_before: Option<SystemTime>) {
     let now = SystemTime::now();
     let mut removed = 0;
     let mut cleaned = 0;
     let root = crate::hub_root_dir();
     if let Some(root) = &root {
-        removed += remove_stale_in(&root.join("tmp"), has_hub_tmp_name, now);
+        removed += remove_stale_in(&root.join("tmp"), is_hub_tmp_name, no_more_checks, now);
     }
     if let Some(old_tmp) = old_tmp {
-        removed += remove_stale_in(&old_tmp, is_old_hub_tmp, now);
+        removed += remove_stale_in(&old_tmp, is_old_hub_tmp_name, is_old_hub_tmp, now);
     }
-    removed += remove_stale_in(&std::env::temp_dir(), has_build_dir_name, now);
-    if deep {
+    removed += remove_stale_in(&std::env::temp_dir(), is_build_dir_name, no_more_checks, now);
+    if let Some(before) = deep_before {
         let mut trees: Vec<PathBuf> = root.iter().flat_map(|r| [r.join("Songs"), r.join("OpenTaiko")]).collect();
         // Hub 0.1's game folder is usually registered as an instance as well
         for instance in instances {
@@ -651,8 +674,9 @@ pub fn sweep_leftovers(instances: Vec<PathBuf>, old_tmp: Option<PathBuf>, deep: 
             }
         }
         for tree in &trees {
-            cleaned += clean_stale_downloads(tree, now);
+            cleaned += clean_stale_downloads(tree, before);
         }
+        SWEEP_OWED.store(false, Ordering::SeqCst);
     }
     if removed > 0 {
         log::info!("Removed {} leftover temporary folder(s)", removed);
@@ -670,10 +694,25 @@ fn session_file<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     private_dir(app).map(|dir| dir.join(SESSION_FILE))
 }
 
+/// Set while a sweep of what the previous run left is owed: until it has run to the end,
+/// the session is not recorded as ended normally, so a close during it does not cancel it.
+static SWEEP_OWED: AtomicBool = AtomicBool::new(false);
+
+/// Set when closing cut work off (see jobs.rs): what it was writing may be left behind.
+static CUT_OFF: AtomicBool = AtomicBool::new(false);
+
+/// Records that closing stopped work under way, so the next start sweeps.
+pub fn mark_cut_off() {
+    CUT_OFF.store(true, Ordering::SeqCst);
+}
+
 /// Records that the Hub is running. True when the previous run did not end normally (a
-/// crash, a forced quit, a power cut), or when no run of this version recorded anything.
+/// crash, a forced quit, a power cut, a close that cut work off), or when no run of this
+/// version recorded anything.
 pub fn begin_session<R: Runtime>(app: &AppHandle<R>) -> bool {
-    session_file(app).map_or(true, |file| begin_session_in(&file))
+    let unclean = session_file(app).map_or(true, |file| begin_session_in(&file));
+    SWEEP_OWED.store(unclean, Ordering::SeqCst);
+    unclean
 }
 
 fn begin_session_in(file: &Path) -> bool {
@@ -684,13 +723,31 @@ fn begin_session_in(file: &Path) -> bool {
     !ended_normally
 }
 
-/// Records a normal exit.
+/// Records the exit: a normal one, unless a sweep is still owed or closing cut work off,
+/// in which case the session stays "running" and the next start sweeps.
 pub fn end_session<R: Runtime>(app: &AppHandle<R>) {
     if let Some(file) = session_file(app) {
-        if let Err(e) = crate::writes::write_atomic(&file, b"stopped") {
-            log::warn!("Could not record the end of the session: {}", e);
-        }
+        end_session_in(&file, SWEEP_OWED.load(Ordering::SeqCst) || CUT_OFF.load(Ordering::SeqCst));
     }
+}
+
+fn end_session_in(file: &Path, leftovers_possible: bool) {
+    if leftovers_possible {
+        log::info!("Leftovers may remain; the next start looks for them");
+        return;
+    }
+    if let Err(e) = crate::writes::write_atomic(file, b"stopped") {
+        log::warn!("Could not record the end of the session: {}", e);
+    }
+}
+
+/// The folders `writes::write_atomic` writes into: the settings folder, the private
+/// folder, and each instance (its save database and version.json).
+pub fn atomic_write_dirs<R: Runtime>(app: &AppHandle<R>) -> Vec<PathBuf> {
+    let mut dirs: Vec<PathBuf> = [app.path().app_config_dir().ok(), private_dir(app)].into_iter().flatten().collect();
+    dirs.extend(instance_roots(app));
+    dirs.extend(crate::hub_root_dir().map(|root| root.join("OpenTaiko")));
+    dirs
 }
 
 /// The instance folders allowed this session.
@@ -713,6 +770,31 @@ pub(crate) fn mock_app() -> tauri::App<tauri::test::MockRuntime> {
 #[cfg(test)]
 pub(crate) fn allow_for_test<R: Runtime>(app: &AppHandle<R>, dir: &Path) {
     allow_dir(app, dir);
+}
+
+/// A build folder in the system temp folder for a test, named as the Hub names them, at
+/// random, and removed with the value even when the test fails: named after the process
+/// and removed on its last line, one left by a failed run could fail a later one.
+#[cfg(test)]
+pub(crate) struct TempBuildDir(pub PathBuf);
+
+#[cfg(test)]
+impl TempBuildDir {
+    pub(crate) fn new() -> Self {
+        static NEXT: std::sync::atomic::AtomicU32 = std::sync::atomic::AtomicU32::new(0);
+        let nanos = SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.subsec_nanos());
+        let id = nanos ^ std::process::id().rotate_left(16) ^ NEXT.fetch_add(0x9e37_79b9, std::sync::atomic::Ordering::Relaxed);
+        let dir = std::env::temp_dir().join(format!("otk-{id:08x}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        Self(dir)
+    }
+}
+
+#[cfg(test)]
+impl Drop for TempBuildDir {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_dir_all(&self.0);
+    }
 }
 
 #[cfg(test)]
@@ -742,8 +824,8 @@ mod tests {
     #[test]
     fn only_the_source_folder_of_a_build_the_hub_named_is_built() {
         let app = mock_app();
-        let id = format!("{:08x}", std::process::id() ^ 0xa5a5_a5a5);
-        let build = std::env::temp_dir().join(format!("otk-{id}"));
+        let temp = TempBuildDir::new();
+        let build = temp.0.clone();
         let project = build.join("s").join("OpenTaiko");
         std::fs::create_dir_all(&project).unwrap();
         allow_dir(app.handle(), &build);
@@ -762,7 +844,6 @@ mod tests {
         std::fs::write(other.path().join("s").join("OpenTaiko").join("OpenTaiko.csproj"), "<Project/>").unwrap();
         allow_dir(app.handle(), other.path());
         assert!(build_source_dir(app.handle(), &other.path().join("s").to_string_lossy()).is_err());
-        let _ = std::fs::remove_dir_all(&build);
     }
 
     #[test]
@@ -804,10 +885,10 @@ mod tests {
             std::fs::create_dir(tmp.path().join(name)).unwrap();
         }
         // Nothing is old enough yet
-        assert_eq!(remove_stale_in(tmp.path(), has_hub_tmp_name, SystemTime::now()), 0);
+        assert_eq!(remove_stale_in(tmp.path(), is_hub_tmp_name, no_more_checks, SystemTime::now()), 0);
         // Seen from seven hours later, only the Hub-named folder goes
         let later = SystemTime::now() + Duration::from_secs(7 * 60 * 60);
-        assert_eq!(remove_stale_in(tmp.path(), has_hub_tmp_name, later), 1);
+        assert_eq!(remove_stale_in(tmp.path(), is_hub_tmp_name, no_more_checks, later), 1);
         assert!(!tmp.path().join("1a2b3c4d").exists());
         assert!(tmp.path().join("mine").exists());
     }
@@ -828,16 +909,24 @@ mod tests {
         std::fs::write(dated.join("photo.jpg"), "mine").unwrap();
         let upper = tmp.path().join("CAFEBABE");
         std::fs::create_dir_all(upper.join("s")).unwrap();
+        // Empty, or holding only the user's own archives: these used to go too
+        let empty = tmp.path().join("20240102");
+        std::fs::create_dir_all(&empty).unwrap();
+        let backups = tmp.path().join("20240103");
+        std::fs::create_dir_all(&backups).unwrap();
+        std::fs::write(backups.join("backup.zip"), "PK").unwrap();
 
         let later = SystemTime::now() + Duration::from_secs(7 * 60 * 60);
-        assert_eq!(remove_stale_in(tmp.path(), is_old_hub_tmp, later), 3);
+        assert_eq!(remove_stale_in(tmp.path(), is_old_hub_tmp_name, is_old_hub_tmp, later), 3);
         assert!(dated.join("photo.jpg").exists());
-        assert!(upper.exists());
+        assert!(upper.exists() && empty.exists() && backups.join("backup.zip").exists());
         assert!(!hub_build.exists() && !hub_download.exists());
     }
 
+    // A restart soon after a crash is the usual one: what the crash left is minutes old,
+    // and a sweep requiring six hours found nothing, then never ran again
     #[test]
-    fn interrupted_downloads_are_cleaned_up_once_old() {
+    fn interrupted_downloads_are_cleaned_up_whatever_their_age() {
         let tmp = tempfile::tempdir().unwrap();
         let song = tmp.path().join("Pop").join("Song");
         std::fs::create_dir_all(&song).unwrap();
@@ -849,9 +938,12 @@ mod tests {
         std::fs::write(song.join("jacket.png.hubold"), "original").unwrap();
         std::fs::write(song.join("notes.part"), "the user's").unwrap();
 
-        assert_eq!(clean_stale_downloads(tmp.path(), SystemTime::now()), 0);
-        let later = SystemTime::now() + Duration::from_secs(7 * 60 * 60);
-        assert_eq!(clean_stale_downloads(tmp.path(), later), 3);
+        // Written after this run started: a download under way
+        let hour_ago = SystemTime::now() - Duration::from_secs(60 * 60);
+        assert_eq!(clean_stale_downloads(tmp.path(), hour_ago), 0);
+        // Written before it, a moment ago: left by the run that ended
+        let started = SystemTime::now() + Duration::from_secs(1);
+        assert_eq!(clean_stale_downloads(tmp.path(), started), 3);
 
         let mut names: Vec<String> = std::fs::read_dir(&song)
             .unwrap()
@@ -861,6 +953,16 @@ mod tests {
         assert_eq!(names, ["jacket.png", "notes.part", "song.tja"]);
         assert_eq!(std::fs::read_to_string(song.join("song.tja")).unwrap(), "new");
         assert_eq!(std::fs::read_to_string(song.join("jacket.png")).unwrap(), "original");
+    }
+
+    #[test]
+    fn a_damaged_roots_file_is_never_written_over() {
+        // Through remember_root's own reading: a damaged file is not an empty one
+        let tmp = tempfile::tempdir().unwrap();
+        let file = tmp.path().join(INSTANCE_ROOTS);
+        std::fs::write(&file, "{ cut short").unwrap();
+        assert!(read_instances(&file).is_none() && file.exists());
+        assert!(read_instances(&tmp.path().join("absent.json")).is_none());
     }
 
     #[test]
@@ -967,7 +1069,11 @@ mod tests {
         assert!(begin_session_in(&file));
         // Still "running": that run never ended normally
         assert!(begin_session_in(&file));
-        crate::writes::write_atomic(&file, b"stopped").unwrap();
+        // An exit with a sweep still owed, or after a close that cut work off, is not a
+        // normal one: the next start sweeps
+        end_session_in(&file, true);
+        assert!(begin_session_in(&file));
+        end_session_in(&file, false);
         assert!(!begin_session_in(&file));
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "running");
     }

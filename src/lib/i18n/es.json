@@ -92,6 +92,7 @@
       "change_build": "Cambiar versión"
     },
     "warn": {
+      "newer_release": "OpenTaiko {version} está disponible: usa «{button}» para instalarlo.",
       "skin_update": "(Actualizar requerirá una actualización del skin)",
       "skin_update_confirm": "Después también habrá que actualizar los skins instalados. ¿Actualizar OpenTaiko ahora?",
       "redownload_confirm": "¿Volver a descargar OpenTaiko {version} y reinstalarlo en esta instancia?"
@@ -171,6 +172,7 @@
       "deleted": "Partida «{name}» eliminada."
     },
     "error": {
+      "timeout": "Leer la base de datos de partidas tardó demasiado.",
       "no_db": "Esta instancia aún no tiene base de datos de partidas.",
       "game_running": "Cierra OpenTaiko antes de cambiar sus partidas guardadas: el juego sobrescribiría el cambio al salir.",
       "load": "No se pudo leer la base de datos de partidas.",
@@ -630,7 +632,7 @@
     "install_cancelled": "Instalación cancelada",
     "dotnet_page": "Obtener .NET 8",
     "instance_busy": "Hay una instalación en curso en esta instancia",
-    "closing": "Se cerrará en cuanto los archivos que se están moviendo estén en su sitio…"
+    "closing": "Se cerrará en cuanto termine el paso en curso…"
   },
   "toast": {
     "copy": "Copiar detalles",

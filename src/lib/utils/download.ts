@@ -41,17 +41,19 @@ export const installFiles = async (
 
 /**
  * Reads a catalog, a database or a GitHub API response through the backend's disk cache.
- * A repeated request is conditional, so an unchanged file is not downloaded again and
- * does not count against GitHub's hourly API limit. Throws `HTTP error status: <code>`.
+ * A repeated request is conditional, so an unchanged file is not downloaded again; GitHub
+ * still counts it against its hourly limit. Offline or refused, the copy kept from before
+ * is returned, unless `current` asks for GitHub's answer of now. Throws
+ * `HTTP error status: <code>`.
  */
-export const fetchCached = async (url: string): Promise<ArrayBuffer> => {
-    return await ipc.fetchCached(url);
+export const fetchCached = async (url: string, current = false): Promise<ArrayBuffer> => {
+    return await ipc.fetchCached(url, current);
 };
 
-export const fetchCachedText = async (url: string): Promise<string> => {
-    return new TextDecoder().decode(await fetchCached(url));
+export const fetchCachedText = async (url: string, current = false): Promise<string> => {
+    return new TextDecoder().decode(await fetchCached(url, current));
 };
 
-export const fetchCachedJson = async <T>(url: string): Promise<T> => {
-    return JSON.parse(await fetchCachedText(url)) as T;
+export const fetchCachedJson = async <T>(url: string, current = false): Promise<T> => {
+    return JSON.parse(await fetchCachedText(url, current)) as T;
 };

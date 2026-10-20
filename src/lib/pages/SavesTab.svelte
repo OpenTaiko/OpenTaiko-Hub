@@ -72,10 +72,14 @@
     // No step of a load may hang forever: a stuck await would leave the tab spinning
     // with nothing to click, so every load is bounded and always ends in a state the
     // user can act on.
+    // The step that took too long goes to the log; the message, shown in the tab, is in the
+    // user's language. Not "timed out": that reads as a network failure (see DescribeError).
     const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => Promise.race([
         promise,
-        // Not "timed out": that reads as a network failure (see DescribeError)
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error(`${label} took too long`)), ms))
+        new Promise<never>((_resolve, reject) => setTimeout(() => {
+            console.warn(`Saves: ${label} took longer than ${ms} ms`);
+            reject(new Error(get(_)('saves.error.timeout')));
+        }, ms))
     ]);
 
     // Loads a specific instance's DB. Captures a token so a slow reload for a previous

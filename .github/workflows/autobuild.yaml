@@ -1,16 +1,19 @@
 name: Build OpenTaiko Hub
 
 on:
+  # Every branch is checked, so a branch's Linux code is compiled and tested before it is
+  # merged: limited to main, the merge was the first time, and a failure there blocked
+  # publishing. Publishing is limited to main (see `version`).
   push:
     branches:
-      - main
-  # Pull requests run the checks only; publishing is limited to pushes to main
+      - '**'
+  # Pull requests run the checks only
   pull_request:
   # Publishes the current version again, replacing the files of its release
   workflow_dispatch:
 
 # Actions are pinned to a commit, with the release it was in alongside: a tag can be moved
-# to other code, and the publish job holds a token that can write releases.
+# to other code, and the release job holds a token that can write releases.
 jobs:
     # Nothing is published unless the type check, the frontend tests, clippy and the Rust
     # tests pass, on both systems the Hub ships for. Linux in particular: its code paths
@@ -99,6 +102,10 @@ jobs:
         runs-on: ubuntu-22.04
         outputs:
           publish: ${{ steps.gate.outputs.publish }}
+          version: ${{ steps.gate.outputs.version }}
+          # The runners to build on, as JSON, and the commit to build
+          platforms: ${{ steps.gate.outputs.platforms }}
+          ref: ${{ steps.gate.outputs.ref }}
         steps:
           - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
             with:
@@ -106,65 +113,62 @@ jobs:
 
           # A release counts once it holds the Windows installer and both Linux packages: a
           # first publish whose Linux leg failed used to count as released, and its release
-          # never got them. A lookup that fails for any other reason than a missing release
-          # (the API unreachable, a rate limit) stops here: counted as unreleased, it
-          # published over a release users had already downloaded.
+          # never got them. What it lacks is built again from its tag, and nothing else:
+          # rebuilt from main, the Windows installer users had was replaced by code the tag
+          # does not point at. Only a 404 means there is no release: `gh release view` also
+          # says "release not found" when GitHub fails to answer, and any failure counted as
+          # unreleased published over a release users had already downloaded.
           - id: gate
             env:
               GH_TOKEN: ${{ github.token }}
             run: |
               version=$(jq -r .version src-tauri/tauri.conf.json)
-              if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
-                echo "Publishing v$version on request"
-                echo "publish=true" >> "$GITHUB_OUTPUT"
+              echo "version=$version" >> "$GITHUB_OUTPUT"
+              both='["ubuntu-22.04","windows-latest"]'
+              if ! assets=$(gh api "repos/$GITHUB_REPOSITORY/releases/tags/v$version" --jq '.assets[].name' 2> "$RUNNER_TEMP/lookup-error.txt"); then
+                if ! grep -q "(HTTP 404)" "$RUNNER_TEMP/lookup-error.txt"; then
+                  cat "$RUNNER_TEMP/lookup-error.txt"
+                  echo "::error::Could not tell whether v$version is released"
+                  exit 1
+                fi
+                echo "Publishing v$version"
+                { echo "publish=true"; echo "platforms=$both"; echo "ref=$GITHUB_SHA"; } >> "$GITHUB_OUTPUT"
                 exit 0
               fi
-              if ! assets=$(gh release view "v$version" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name' 2> lookup-error.txt); then
-                if grep -qi "release not found" lookup-error.txt; then
-                  echo "Publishing v$version"
-                  echo "publish=true" >> "$GITHUB_OUTPUT"
-                  exit 0
-                fi
-                cat lookup-error.txt
-                echo "::error::Could not tell whether v$version is released"
-                exit 1
-              fi
-              missing=""
-              for suffix in -setup.exe .deb .AppImage; do
-                printf '%s\n' "$assets" | grep -q -- "${suffix}\$" || missing="$missing *$suffix"
-              done
-              if [ -n "$missing" ]; then
-                echo "::warning::v$version is released without$missing; publishing it again"
-                echo "publish=true" >> "$GITHUB_OUTPUT"
+              has() { printf '%s\n' "$assets" | grep -q -- "$1\$"; }
+              missing=()
+              has -setup.exe || missing+=('"windows-latest"')
+              { has .deb && has .AppImage; } || missing+=('"ubuntu-22.04"')
+              if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+                echo "Publishing v$version again on request, from its tag"
+                { echo "publish=true"; echo "platforms=$both"; echo "ref=refs/tags/v$version"; } >> "$GITHUB_OUTPUT"
+              elif [ ${#missing[@]} -gt 0 ]; then
+                list=$(IFS=,; echo "[${missing[*]}]")
+                echo "::warning::v$version is released without the files built on $list; building those from its tag"
+                { echo "publish=true"; echo "platforms=$list"; echo "ref=refs/tags/v$version"; } >> "$GITHUB_OUTPUT"
               else
                 echo "::notice::v$version is already released. Bump the version in src-tauri/tauri.conf.json, src-tauri/Cargo.toml and package.json to publish."
                 echo "publish=false" >> "$GITHUB_OUTPUT"
               fi
 
-    publish:
+    # Builds without any token that can write: the build runs code from every dependency
+    # (build scripts, bundler plugins), which used to run with the release token in its
+    # environment. The files go to the `release` job as artifacts.
+    build:
         needs: version
         if: needs.version.outputs.publish == 'true'
         permissions:
-          contents: write
-        # Two runs uploading to the same release take turns
-        concurrency:
-          group: publish-${{ matrix.platform }}
-          cancel-in-progress: false
+          contents: read
         strategy:
           fail-fast: false
           matrix:
-            include:
-              - platform: 'ubuntu-22.04'
-                args: ''
-              - platform: 'windows-latest'
-                args: ''
+            platform: ${{ fromJSON(needs.version.outputs.platforms) }}
 
         runs-on: ${{ matrix.platform }}
         steps:
-          # The release step gets its token from GITHUB_TOKEN below; none is left in
-          # .git/config for the dependency installs to read
           - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
             with:
+              ref: ${{ needs.version.outputs.ref }}
               persist-credentials: false
 
           - name: install dependencies (ubuntu only)
@@ -201,17 +205,61 @@ jobs:
             # If you don't have `beforeBuildCommand` configured you may want to build your frontend here too.
             # `ci` installs exactly the locked versions. The Tauri CLI decides the deb's
             # dependency list, so an unpinned bump silently changes what the package requires.
-            # No install scripts, as in the checks: this job can write releases.
+            # No install scripts, as in the checks.
             run: npm ci --ignore-scripts
 
-          - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0.6.2
-            env:
-              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # The bundles tauri.conf.json asks for: the NSIS installer on Windows, the deb and
+          # the AppImage on Linux
+          - name: build
+            run: npm run tauri build
+
+          - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
             with:
-              tagName: v__VERSION__ # the action automatically replaces \_\_VERSION\_\_ with the app version.
-              releaseName: 'OpenTaiko Hub v__VERSION__'
-              releaseBody: |
-                Linux builds are considered functional from 0.1.5, please update if your version is older.
-              releaseDraft: false
-              prerelease: false
-              args: ${{ matrix.args }}
+              name: bundle-${{ matrix.platform }}
+              path: |
+                src-tauri/target/release/bundle/nsis/*-setup.exe
+                src-tauri/target/release/bundle/deb/*.deb
+                src-tauri/target/release/bundle/appimage/*.AppImage
+              if-no-files-found: error
+              retention-days: 7
+
+    # The only job that can write releases, and it runs nothing but `gh`. A build that
+    # failed on one system does not hold back the other's files: the gate then builds
+    # only what is missing, on the next push.
+    release:
+        needs: [version, build]
+        if: ${{ !cancelled() && needs.version.outputs.publish == 'true' }}
+        permissions:
+          contents: write
+        # Two runs uploading to the same release take turns
+        concurrency:
+          group: release
+          cancel-in-progress: false
+        runs-on: ubuntu-22.04
+        steps:
+          - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+            with:
+              pattern: bundle-*
+              path: bundles
+              merge-multiple: true
+
+          - env:
+              GH_TOKEN: ${{ github.token }}
+              TAG: v${{ needs.version.outputs.version }}
+            run: |
+              cd bundles
+              ls -la
+              # Spaces become dots, as in the file names of earlier releases
+              for file in *; do
+                [ "$file" = "${file// /.}" ] || mv -- "$file" "${file// /.}"
+              done
+              if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > /dev/null 2> "$RUNNER_TEMP/lookup-error.txt"; then
+                if ! grep -q "(HTTP 404)" "$RUNNER_TEMP/lookup-error.txt"; then
+                  cat "$RUNNER_TEMP/lookup-error.txt"
+                  exit 1
+                fi
+                gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+                  --title "OpenTaiko Hub $TAG" \
+                  --notes "Linux builds are considered functional from 0.1.5, please update if your version is older."
+              fi
+              gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber -- *

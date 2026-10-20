@@ -127,7 +127,8 @@ export const ipc = {
         invoke<void>('download_file', { url, path, attempts, job, onProgress }),
     installFiles: (destRoot: string, entries: InstallEntry[], onProgress: Channel<ProgressPayload>, job?: string) =>
         invoke<InstallReport>('install_files', { destRoot, entries, job, onProgress }),
-    fetchCached: (url: string) => invoke<ArrayBuffer>('fetch_cached', { url }),
+    /** `current`: GitHub's answer of now, never the copy kept from before. */
+    fetchCached: (url: string, current = false) => invoke<ArrayBuffer>('fetch_cached', { url, current }),
 
     // Long operations (jobs.rs)
     beginJob: (job: string, prompt: ClosePrompt) => invoke<void>('begin_job', { job, prompt }),

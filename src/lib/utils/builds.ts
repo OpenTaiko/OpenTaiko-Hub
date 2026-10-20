@@ -63,7 +63,9 @@ export const fetchReleaseByTag = async (tag: string): Promise<GitHubRelease> => 
     return ValidRelease(await fetchCachedJson<unknown>(`${apiUrl(GAME_REPO)}/releases/tags/${encodeURIComponent(tag)}`));
 };
 
+// The head of now, never an old copy: a build of an old commit would be recorded as the
+// current one, and the update check would then say it is up to date
 export const fetchBranchHeadSha = async (branch: string): Promise<string | null> => {
-    const data = await fetchCachedJson<{ commit?: { sha?: string } }>(`${apiUrl(GAME_REPO)}/branches/${branch}`);
+    const data = await fetchCachedJson<{ commit?: { sha?: string } }>(`${apiUrl(GAME_REPO)}/branches/${branch}`, true);
     return data.commit?.sha ?? null;
 };

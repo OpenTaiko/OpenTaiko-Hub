@@ -29,11 +29,20 @@
 		?? (LoadSrc ? null : songInfo ? rawUrl(SOUNDTRACK_REPO, songInfo.chartAudioFilePath) : null)
 	);
 
+	// Clicks while the audio is being read are ignored: each one used to toggle once the
+	// read ended, so a double click played and paused at once
+	let loadingSrc = false;
 	const TogglePlay = async () => {
+		if (loadingSrc) return;
 		if (paused && !source && LoadSrc) {
-			if (!(await LoadSrc())) return;
-			// Src arrives as a prop: let it reach the <audio> before playing
-			await tick();
+			loadingSrc = true;
+			try {
+				if (!(await LoadSrc())) return;
+				// Src arrives as a prop: let it reach the <audio> before playing
+				await tick();
+			} finally {
+				loadingSrc = false;
+			}
 		}
 		paused = !paused;
 	};

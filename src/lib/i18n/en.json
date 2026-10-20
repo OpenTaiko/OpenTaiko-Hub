@@ -92,6 +92,7 @@
       "change_build": "Change build"
     },
     "warn": {
+      "newer_release": "OpenTaiko {version} is available: use “{button}” to install it.",
       "skin_update": "(Updating will require a skin update)",
       "skin_update_confirm": "Your installed skins will need an update too after this one. Update OpenTaiko now?",
       "redownload_confirm": "Download OpenTaiko {version} again and reinstall it in this instance?"
@@ -171,6 +172,7 @@
       "deleted": "Deleted the save \"{name}\"."
     },
     "error": {
+      "timeout": "Reading the save database took too long.",
       "no_db": "This instance has no save database yet.",
       "game_running": "Close OpenTaiko before changing its saves: the game would overwrite the change when it exits.",
       "load": "Could not read the save database.",
@@ -630,7 +632,7 @@
     "install_cancelled": "Install cancelled",
     "dotnet_page": "Get .NET 8",
     "instance_busy": "An install is running in this instance",
-    "closing": "Closing once the files being moved are in place…"
+    "closing": "Closing once the current step is done…"
   },
   "toast": {
     "copy": "Copy details",

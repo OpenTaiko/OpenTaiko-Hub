@@ -261,9 +261,14 @@ impl ScanCache {
     }
 }
 
+/// A scan cache unused this long, of a library not found, is removed.
+const CACHE_UNUSED: Duration = Duration::from_secs(30 * 24 * 60 * 60);
+
 /// Removes the scan caches of libraries that no longer exist (an old location after the
-/// library moved, a deleted instance) or that an older Hub wrote, and temporary files a
-/// crash left. Nothing used to remove any of them.
+/// library moved, a deleted instance), once unused for CACHE_UNUSED, and temporary files a
+/// crash left. A library not found at one start may be on a drive not plugged in or not
+/// reconnected yet: removing its cache at once cost a full rescan when it came back. A
+/// cache of another Hub version is replaced by the next scan of its library, not removed.
 pub fn prune_cache(dir: &Path) {
     let Ok(entries) = std::fs::read_dir(dir) else { return };
     for entry in entries.flatten() {
@@ -271,9 +276,12 @@ pub fn prune_cache(dir: &Path) {
         let name = entry.file_name().to_string_lossy().into_owned();
         let stale = if name.ends_with(".tmp") {
             crate::download::older_than(&path, Duration::from_secs(24 * 60 * 60))
-        } else if name.ends_with(".json") {
-            let (cache, _) = ScanCache::load(&path);
-            cache.root.as_deref().map_or(true, |root| !root.is_dir())
+        } else if name.ends_with(".json") && crate::download::older_than(&path, CACHE_UNUSED) {
+            let root = std::fs::read(&path)
+                .ok()
+                .and_then(|bytes| serde_json::from_slice::<ScanCache>(&bytes).ok())
+                .and_then(|cache| cache.root);
+            root.map_or(true, |root| !root.is_dir())
         } else {
             false
         };
@@ -399,9 +407,17 @@ fn walk_dir(dir: &Path, ctx: &mut WalkCtx) {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    // Song folders read on this thread, for tests to tell a count from a scan
+    static SONGS_READ: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Reads a song folder: the hash of each chart, and the title, levels and tower side of
 /// the first.
 fn read_song(dir: &Path, rel_path: &str, tja_files: &[PathBuf]) -> ScannedSong {
+    #[cfg(test)]
+    SONGS_READ.with(|read| read.set(read.get() + 1));
     let mut tja_md5s = Vec::with_capacity(tja_files.len());
     let mut title = None;
     let mut difficulties = Vec::new();
@@ -659,34 +675,20 @@ mod tests {
         }
     }
 
-    /// Keeps `path` from being read for as long as the returned value lives.
-    fn unreadable(path: &Path) -> std::fs::File {
-        #[cfg(windows)]
-        {
-            use std::os::windows::fs::OpenOptionsExt;
-            // Opened with no sharing: nothing else can open it meanwhile
-            std::fs::File::options().read(true).share_mode(0).open(path).unwrap()
-        }
-        #[cfg(unix)]
-        {
-            use std::os::unix::fs::PermissionsExt;
-            std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o000)).unwrap();
-            // Nothing to undo: the temporary folder is removed with what it holds
-            std::fs::File::open("/dev/null").unwrap()
-        }
-    }
-
     #[test]
     fn songs_are_counted_without_being_read() {
         let tmp = tempfile::tempdir().unwrap();
-        let charts = ["Loose.tja", "01 Pop/A/a.tja", "01 Pop/A/extra/x.tja", "02/B/b.tja"].map(|rel| tmp.path().join(rel));
-        for chart in &charts {
-            write(chart, "TITLE:Song\n");
+        for rel in ["Loose.tja", "01 Pop/A/a.tja", "01 Pop/A/extra/x.tja", "02/B/b.tja"] {
+            write(&tmp.path().join(rel), "TITLE:Song\n");
         }
-        // A count that read the charts, as the hashing scan it replaced did, fails now
-        let _locked: Vec<_> = charts.iter().map(|chart| unreadable(chart)).collect();
-        assert!(std::fs::read(&charts[1]).is_err(), "the charts must be unreadable for this test to mean anything");
+        let read = || SONGS_READ.with(|read| read.get());
+        let before = read();
         assert_eq!(count_songs_in(tmp.path()), 2);
+        // The hashing scan it replaced read every song: a count that does fails here
+        assert_eq!(read(), before);
+        // And the counter does see a scan's reads
+        let _ = collect_tree(tmp.path(), &ScanCache::default(), false, &mut |_| {});
+        assert!(read() > before);
     }
 
     #[test]
@@ -698,17 +700,26 @@ mod tests {
         std::fs::create_dir_all(&library).unwrap();
         let write = |name: &str, cache: &ScanCache| std::fs::write(dir.join(name), serde_json::to_vec(cache).unwrap()).unwrap();
 
+        let gone = tmp.path().join("Old Songs");
         write("kept.json", &ScanCache { root: Some(library.clone()), ..ScanCache::default() });
-        write("moved.json", &ScanCache { root: Some(tmp.path().join("Old Songs")), ..ScanCache::default() });
-        // Written by an older Hub, which recorded no library
-        write("old.json", &ScanCache { hub: "0.2.10".into(), root: Some(library.clone()), ..ScanCache::default() });
+        write("moved.json", &ScanCache { root: Some(gone.clone()), ..ScanCache::default() });
+        // A drive not plugged in at this start: its cache was used a moment ago
+        write("unplugged.json", &ScanCache { root: Some(gone.clone()), ..ScanCache::default() });
+        // Another Hub's cache of a library that exists, replaced by its next scan
+        write("other.json", &ScanCache { hub: "0.2.10".into(), root: Some(library.clone()), ..ScanCache::default() });
+        // Written by a Hub that recorded no library
+        write("unknown.json", &ScanCache { hub: "0.2.10".into(), ..ScanCache::default() });
         std::fs::write(dir.join("kept.json.1-1.tmp"), "half").unwrap();
+        let long_ago = std::time::SystemTime::now() - Duration::from_secs(40 * 24 * 60 * 60);
+        for name in ["kept.json", "moved.json", "other.json", "unknown.json"] {
+            std::fs::File::options().write(true).open(dir.join(name)).unwrap().set_modified(long_ago).unwrap();
+        }
 
         prune_cache(&dir);
         let mut left: Vec<String> = std::fs::read_dir(&dir).unwrap().map(|e| e.unwrap().file_name().to_string_lossy().into_owned()).collect();
         left.sort();
         // A temporary file only goes once it is a day old
-        assert_eq!(left, ["kept.json", "kept.json.1-1.tmp"]);
+        assert_eq!(left, ["kept.json", "kept.json.1-1.tmp", "other.json", "unplugged.json"]);
     }
 
     #[test]
@@ -768,7 +779,12 @@ pub async fn scan_songs(
         // Written only when something changed: it was rewritten after every scan.
         if let Some(path) = cache_path {
             let saved = serde_json::to_vec(&cache).map_err(|e| e.to_string()).and_then(|bytes| {
-                if bytes == previous_bytes { Ok(()) } else { crate::writes::write_atomic(&path, &bytes) }
+                // Unchanged, it is only dated, which keeps it from `prune_cache`
+                if bytes == previous_bytes {
+                    crate::download::touch(&path).map_err(|e| e.to_string())
+                } else {
+                    crate::writes::write_atomic(&path, &bytes)
+                }
             });
             if let Err(e) = saved {
                 log::warn!("Could not keep the scan cache: {}", e);

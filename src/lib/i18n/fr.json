@@ -92,6 +92,7 @@
       "change_build": "Changer de version"
     },
     "warn": {
+      "newer_release": "OpenTaiko {version} est disponible : utilisez « {button} » pour l’installer.",
       "skin_update": "(La mise à jour nécessitera une mise à jour du skin)",
       "skin_update_confirm": "Vos skins installés devront ensuite être mis à jour aussi. Mettre à jour OpenTaiko maintenant ?",
       "redownload_confirm": "Retélécharger OpenTaiko {version} et le réinstaller dans cette instance ?"
@@ -171,6 +172,7 @@
       "deleted": "Sauvegarde « {name} » supprimée."
     },
     "error": {
+      "timeout": "La lecture de la base de sauvegarde a pris trop de temps.",
       "no_db": "Cette instance n'a pas encore de base de sauvegarde.",
       "game_running": "Fermez OpenTaiko avant de modifier ses sauvegardes : le jeu écraserait la modification en quittant.",
       "load": "Impossible de lire la base de sauvegarde.",
@@ -358,7 +360,7 @@
     "error": {
       "open_folder": "Impossible d'ouvrir le dossier : {error}",
       "scanning": "Impossible de télécharger des chansons pendant l'analyse des dossiers locaux",
-      "audio_failed": "Impossible de lire l'audio de ce morceau : {error}",
+      "audio_failed": "Impossible de lire l'audio de cette chanson : {error}",
       "scan_failed": "Échec de l'analyse de la bibliothèque de chansons : {error}"
     },
     "success": {
@@ -630,7 +632,7 @@
     "install_cancelled": "Installation annulée",
     "dotnet_page": "Obtenir .NET 8",
     "instance_busy": "Une installation est en cours dans cette instance",
-    "closing": "Fermeture dès que les fichiers en cours de déplacement sont en place…"
+    "closing": "Fermeture dès que l'étape en cours est terminée…"
   },
   "toast": {
     "copy": "Copier les détails",

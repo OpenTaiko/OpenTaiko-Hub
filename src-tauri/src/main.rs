@@ -91,7 +91,19 @@ async fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), 
     let mut command = Command::new(&full_path);
     command.current_dir(dir).stderr(Stdio::piped());
     #[cfg(target_os = "linux")]
-    procs::apply_env(&mut command, procs::game_env(&procs::utf8_env(), &dir.to_string_lossy()));
+    {
+        let mut changes = procs::game_env(&procs::utf8_env(), &dir.to_string_lossy());
+        // A library path that is not valid UTF-8 is extended as it is: read as missing, it
+        // was replaced by the game's folder alone
+        if let Some(raw) = procs::non_utf8_var("LD_LIBRARY_PATH") {
+            changes.retain(|(key, _)| key != "LD_LIBRARY_PATH");
+            let mut path = dir.as_os_str().to_os_string();
+            path.push(":");
+            path.push(raw);
+            command.env("LD_LIBRARY_PATH", path);
+        }
+        procs::apply_env(&mut command, changes);
+    }
     let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to execute the app: {}", e))?;
@@ -677,10 +689,15 @@ fn main() {
             let old_tmp = old_shared_root().map(|root| root.join("tmp"));
             #[cfg(any(debug_assertions, target_os = "windows"))]
             let old_tmp = None;
-            let crashed = guard::begin_session(app.handle());
+            // After a run that did not end normally, what downloads left before this start
+            let deep_before = guard::begin_session(app.handle()).then(std::time::SystemTime::now);
             let cache_dir = app.path().app_cache_dir().ok();
+            let write_dirs = guard::atomic_write_dirs(app.handle());
             std::thread::spawn(move || {
-                guard::sweep_leftovers(instances, old_tmp, crashed);
+                guard::sweep_leftovers(instances, old_tmp, deep_before);
+                for dir in &write_dirs {
+                    writes::remove_stale_temps(dir);
+                }
                 if let Some(dir) = cache_dir {
                     scan::prune_cache(&dir.join("scan"));
                     download::prune_cache(&dir.join("http"));

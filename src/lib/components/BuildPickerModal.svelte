@@ -69,7 +69,7 @@
 </script>
 
 {#if Show}
-<Modal Label={$_('instances.picker.title')} OnClose={OnClose}>
+<Modal Label={$_('instances.picker.title')} OnClose={OnClose} Busy={picking}>
     <div class="p-6 space-y-4 modal-body">
         <h2 class="h3">{$_('instances.picker.title')}</h2>
 

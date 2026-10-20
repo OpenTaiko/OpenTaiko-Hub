@@ -68,12 +68,15 @@ impl Jobs {
         self.entries.lock().unwrap_or_else(|e| e.into_inner())
     }
 
-    /// Cancels every running operation and marks it over.
-    fn cancel_all(&self) {
+    /// Cancels every running operation and marks it over. Returns how many were running.
+    fn cancel_all(&self) -> usize {
+        let mut cancelled = 0;
         for entry in self.entries().values_mut().filter(|e| e.active) {
             entry.token.cancel();
             entry.active = false;
+            cancelled += 1;
         }
+        cancelled
     }
 
     /// The token of operation `id`, registering it as running if this is the first word
@@ -100,6 +103,11 @@ impl Jobs {
         if let Some(entry) = self.entries().get_mut(id) {
             entry.active = false;
         }
+    }
+
+    /// Marks the window as closing. False when it already was.
+    fn start_closing(&self) -> bool {
+        !self.closing.swap(true, Ordering::SeqCst)
     }
 
     /// What a close request does now.
@@ -274,12 +282,15 @@ pub fn allow_close<R: Runtime>(window: &Window<R>) -> bool {
 /// without the Hub, and an install was cut off midway. Everything is cancelled, and the
 /// window closes once a build has been stopped and no files are being moved.
 fn close_when_settled<R: Runtime>(window: Window<R>) {
-    if window.state::<Jobs>().closing.swap(true, Ordering::SeqCst) {
+    if !window.state::<Jobs>().start_closing() {
         return;
     }
     std::thread::spawn(move || {
         let jobs = window.state::<Jobs>();
-        jobs.cancel_all();
+        // A cancelled download removes its partial files after the window may be gone
+        if jobs.cancel_all() > 0 {
+            crate::guard::mark_cut_off();
+        }
         // The window stays a moment longer: the page says why, rather than seeming to
         // ignore the close
         if jobs.in_flight.load(Ordering::SeqCst) > 0 {
@@ -289,7 +300,14 @@ fn close_when_settled<R: Runtime>(window: Window<R>) {
         while jobs.in_flight.load(Ordering::SeqCst) > 0 && Instant::now() < until {
             std::thread::sleep(Duration::from_millis(100));
         }
-        let _ = window.destroy();
+        if jobs.in_flight.load(Ordering::SeqCst) > 0 {
+            crate::guard::mark_cut_off();
+        }
+        // Still open, it must not hold every later close
+        if let Err(e) = window.destroy() {
+            log::error!("Could not close the window: {}", e);
+            jobs.closing.store(false, Ordering::SeqCst);
+        }
     });
 }
 
@@ -372,9 +390,12 @@ mod tests {
         jobs.begin("install");
         assert_eq!(jobs.on_close(), CloseDecision::Ask);
         jobs.in_flight.fetch_add(1, Ordering::SeqCst);
-        jobs.closing.store(true, Ordering::SeqCst);
-        jobs.cancel_all();
+        // What "Close anyway" does, through the same calls
+        assert!(jobs.start_closing());
+        assert_eq!(jobs.cancel_all(), 1);
         assert_eq!(jobs.on_close(), CloseDecision::Hold);
+        // Closing starts once: a second close does not start another wait
+        assert!(!jobs.start_closing());
 
         // Files still moving with no job left to ask about: closed once they are in place
         let jobs = Jobs::default();

@@ -92,6 +92,7 @@
       "change_build": "更换版本"
     },
     "warn": {
+      "newer_release": "OpenTaiko {version} 已发布：请通过“{button}”安装。",
       "skin_update": "（更新需要同步更新皮肤文件）",
       "skin_update_confirm": "此更新之后，已安装的皮肤也需要更新。现在更新 OpenTaiko 吗？",
       "redownload_confirm": "重新下载 OpenTaiko {version} 并在此实例中重新安装吗？"
@@ -171,6 +172,7 @@
       "deleted": "已删除存档“{name}”。"
     },
     "error": {
+      "timeout": "读取存档数据库耗时过长。",
       "no_db": "此实例尚无存档数据库。",
       "game_running": "更改存档前请先关闭 OpenTaiko：游戏退出时会覆盖这些更改。",
       "load": "无法读取存档数据库。",
@@ -630,7 +632,7 @@
     "install_cancelled": "安装已取消",
     "dotnet_page": "获取 .NET 8",
     "instance_busy": "此实例正在进行安装",
-    "closing": "正在移动的文件完成后即关闭…"
+    "closing": "当前步骤完成后即关闭…"
   },
   "toast": {
     "copy": "复制详情",

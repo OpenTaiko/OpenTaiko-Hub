@@ -25,15 +25,30 @@ describe('SongInstallEntries', () => {
         expect(entries[0].relPath).toBe('x.ogg');
     });
 
-    it('downloads an indexed file from the commit its git blob SHA was read at', () => {
+    it('downloads an indexed song from the commit its git blob SHAs were read at', () => {
         const commit = '0123456789abcdef0123456789abcdef01234567';
-        const index = { commit, files: new Map([['01 Pop/Song/song.tja', { sha: 'abc', size: 1234 }]]) };
+        const index = {
+            commit,
+            files: new Map([
+                ['01 Pop/Song/song.tja', { sha: 'abc', size: 1234 }],
+                ['01 Pop/Song/song.ogg', { sha: 'def', size: null }]
+            ])
+        };
         const entries = SongInstallEntries(song('01 Pop\\Song', ['01 Pop\\Song\\song.tja', '01 Pop\\Song\\song.ogg']), index);
-        expect(entries.map((e) => e.gitSha)).toEqual(['abc', null]);
+        expect(entries.map((e) => e.gitSha)).toEqual(['abc', 'def']);
         expect(entries.map((e) => e.size)).toEqual([1234, null]);
         expect(entries[0].url).toBe(`https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/${commit}/01 Pop/Song/song.tja`);
-        // A file newer than the index comes from the branch, with nothing to check it against
-        expect(entries[1].url).toBe('https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/01 Pop/Song/song.ogg');
+    });
+
+    it('takes a song the index does not list whole from the branch, every file of it', () => {
+        const commit = '0123456789abcdef0123456789abcdef01234567';
+        const index = { commit, files: new Map([['01 Pop/Song/song.tja', { sha: 'abc', size: 1234 }]]) };
+        const entries = SongInstallEntries(song('01 Pop\\Song', ['01 Pop\\Song\\song.tja', '01 Pop\\Song\\renamed.ogg']), index);
+        expect(entries.map((e) => e.url)).toEqual([
+            'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/01 Pop/Song/song.tja',
+            'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/01 Pop/Song/renamed.ogg'
+        ]);
+        expect(entries.map((e) => e.gitSha)).toEqual([null, null]);
     });
 });
 

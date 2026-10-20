@@ -92,6 +92,7 @@
       "change_build": "Version wechseln"
     },
     "warn": {
+      "newer_release": "OpenTaiko {version} ist verfügbar: Installiere es mit „{button}“.",
       "skin_update": "(Nach dem Aktualisieren ist ein Skin-Update erforderlich)",
       "skin_update_confirm": "Danach müssen auch deine installierten Skins aktualisiert werden. OpenTaiko jetzt aktualisieren?",
       "redownload_confirm": "OpenTaiko {version} erneut herunterladen und in dieser Instanz neu installieren?"
@@ -171,6 +172,7 @@
       "deleted": "Spielstand „{name}“ gelöscht."
     },
     "error": {
+      "timeout": "Das Lesen der Spielstand-Datenbank hat zu lange gedauert.",
       "no_db": "Diese Instanz hat noch keine Spielstand-Datenbank.",
       "game_running": "Schließe OpenTaiko, bevor du Spielstände änderst: Das Spiel würde die Änderung beim Beenden überschreiben.",
       "load": "Die Spielstand-Datenbank konnte nicht gelesen werden.",
@@ -630,7 +632,7 @@
     "install_cancelled": "Installation abgebrochen",
     "dotnet_page": ".NET 8 herunterladen",
     "instance_busy": "In dieser Instanz läuft eine Installation",
-    "closing": "Wird geschlossen, sobald die verschobenen Dateien an ihrem Platz sind…"
+    "closing": "Wird geschlossen, sobald der aktuelle Schritt abgeschlossen ist…"
   },
   "toast": {
     "copy": "Details kopieren",

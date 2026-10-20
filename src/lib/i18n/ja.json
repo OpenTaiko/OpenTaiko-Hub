@@ -92,6 +92,7 @@
       "change_build": "ビルドを変更"
     },
     "warn": {
+      "newer_release": "OpenTaiko {version} が公開されています。「{button}」からインストールできます。",
       "skin_update": "（更新にはスキンの更新が必要です）",
       "skin_update_confirm": "この更新の後、インストール済みのスキンも更新が必要になります。今すぐ OpenTaiko を更新しますか？",
       "redownload_confirm": "OpenTaiko {version} を再ダウンロードして、このインスタンスに再インストールしますか？"
@@ -171,6 +172,7 @@
       "deleted": "セーブ「{name}」を削除しました。"
     },
     "error": {
+      "timeout": "セーブデータベースの読み込みに時間がかかりすぎました。",
       "no_db": "このインスタンスにはまだセーブデータベースがありません。",
       "game_running": "セーブデータを変更する前に OpenTaiko を終了してください。終了時にゲームが変更を上書きしてしまいます。",
       "load": "セーブデータベースを読み込めませんでした。",
@@ -630,7 +632,7 @@
     "install_cancelled": "インストールを中止しました",
     "dotnet_page": ".NET 8 を入手",
     "instance_busy": "このインスタンスでインストールが実行中です",
-    "closing": "移動中のファイルの処理が終わり次第、閉じます…"
+    "closing": "現在の処理が終わり次第、閉じます…"
   },
   "toast": {
     "copy": "詳細をコピー",

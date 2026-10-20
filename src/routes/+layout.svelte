@@ -44,19 +44,25 @@
         return (hash >>> 0).toString(36);
     };
     let toastCount = 0;
+    // The toast showing each message, while it is shown. A toast leaves the moment it
+    // starts going away: the store still counts it as visible during its exit animation,
+    // and the same error raised then was given to the toast on its way out, and lost.
     const shownErrors = new Map<string, string>();
     const shownWarnings = new Map<string, string>();
+    const ForgetWhenGone = (shown: Map<string, string>, msg: string, id: string) => ({ status }: { status: string }) => {
+        if (status !== 'visible' && shown.get(msg) === id) shown.delete(msg);
+    };
 
     const TriggerError = (msg: string, options: ErrorToastOptions = {}) => {
         console.error(options.details ? `${msg} (${options.details})` : msg);
-        const shown = shownErrors.get(msg);
-        const id = shown && toaster.isVisible(shown) ? shown : `error-${MessageKey(msg)}-${++toastCount}`;
+        const id = shownErrors.get(msg) ?? `error-${MessageKey(msg)}-${++toastCount}`;
         shownErrors.set(msg, id);
         toaster.error({
             id,
             description: msg,
             duration: Infinity,
-            meta: { details: options.details ?? PlainText(msg), action: options.action }
+            meta: { details: options.details ?? PlainText(msg), action: options.action },
+            onStatusChange: ForgetWhenGone(shownErrors, msg, id)
         });
     };
 
@@ -90,10 +96,10 @@
     const TriggerWarning = (msg: string) => {
         console.warn(msg);
         const shown = shownWarnings.get(msg);
-        if (shown && toaster.isVisible(shown)) toaster.remove(shown);
+        if (shown) toaster.remove(shown);
         const id = `warning-${MessageKey(msg)}-${++toastCount}`;
         shownWarnings.set(msg, id);
-        toaster.warning({ id, description: msg, duration: 6000 });
+        toaster.warning({ id, description: msg, duration: 6000, onStatusChange: ForgetWhenGone(shownWarnings, msg, id) });
     };
 
     const TriggerSuccess = (msg: string) => {

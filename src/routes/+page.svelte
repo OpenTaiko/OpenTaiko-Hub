@@ -1,5 +1,5 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
     import { listen } from '@tauri-apps/api/event';
     import { Navigation } from '@skeletonlabs/skeleton-svelte';
     import { _ } from 'svelte-i18n';
@@ -105,11 +105,6 @@
     });
 
     onMount(async () => {
-        // The page and its tabs rendered: what fails from here on goes to the log, not to
-        // the box app.html shows when the app cannot start. Not from the layout, which
-        // mounts before the translations load and the page renders: an error while the
-        // page first rendered then left a blank window with nothing shown.
-        window.__hubStarted?.();
         try {
             await loadInstances();
 
@@ -125,6 +120,12 @@
             // The body starts hidden (app.html) to avoid a theme flash; always unhide
             themetarget?.setAttribute("style", "");
         }
+        // Home and the instance bar render once the instances are loaded: from here on,
+        // what fails goes to the log, not to the box app.html shows when the app cannot
+        // start. Detached earlier (from the layout, before the translations loaded; then
+        // before the instances), an error in their first render left nothing on screen.
+        await tick();
+        window.__hubStarted?.();
     });
 </script>
 
