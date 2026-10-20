@@ -358,6 +358,7 @@
       "updated": "Updated {count, plural, one {# genre folder} other {# genre folders}}"
     },
     "error": {
+      "audio_missing": "{name} is no longer in this song's folder.",
       "open_folder": "Could not open the folder: {error}",
       "scanning": "Cannot download songs while local folders are being scanned",
       "audio_failed": "Could not read this song's audio: {error}",
@@ -649,6 +650,7 @@
     "songs_link_failed": "Could not link the song library to {name}, so the game will not show its songs."
   },
   "bulk": {
+    "finishing": "Finishing the folders of the songs downloaded…",
     "status": "Downloading {done} / {total} · {size} left",
     "done": "Downloaded {count} of {total}",
     "failed": "Downloaded {count} of {total}. Failed: {failed}",

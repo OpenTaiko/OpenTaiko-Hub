@@ -2,8 +2,8 @@
 // developed under its author's account; the Hub, the soundtrack and the skins live in
 // the OpenTaiko organisation.
 //
-// The backend downloads from these accounts only (OWNERS in src-tauri/src/download.rs):
-// a repository moved to another account has to be allowed there too.
+// The backend downloads from these repositories only (REPOSITORIES in
+// src-tauri/src/download.rs): one added or moved has to be allowed there too.
 
 export interface Repo {
     owner: string;

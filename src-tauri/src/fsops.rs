@@ -56,16 +56,52 @@ fn merge_move(src: &Path, dest: &Path) -> Result<(), String> {
 
 /// Moves the CONTENT of `src` into `dest` (merging into existing folders, replacing
 /// existing files), then removes the emptied `src`.
+///
+/// Only what the Hub extracted or built in its own temporary folders is moved: any folder
+/// the page could reach used to be, so files imported anywhere could be moved beside the
+/// game, or into a build. Into a build folder, only the source archive just extracted
+/// goes, and its file list is kept for `publish_game` to check the folder against.
 #[tauri::command]
 pub async fn merge_move_dir(app: tauri::AppHandle, src: String, dest: String) -> Result<(), String> {
     // Both ends are written to: the source is emptied and removed
-    crate::guard::checked(&app, &src)?;
-    crate::guard::checked(&app, &dest)?;
+    let src_path = crate::guard::checked(&app, &src)?;
+    let dest_path = crate::guard::checked(&app, &dest)?;
+    if !crate::guard::inside_hub_tmp(&src_path) {
+        return Err(format!("Refusing to move {}: not a folder the Hub prepared", src));
+    }
+    let into_build = crate::guard::inside_hub_tmp(&dest_path);
+    if into_build && !crate::download::take_extracted(&src_path) {
+        return Err(format!("Refusing to move {} into {}: not the source the Hub extracted", src, dest));
+    }
     // Cut off by a closing window, an install would leave the instance half old, half new
     let _moving = crate::jobs::in_flight(&app);
-    tokio::task::spawn_blocking(move || merge_move_dir_sync(&src, &dest))
-        .await
-        .map_err(|e| format!("Task failed: {e}"))?
+    tokio::task::spawn_blocking(move || {
+        if into_build {
+            crate::procs::remember_source(&dest_path, files_under(&src_path));
+        }
+        merge_move_dir_sync(&src, &dest)
+    })
+    .await
+    .map_err(|e| format!("Task failed: {e}"))?
+}
+
+/// Every file under `dir`, relative to it. Links are not followed.
+pub(crate) fn files_under(dir: &Path) -> std::collections::HashSet<std::path::PathBuf> {
+    let mut files = std::collections::HashSet::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(folder) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(&folder) else { continue };
+        for entry in entries.flatten() {
+            let Ok(kind) = entry.file_type() else { continue };
+            let path = entry.path();
+            if kind.is_dir() {
+                pending.push(path);
+            } else if let Ok(relative) = path.strip_prefix(dir) {
+                files.insert(relative.to_path_buf());
+            }
+        }
+    }
+    files
 }
 
 /// A song folder is a directory that directly contains at least one .tja file.

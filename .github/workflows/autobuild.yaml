@@ -12,6 +12,13 @@ on:
   # Publishes the current version again, replacing the files of its release
   workflow_dispatch:
 
+# Runs of main take turns, so two pushes made before a version is released cannot both
+# publish it, the second uploading its files under the first one's tag. Other branches
+# only run the checks, and a newer push cancels the run of the one before.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 # Actions are pinned to a commit, with the release it was in alongside: a tag can be moved
 # to other code, and the release job holds a token that can write releases.
 jobs:
@@ -52,10 +59,13 @@ jobs:
               toolchain: 1.97.0
               components: clippy
 
+          # Saved from main only: every branch saving its own pushed main's caches out of
+          # the repository's 10 GB, and branches restore main's
           - name: Rust cache
             uses: swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
             with:
               workspaces: './src-tauri -> target'
+              save-if: ${{ github.ref == 'refs/heads/main' }}
 
           # Without install scripts: none of the packages needs one to work (es5-ext only
           # prints a message, esbuild under svelte-i18n only checks its binary), and they
@@ -243,23 +253,31 @@ jobs:
               path: bundles
               merge-multiple: true
 
+          # The artifacts keep the bundle folders (nsis/, deb/, appimage/): with several
+          # paths, upload-artifact roots them at their common parent. The files are moved
+          # out of them first: handed the folders, the upload failed and left an empty
+          # release. A new release is created with its files in one step, so it is never
+          # public without them (gh uploads to a draft, then publishes it).
           - env:
               GH_TOKEN: ${{ github.token }}
               TAG: v${{ needs.version.outputs.version }}
             run: |
               cd bundles
-              ls -la
+              find . -mindepth 2 -type f -exec mv -t . -- {} +
+              find . -mindepth 1 -type d -empty -delete
               # Spaces become dots, as in the file names of earlier releases
               for file in *; do
                 [ "$file" = "${file// /.}" ] || mv -- "$file" "${file// /.}"
               done
-              if ! gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > /dev/null 2> "$RUNNER_TEMP/lookup-error.txt"; then
-                if ! grep -q "(HTTP 404)" "$RUNNER_TEMP/lookup-error.txt"; then
-                  cat "$RUNNER_TEMP/lookup-error.txt"
-                  exit 1
-                fi
+              ls -la
+              if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$TAG" > /dev/null 2> "$RUNNER_TEMP/lookup-error.txt"; then
+                gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber -- *
+              elif grep -q "(HTTP 404)" "$RUNNER_TEMP/lookup-error.txt"; then
                 gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
                   --title "OpenTaiko Hub $TAG" \
-                  --notes "Linux builds are considered functional from 0.1.5, please update if your version is older."
+                  --notes "Linux builds are considered functional from 0.1.5, please update if your version is older." \
+                  -- *
+              else
+                cat "$RUNNER_TEMP/lookup-error.txt"
+                exit 1
               fi
-              gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber -- *

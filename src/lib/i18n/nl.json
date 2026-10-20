@@ -358,6 +358,7 @@
       "updated": "{count, plural, one {# genremap} other {# genremappen}} bijgewerkt"
     },
     "error": {
+      "audio_missing": "{name} staat niet meer in de map van dit nummer.",
       "open_folder": "Kon de map niet openen: {error}",
       "scanning": "Kan geen nummers downloaden terwijl lokale mappen worden gescand",
       "audio_failed": "Kon de audio van dit nummer niet lezen: {error}",
@@ -649,6 +650,7 @@
     "songs_link_failed": "Kan de nummerbibliotheek niet koppelen aan {name}, dus het spel toont de nummers niet."
   },
   "bulk": {
+    "finishing": "De mappen van de gedownloade nummers worden afgerond…",
     "status": "Downloaden {done} / {total} · nog {size}",
     "done": "{count} van {total} gedownload",
     "failed": "{count} van {total} gedownload. Mislukt: {failed}",

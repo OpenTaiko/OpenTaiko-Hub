@@ -92,7 +92,7 @@
       "change_build": "빌드 변경"
     },
     "warn": {
-      "newer_release": "OpenTaiko {version}이(가) 나왔습니다. ‘{button}’으로 설치하세요.",
+      "newer_release": "OpenTaiko {version}이(가) 나왔습니다. ‘{button}’로 설치하세요.",
       "skin_update": "(업데이트하면 스킨 업데이트가 필요합니다)",
       "skin_update_confirm": "이 업데이트 후에는 설치된 스킨도 업데이트해야 합니다. 지금 OpenTaiko를 업데이트할까요?",
       "redownload_confirm": "OpenTaiko {version}을(를) 다시 내려받아 이 인스턴스에 다시 설치할까요?"
@@ -358,6 +358,7 @@
       "updated": "장르 폴더 {count}개를 업데이트했습니다"
     },
     "error": {
+      "audio_missing": "{name}이(가) 더 이상 이 곡의 폴더에 없습니다.",
       "open_folder": "폴더를 열 수 없습니다: {error}",
       "scanning": "로컬 폴더 스캔 중에는 곡을 다운로드할 수 없습니다",
       "audio_failed": "이 곡의 오디오를 읽을 수 없습니다: {error}",
@@ -649,6 +650,7 @@
     "songs_link_failed": "{name}에 곡 라이브러리를 연결할 수 없어 게임에 곡이 표시되지 않습니다."
   },
   "bulk": {
+    "finishing": "다운로드한 곡의 폴더를 마무리하는 중…",
     "status": "다운로드 중 {done} / {total} · 남은 용량 {size}",
     "done": "{total}개 중 {count}개 다운로드 완료",
     "failed": "{total}개 중 {count}개 다운로드 완료. 실패: {failed}",

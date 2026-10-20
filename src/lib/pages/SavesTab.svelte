@@ -74,13 +74,18 @@
     // user can act on.
     // The step that took too long goes to the log; the message, shown in the tab, is in the
     // user's language. Not "timed out": that reads as a network failure (see DescribeError).
-    const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => Promise.race([
-        promise,
-        new Promise<never>((_resolve, reject) => setTimeout(() => {
-            console.warn(`Saves: ${label} took longer than ${ms} ms`);
-            reject(new Error(get(_)('saves.error.timeout')));
-        }, ms))
-    ]);
+    // The timer stops once the step is done: left running, every load wrote warnings of
+    // steps taking too long into the log, 15 and 30 seconds after they had ended.
+    const withTimeout = <T,>(promise: Promise<T>, ms: number, label: string): Promise<T> => {
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const timeout = new Promise<never>((_resolve, reject) => {
+            timer = setTimeout(() => {
+                console.warn(`Saves: ${label} took longer than ${ms} ms`);
+                reject(new Error(get(_)('saves.error.timeout')));
+            }, ms);
+        });
+        return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+    };
 
     // Loads a specific instance's DB. Captures a token so a slow reload for a previous
     // instance can never overwrite the current one's data. `silent` keeps the current

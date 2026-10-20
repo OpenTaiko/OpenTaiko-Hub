@@ -147,7 +147,7 @@ fn directive(text: &str, key: &str) -> Option<String> {
 #[tauri::command]
 pub async fn read_box_def(app: tauri::AppHandle, base: String, rel_path: String) -> Result<BoxDef, String> {
     blocking(move || {
-        crate::guard::checked(&app, &base)?;
+        crate::guard::songs_dir(&app, &base)?;
         let dir = resolve_inside(Path::new(&base), &rel_path)?;
         if !dir.is_dir() {
             return Ok(BoxDef { folder_exists: false, file_exists: false, text: String::new(), title: None });
@@ -168,7 +168,7 @@ pub async fn read_box_def(app: tauri::AppHandle, base: String, rel_path: String)
 #[tauri::command]
 pub async fn write_box_def(app: tauri::AppHandle, base: String, rel_path: String, text: String) -> Result<(), String> {
     blocking(move || {
-        crate::guard::checked(&app, &base)?;
+        crate::guard::songs_dir(&app, &base)?;
         let dir = resolve_inside(Path::new(&base), &rel_path)?;
         if !dir.is_dir() {
             return Err("That folder is not on disk yet".into());
@@ -196,7 +196,7 @@ pub async fn write_box_def(app: tauri::AppHandle, base: String, rel_path: String
 #[tauri::command]
 pub async fn create_genre_folder(app: tauri::AppHandle, base: String, parent_rel: String, name: String) -> Result<String, String> {
     blocking(move || {
-        crate::guard::checked(&app, &base)?;
+        crate::guard::songs_dir(&app, &base)?;
         let parent = resolve_inside(Path::new(&base), &parent_rel)?;
         fs::create_dir_all(&parent).map_err(|e| format!("Could not reach that folder: {}", e))?;
 
@@ -231,7 +231,7 @@ pub async fn create_genre_folder(app: tauri::AppHandle, base: String, parent_rel
 #[tauri::command]
 pub async fn delete_library_entry(app: tauri::AppHandle, base: String, rel_path: String) -> Result<(), String> {
     blocking(move || {
-        crate::guard::checked(&app, &base)?;
+        crate::guard::songs_dir(&app, &base)?;
         let dir = resolve_entry_inside(Path::new(&base), &rel_path)?;
         if !dir.exists() {
             return Ok(());
@@ -253,7 +253,7 @@ const JACKET_EXTS: [&str; 4] = ["png", "jpg", "jpeg", "webp"];
 #[tauri::command]
 pub async fn set_folder_jacket(app: tauri::AppHandle, base: String, rel_path: String, source: String) -> Result<String, String> {
     blocking(move || {
-        crate::guard::checked(&app, &base)?;
+        crate::guard::songs_dir(&app, &base)?;
         let dir = resolve_inside(Path::new(&base), &rel_path)?;
         if !dir.is_dir() {
             return Err("That folder is not on disk yet".into());
@@ -358,7 +358,7 @@ fn any_with_ext(dir: &Path, exts: &[&str]) -> Option<String> {
 #[tauri::command]
 pub async fn read_song_media(app: tauri::AppHandle, base: String, rel_path: String) -> Result<SongMedia, String> {
     blocking(move || {
-        crate::guard::checked(&app, &base)?;
+        crate::guard::songs_dir(&app, &base)?;
         let dir = resolve_inside(Path::new(&base), &rel_path)?;
         if !dir.is_dir() {
             return Ok(SongMedia { preimage: None, audio: None });
@@ -410,7 +410,7 @@ fn with_preimage(text: &str, name: &str) -> String {
 #[tauri::command]
 pub async fn set_song_preimage(app: tauri::AppHandle, base: String, rel_path: String, source: String) -> Result<String, String> {
     blocking(move || {
-        crate::guard::checked(&app, &base)?;
+        crate::guard::songs_dir(&app, &base)?;
         let dir = resolve_inside(Path::new(&base), &rel_path)?;
         if !dir.is_dir() {
             return Err("That chart is not on disk".into());
@@ -648,7 +648,7 @@ pub async fn import_chart_archives(
     archives: Vec<String>,
 ) -> Result<ImportReport, String> {
     blocking(move || {
-        crate::guard::checked(&app, &base)?;
+        crate::guard::songs_dir(&app, &base)?;
         let dest_parent = resolve_inside(Path::new(&base), &rel_path)?;
         if !dest_parent.is_dir() {
             return Err("That folder is not on disk yet".into());

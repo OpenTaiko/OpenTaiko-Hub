@@ -98,21 +98,46 @@ fn page_instances(config: &Path) -> Option<Vec<PathBuf>> {
 }
 
 /// The folder holding the files the page may not touch (the instance folders the Hub
-/// allows, the session state), inside the app local data folder. A folder of their own,
-/// forbidden as a whole: on macOS the app local data folder is the config folder the page
-/// uses, where it could create a folder in place of one of their temporary files, or
-/// remove the session file.
+/// allows, the session state): `<app local data>.private`, beside the app local data
+/// folder rather than in it. On macOS the app local data folder is the config folder the
+/// page uses, and a folder inside it, though forbidden, could still be reached by spelling
+/// its name in another letter case: the fs plugin compares paths case-sensitively, the
+/// disk does not.
+pub(crate) fn private_dir_for(local_data: &Path) -> Option<PathBuf> {
+    let name = local_data.file_name()?.to_string_lossy();
+    Some(local_data.with_file_name(format!("{name}.private")))
+}
+
 fn private_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    app.path().app_local_data_dir().ok().map(|dir| dir.join("private"))
+    private_dir_for(&app.path().app_local_data_dir().ok()?)
+}
+
+/// Where the Hub keeps its list of instance folders, for `local_data`, the app local data
+/// folder. Also used before the app starts, by the relocation of Linux and macOS data.
+pub fn roots_file_for(local_data: &Path) -> Option<PathBuf> {
+    private_dir_for(local_data).map(|dir| dir.join(INSTANCE_ROOTS))
 }
 
 fn roots_file<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    private_dir(app).map(|dir| dir.join(INSTANCE_ROOTS))
+    roots_file_for(&app.path().app_local_data_dir().ok()?)
 }
 
-/// Where the roots file was kept before it had a folder of its own.
-fn moved_roots_file<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    app.path().app_local_data_dir().ok().map(|dir| dir.join(INSTANCE_ROOTS))
+/// Moves the Hub's own files from where earlier versions kept them, in the app local data
+/// folder (`local_data`) and then in its `private` subfolder, into the private folder, and
+/// removes the session files left there. Before anything reads them: the relocation of
+/// Linux and macOS data rewrites the roots file, and rewrote the old one, which nothing
+/// read any more, while the instances it had moved were refused.
+pub fn move_into_private_dir(local_data: &Path) {
+    let Some(new) = roots_file_for(local_data) else { return };
+    let old_private = local_data.join("private");
+    for old in [old_private.join(INSTANCE_ROOTS), local_data.join(INSTANCE_ROOTS)] {
+        move_roots_file(Some(&old), &new);
+    }
+    for leftover in [old_private.join("session"), old_private.join("session-dev"), local_data.join("session")] {
+        let _ = std::fs::remove_file(leftover);
+    }
+    // Only when empty
+    let _ = std::fs::remove_dir(&old_private);
 }
 
 /// Forbids the private folder and everything in it, and the folder holding it, which
@@ -136,8 +161,9 @@ fn protect_private_dir<R: Runtime>(app: &AppHandle<R>, private: &Path) {
 
 /// A folder of the page's list taken over on the first start of a Hub that keeps its own:
 /// one the Hub made in its folder (`OpenTaiko-<uuid>`, or Hub 0.1's `OpenTaiko`), or a
-/// folder that holds a game or its settings and could be attached. Any folder the list
-/// named used to be taken, so a page that had rewritten the list was granted it.
+/// folder that holds the game and could be attached. Any folder the list named used to be
+/// taken, so a page that had rewritten the list was granted it; a `Config.ini` was enough
+/// too, and many programs keep one.
 fn seedable<R: Runtime>(app: &AppHandle<R>, dir: &Path) -> bool {
     let name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
     let in_root = dir.parent().is_some_and(|parent| root_spellings().iter().any(|root| same_path(root, parent)));
@@ -146,37 +172,58 @@ fn seedable<R: Runtime>(app: &AppHandle<R>, dir: &Path) -> bool {
 }
 
 fn holds_a_game(dir: &Path) -> bool {
-    ["OpenTaiko.exe", "OpenTaiko", "Config.ini"].iter().any(|name| dir.join(name).is_file())
+    ["OpenTaiko.exe", "OpenTaiko"].iter().any(|name| dir.join(name).is_file())
 }
 
-fn write_roots(file: &Path, roots: &[PathBuf]) -> Result<(), String> {
-    let json = serde_json::json!({
-        "version": 1,
-        "instances": roots.iter().map(|p| serde_json::json!({ "path": p })).collect::<Vec<_>>()
-    });
+fn write_roots(file: &Path, roots: &[PathBuf], pending: &[PathBuf]) -> Result<(), String> {
+    let entries = |paths: &[PathBuf]| paths.iter().map(|p| serde_json::json!({ "path": p })).collect::<Vec<_>>();
+    let json = serde_json::json!({ "version": 1, "instances": entries(roots), "pending": entries(pending) });
     crate::writes::write_atomic(file, json.to_string().as_bytes())
+}
+
+/// Folders of the page's list that could not be reached when it was taken over.
+fn read_pending(file: &Path) -> Vec<PathBuf> {
+    let Ok(text) = std::fs::read_to_string(file) else { return Vec::new() };
+    let Ok(json) = serde_json::from_str::<serde_json::Value>(&text) else { return Vec::new() };
+    json.get("pending")
+        .and_then(|list| list.as_array())
+        .map(|list| list.iter().filter_map(|e| e.get("path")?.as_str()).map(PathBuf::from).collect())
+        .unwrap_or_default()
 }
 
 /// The instance folders the Hub may use, of those `registered` (the page's list) names.
 ///
 /// The first time, before the Hub kept a list of its own, the folders the page's list
 /// names are taken over, those `seedable` accepts only: a list the page had rewritten
-/// could otherwise grant it any folder. A page list that cannot be read takes over nothing
-/// and is not recorded, so a later start can still take it over; recording it as empty
-/// cut off every instance.
+/// could otherwise grant it any folder. A folder that cannot be reached then (on a drive
+/// not connected) is kept aside, and taken over once it is found holding the game: it used
+/// to be dropped for good. A page list that cannot be read takes over nothing and is not
+/// recorded, so a later start can still take it over; recording it as empty cut off every
+/// instance.
 fn load_roots(file: &Path, registered: Option<&[PathBuf]>, seedable: impl Fn(&Path) -> bool) -> Vec<PathBuf> {
     if !file.exists() {
         let Some(registered) = registered else { return Vec::new() };
-        let roots: Vec<PathBuf> = registered.iter().filter(|dir| seedable(dir)).cloned().collect();
-        if let Err(e) = write_roots(file, &roots) {
+        let (reachable, pending): (Vec<PathBuf>, Vec<PathBuf>) = registered.iter().cloned().partition(|dir| dir.exists());
+        let roots: Vec<PathBuf> = reachable.into_iter().filter(|dir| seedable(dir)).collect();
+        if let Err(e) = write_roots(file, &roots, &pending) {
             log::warn!("Could not record the instance folders: {}", e);
         }
         return roots;
     }
-    let Some(saved) = read_instances(file) else {
+    let Some(mut saved) = read_instances(file) else {
         log::warn!("Could not read {}; no instance folder is allowed this session", file.display());
         return Vec::new();
     };
+    let pending = read_pending(file);
+    if !pending.is_empty() {
+        let (found, still): (Vec<PathBuf>, Vec<PathBuf>) = pending.into_iter().partition(|dir| dir.exists());
+        if !found.is_empty() {
+            saved.extend(found.into_iter().filter(|dir| seedable(dir)));
+            if let Err(e) = write_roots(file, &saved, &still) {
+                log::warn!("Could not record the instance folders: {}", e);
+            }
+        }
+    }
     // Detaching an instance only edits the page's list, so a folder it no longer names is
     // not allowed this session. Nothing is removed from the file: the page's list cannot
     // be relied on, for instance after a crash while it was being written.
@@ -209,10 +256,16 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
     let mut roots = Vec::new();
     if let Ok(config) = app.path().app_config_dir() {
         allow_dir(app, &config);
-        if let (Some(private), Some(file)) = (private_dir(app), roots_file(app)) {
+        if let (Some(private), Some(file), Ok(local_data)) = (private_dir(app), roots_file(app), app.path().app_local_data_dir()) {
             protect_private_dir(app, &private);
-            move_roots_file(moved_roots_file(app).as_deref(), &file);
-            roots = load_roots(&file, page_instances(&config).as_deref(), |dir| seedable(app, dir));
+            move_into_private_dir(&local_data);
+            // No list at all is a fresh install: recorded as no instances at once, so page
+            // script cannot write a list for a later start to take over
+            let listed = page_instances(&config);
+            let fresh = listed.is_none()
+                && ![INSTANCE_REGISTRY.to_string(), format!("{INSTANCE_REGISTRY}.bak")].iter().any(|name| config.join(name).exists());
+            let registered = if fresh { Some(Vec::new()) } else { listed };
+            roots = load_roots(&file, registered.as_deref(), |dir| seedable(app, dir));
         }
     }
     for root in &roots {
@@ -228,20 +281,25 @@ fn remember_root<R: Runtime>(app: &AppHandle<R>, dir: &Path) -> Result<(), Strin
     // Held from reading the file to writing it: an attach and a create at the same time
     // each wrote the file as they had read it, and one of the two folders was lost
     let mut roots = state.0.lock().unwrap_or_else(|e| e.into_inner());
-    // A damaged file is left as it is: read as empty, it was written over with this one
-    // folder, and every instance it recorded was lost
-    let mut saved = match read_instances(&file) {
+    add_root_in(&file, dir)?;
+    allow_dir(app, dir);
+    if !roots.iter().any(|p| same_path(p, dir)) {
+        roots.push(dir.to_path_buf());
+    }
+    Ok(())
+}
+
+/// Records `dir` in the roots `file`. A damaged file is left as it is: read as empty, it
+/// was written over with this one folder, and every instance it recorded was lost.
+fn add_root_in(file: &Path, dir: &Path) -> Result<(), String> {
+    let mut saved = match read_instances(file) {
         Some(saved) => saved,
         None if file.exists() => return Err(format!("{} cannot be read; the Hub's list of instance folders is left as it is", file.display())),
         None => Vec::new(),
     };
     if !saved.iter().any(|p| same_path(p, dir)) {
         saved.push(dir.to_path_buf());
-        write_roots(&file, &saved)?;
-    }
-    allow_dir(app, dir);
-    if !roots.iter().any(|p| same_path(p, dir)) {
-        roots.push(dir.to_path_buf());
+        write_roots(file, &saved, &read_pending(file))?;
     }
     Ok(())
 }
@@ -259,6 +317,22 @@ pub fn instance_dir<R: Runtime>(app: &AppHandle<R>, raw: &str) -> Result<PathBuf
         Ok(dir)
     } else {
         Err(format!("{} is not one of the Hub's instances", dir.display()))
+    }
+}
+
+/// A Songs folder the library commands may change: the Hub's shared library, or the Songs
+/// folder of one of its instances. Any folder the page could reach used to be accepted,
+/// and a chart archive imported into a build folder put its files where the compiler
+/// reads them.
+pub fn songs_dir<R: Runtime>(app: &AppHandle<R>, raw: &str) -> Result<PathBuf, String> {
+    let dir = checked(app, raw)?;
+    let shared = root_spellings().iter().any(|root| same_path(&root.join("Songs"), &dir));
+    let of_instance = dir.file_name().and_then(|n| n.to_str()).is_some_and(|n| n.eq_ignore_ascii_case("Songs"))
+        && dir.parent().and_then(Path::to_str).is_some_and(|parent| instance_dir(app, parent).is_ok());
+    if shared || of_instance {
+        Ok(dir)
+    } else {
+        Err(format!("{} is not one of the Hub's Songs folders", dir.display()))
     }
 }
 
@@ -287,6 +361,12 @@ pub fn is_hub_tmp_dir(dir: &Path) -> bool {
     let Some(container) = dir.parent() else { return false };
     (is_hub_tmp_name(name) && root_spellings().iter().any(|root| same_path(&root.join("tmp"), container)))
         || (is_build_dir_name(name) && same_path(&std::env::temp_dir(), container))
+}
+
+/// True when `path` is one of the Hub's temporary folders (see `is_hub_tmp_dir`) or lies
+/// inside one.
+pub fn inside_hub_tmp(path: &Path) -> bool {
+    path.ancestors().any(is_hub_tmp_dir)
 }
 
 /// Spelled the way the disk has it, compared component by component, and without regard
@@ -407,9 +487,18 @@ pub async fn pick_save<R: Runtime>(app: AppHandle<R>, window: tauri::Window<R>, 
         if size > MAX_SAVE_FILE {
             return Err(format!("{} is too large to be a save", path.display()));
         }
-        std::fs::read_to_string(&path).map(Some).map_err(|e| format!("Could not read {}: {}", path.display(), e))
+        let bytes = std::fs::read(&path).map_err(|e| format!("Could not read {}: {}", path.display(), e))?;
+        Ok(Some(save_text(&bytes)))
     })
     .await
+}
+
+/// A save file's text, as the page used to decode it itself: without a byte order mark,
+/// which editors add and JSON does not allow, and with invalid bytes replaced rather than
+/// failing on an untranslated error.
+fn save_text(bytes: &[u8]) -> String {
+    let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+    String::from_utf8_lossy(bytes).into_owned()
 }
 
 /// The files picked in a dialog the Hub shows itself, none when it was closed.
@@ -612,30 +701,57 @@ fn remove_stale_in(dir: &Path, name_ok: fn(&str) -> bool, content_ok: fn(&Path) 
 /// aside, put back when their replacement never arrived. Only files last changed
 /// `before` (this run's start): anything later belongs to a download under way. Symbolic
 /// links are not followed.
-fn clean_stale_downloads(dir: &Path, before: SystemTime) -> usize {
-    let Ok(entries) = std::fs::read_dir(dir) else { return 0 };
-    let mut cleaned = 0;
+fn clean_stale_downloads(dir: &Path, before: SystemTime) -> Sweep {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        // A tree that is not there has nothing to sweep; one that cannot be read does
+        return Sweep { cleaned: 0, complete: !dir.exists() };
+    };
+    let mut sweep = Sweep { cleaned: 0, complete: true };
+    let mut files = Vec::new();
     for entry in entries.flatten() {
         let Ok(kind) = entry.file_type() else { continue };
-        let path = entry.path();
         if kind.is_dir() {
-            cleaned += clean_stale_downloads(&path, before);
-            continue;
+            let inner = clean_stale_downloads(&entry.path(), before);
+            sweep.cleaned += inner.cleaned;
+            sweep.complete &= inner.complete;
+        } else {
+            files.push((entry, kind));
         }
+    }
+    // Not while a commit is moving files in this process: between its two renames, a file
+    // set aside is not dated yet, and was taken for a leftover
+    let _commits = crate::download::commit_lock();
+    for (entry, kind) in files {
+        let path = entry.path();
         let name = entry.file_name().to_string_lossy().into_owned();
         let stale = || kind.is_file() && entry.metadata().and_then(|m| m.modified()).is_ok_and(|modified| modified < before);
-        let done = if name.ends_with(crate::download::PART_SUFFIX) && stale() {
-            std::fs::remove_file(&path).is_ok()
+        let outcome = if name.ends_with(crate::download::PART_SUFFIX) && stale() {
+            Some(std::fs::remove_file(&path))
         } else if let Some(original) = name.strip_suffix(crate::download::OLD_SUFFIX).filter(|_| stale()) {
             let dest = path.with_file_name(original);
-            let outcome = if dest.exists() { std::fs::remove_file(&path) } else { std::fs::rename(&path, &dest) };
-            outcome.is_ok()
+            Some(if dest.exists() { std::fs::remove_file(&path) } else { std::fs::rename(&path, &dest) })
         } else {
-            false
+            None
         };
-        cleaned += usize::from(done);
+        match outcome {
+            Some(Ok(())) => sweep.cleaned += 1,
+            Some(Err(e)) => {
+                log::warn!("Could not clean up {}: {}", path.display(), e);
+                sweep.complete = false;
+            }
+            None => {}
+        }
     }
-    cleaned
+    sweep
+}
+
+/// What a sweep of interrupted downloads did: how many files it cleaned up, and whether it
+/// got through everything (a folder it could not read, a file it could not remove or put
+/// back, and it did not).
+#[derive(Debug, PartialEq)]
+struct Sweep {
+    cleaned: usize,
+    complete: bool,
 }
 
 /// A download or build stopped by a crash, a forced quit or a power cut never reaches the
@@ -673,10 +789,17 @@ pub fn sweep_leftovers(instances: Vec<PathBuf>, old_tmp: Option<PathBuf>, deep_b
                 trees.push(instance);
             }
         }
+        let mut complete = true;
         for tree in &trees {
-            cleaned += clean_stale_downloads(tree, before);
+            let sweep = clean_stale_downloads(tree, before);
+            cleaned += sweep.cleaned;
+            complete &= sweep.complete;
         }
-        SWEEP_OWED.store(false, Ordering::SeqCst);
+        // Only once everything was swept: a drive not connected, or a file held open, is
+        // looked at again at the next start
+        if complete {
+            SWEEP_OWED.store(false, Ordering::SeqCst);
+        }
     }
     if removed > 0 {
         log::info!("Removed {} leftover temporary folder(s)", removed);
@@ -687,8 +810,9 @@ pub fn sweep_leftovers(instances: Vec<PathBuf>, old_tmp: Option<PathBuf>, deep_b
 }
 
 /// Says, in the private folder, whether the Hub is running: "running" from start to exit,
-/// "stopped" after a normal exit.
-const SESSION_FILE: &str = "session";
+/// "stopped" after a normal exit. A development build has its own: it shares the app's
+/// folders with an installed Hub, and may run beside it.
+const SESSION_FILE: &str = if cfg!(debug_assertions) { "session-dev" } else { "session" };
 
 fn session_file<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     private_dir(app).map(|dir| dir.join(SESSION_FILE))
@@ -725,9 +849,14 @@ fn begin_session_in(file: &Path) -> bool {
 
 /// Records the exit: a normal one, unless a sweep is still owed or closing cut work off,
 /// in which case the session stays "running" and the next start sweeps.
+///
+/// Work still under way counts too: a shutdown, a restart for updates, a logoff (Windows)
+/// or Cmd+Q (macOS) end the Hub without the close prompt, and were recorded as a normal
+/// exit while downloads ran, so what they left was never swept.
 pub fn end_session<R: Runtime>(app: &AppHandle<R>) {
     if let Some(file) = session_file(app) {
-        end_session_in(&file, SWEEP_OWED.load(Ordering::SeqCst) || CUT_OFF.load(Ordering::SeqCst));
+        let leftovers = SWEEP_OWED.load(Ordering::SeqCst) || CUT_OFF.load(Ordering::SeqCst) || crate::jobs::work_under_way(app);
+        end_session_in(&file, leftovers);
     }
 }
 
@@ -940,10 +1069,12 @@ mod tests {
 
         // Written after this run started: a download under way
         let hour_ago = SystemTime::now() - Duration::from_secs(60 * 60);
-        assert_eq!(clean_stale_downloads(tmp.path(), hour_ago), 0);
+        assert_eq!(clean_stale_downloads(tmp.path(), hour_ago), Sweep { cleaned: 0, complete: true });
         // Written before it, a moment ago: left by the run that ended
         let started = SystemTime::now() + Duration::from_secs(1);
-        assert_eq!(clean_stale_downloads(tmp.path(), started), 3);
+        assert_eq!(clean_stale_downloads(tmp.path(), started), Sweep { cleaned: 3, complete: true });
+        // A tree that is not there has nothing to sweep
+        assert!(clean_stale_downloads(&tmp.path().join("absent"), started).complete);
 
         let mut names: Vec<String> = std::fs::read_dir(&song)
             .unwrap()
@@ -957,12 +1088,52 @@ mod tests {
 
     #[test]
     fn a_damaged_roots_file_is_never_written_over() {
-        // Through remember_root's own reading: a damaged file is not an empty one
         let tmp = tempfile::tempdir().unwrap();
         let file = tmp.path().join(INSTANCE_ROOTS);
+        let (a, b) = (tmp.path().join("A"), tmp.path().join("B"));
+        // No file yet: one is written, then added to, once per folder
+        add_root_in(&file, &a).unwrap();
+        add_root_in(&file, &b).unwrap();
+        add_root_in(&file, &a).unwrap();
+        assert_eq!(registered_instances(&file), vec![a.clone(), b]);
+        // Damaged: refused, and left as it is
         std::fs::write(&file, "{ cut short").unwrap();
-        assert!(read_instances(&file).is_none() && file.exists());
-        assert!(read_instances(&tmp.path().join("absent.json")).is_none());
+        assert!(add_root_in(&file, &a).is_err());
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "{ cut short");
+    }
+
+    #[test]
+    fn only_the_hub_songs_folders_take_library_commands() {
+        let app = mock_app();
+        let tmp = tempfile::tempdir().unwrap();
+        let instance = tmp.path().join("Game");
+        let build = tmp.path().join("Build").join("s").join("OpenTaiko");
+        for dir in [instance.join("Songs"), build.clone()] {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        allow_dir(app.handle(), tmp.path());
+        let text = |p: &Path| p.to_string_lossy().into_owned();
+        // In scope, but not a Songs folder of an instance: a build folder in particular
+        assert!(songs_dir(app.handle(), &text(&instance.join("Songs"))).is_err());
+        app.state::<InstanceRoots>().0.lock().unwrap().push(instance.clone());
+        assert!(songs_dir(app.handle(), &text(&instance.join("Songs"))).is_ok());
+        assert!(songs_dir(app.handle(), &text(&instance)).is_err());
+        assert!(songs_dir(app.handle(), &text(&build)).is_err());
+    }
+
+    #[test]
+    fn the_hub_temporary_folders_are_recognised_with_what_they_hold() {
+        let temp = TempBuildDir::new();
+        assert!(inside_hub_tmp(&temp.0));
+        assert!(inside_hub_tmp(&temp.0.join("s").join("OpenTaiko")));
+        assert!(!inside_hub_tmp(&std::env::temp_dir()));
+        assert!(!inside_hub_tmp(&std::env::temp_dir().join("elsewhere").join("x")));
+    }
+
+    #[test]
+    fn a_save_is_read_as_the_page_read_it() {
+        assert_eq!(save_text(b"\xEF\xBB\xBF{\"format\":\"optk-save\"}"), "{\"format\":\"optk-save\"}");
+        assert_eq!(save_text(b"{\"n\":\"\xFF\"}"), "{\"n\":\"\u{FFFD}\"}");
     }
 
     #[test]
@@ -984,6 +1155,9 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let file = tmp.path().join("data").join(INSTANCE_ROOTS);
         let (a, b, c) = (tmp.path().join("A"), tmp.path().join("B"), tmp.path().join("C"));
+        for dir in [&a, &b, &c] {
+            std::fs::create_dir_all(dir).unwrap();
+        }
 
         // The first start takes over the folders of the page's list that `seedable`
         // accepts, and records them
@@ -1002,6 +1176,32 @@ mod tests {
         assert_eq!(load_roots(&file, None, |_: &Path| true), vec![a, b]);
     }
 
+    // An instance on a drive not connected at the first start used to be dropped for good
+    #[test]
+    fn a_folder_not_reachable_at_the_first_start_is_taken_over_once_found() {
+        let tmp = tempfile::tempdir().unwrap();
+        let file = tmp.path().join("data").join(INSTANCE_ROOTS);
+        let (here, usb) = (tmp.path().join("Here"), tmp.path().join("Usb").join("OpenTaiko"));
+        std::fs::create_dir_all(&here).unwrap();
+        let page = [here.clone(), usb.clone()];
+        assert_eq!(load_roots(&file, Some(&page), |_: &Path| true), vec![here.clone()]);
+        assert_eq!(read_pending(&file), vec![usb.clone()]);
+
+        // Still away: nothing changes
+        assert_eq!(load_roots(&file, Some(&page), |_: &Path| true), vec![here.clone()]);
+        // Found, and holding the game
+        std::fs::create_dir_all(&usb).unwrap();
+        assert_eq!(load_roots(&file, Some(&page), |_: &Path| true), vec![here.clone(), usb.clone()]);
+        assert!(read_pending(&file).is_empty());
+        // Found but not an instance: dropped, never taken over
+        let file2 = tmp.path().join("data2").join(INSTANCE_ROOTS);
+        let other = tmp.path().join("Other");
+        load_roots(&file2, Some(std::slice::from_ref(&other)), |_: &Path| true);
+        std::fs::create_dir_all(&other).unwrap();
+        assert!(load_roots(&file2, Some(&[other]), |_: &Path| false).is_empty());
+        assert!(read_pending(&file2).is_empty());
+    }
+
     // A page list rewritten by page script could name any folder, and the first start of
     // a Hub keeping its own list took over every one that held no protected folder
     #[test]
@@ -1017,7 +1217,8 @@ mod tests {
         std::fs::write(game.join(if cfg!(windows) { "OpenTaiko.exe" } else { "OpenTaiko" }), "game").unwrap();
         std::fs::write(settings_only.join("Config.ini"), "[System]").unwrap();
         assert!(seedable(app.handle(), &game));
-        assert!(seedable(app.handle(), &settings_only));
+        // Many programs keep a Config.ini: not enough to be taken for a game folder
+        assert!(!seedable(app.handle(), &settings_only));
         assert!(!seedable(app.handle(), &anything));
         assert!(!seedable(app.handle(), &tmp.path().join("missing")));
         // An instance folder the Hub made in its own folder, empty while its install waits
@@ -1044,6 +1245,29 @@ mod tests {
         assert!(checked(app.handle(), &text(&data.join("settings.json"))).is_ok());
         for path in [private.join(INSTANCE_ROOTS), private.join("session.123-4.tmp"), private.clone(), data.clone()] {
             assert!(checked(app.handle(), &text(&path)).is_err(), "{}", path.display());
+        }
+    }
+
+    // Beside the app local data folder, which on macOS is the config folder the page uses
+    #[test]
+    fn the_private_folder_is_beside_the_app_folder() {
+        let local = Path::new("/home/u/.local/share/com.opentaiko.hub");
+        assert_eq!(private_dir_for(local), Some(PathBuf::from("/home/u/.local/share/com.opentaiko.hub.private")));
+        assert_eq!(roots_file_for(local), Some(PathBuf::from("/home/u/.local/share/com.opentaiko.hub.private").join(INSTANCE_ROOTS)));
+    }
+
+    #[test]
+    fn the_hub_files_move_from_both_earlier_places() {
+        for earlier in ["", "private"] {
+            let tmp = tempfile::tempdir().unwrap();
+            let local = tmp.path().join("com.opentaiko.hub");
+            std::fs::create_dir_all(local.join("private")).unwrap();
+            std::fs::write(local.join(earlier).join(INSTANCE_ROOTS), "{}").unwrap();
+            std::fs::write(local.join("private").join("session"), "running").unwrap();
+            move_into_private_dir(&local);
+            assert_eq!(std::fs::read_to_string(roots_file_for(&local).unwrap()).unwrap(), "{}", "{earlier}");
+            assert!(!local.join(earlier).join(INSTANCE_ROOTS).exists());
+            assert!(!local.join("private").exists(), "the emptied folder goes");
         }
     }
 

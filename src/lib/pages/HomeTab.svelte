@@ -128,7 +128,9 @@
     $effect(() => {
         if (current && versionLoadedFor !== current.id) {
             versionLoadedFor = current.id;
-            LoadInstanceState();
+            // Caught here: started from an effect, a failure was an unhandled rejection,
+            // which during startup showed the boot error box under a working Hub
+            LoadInstanceState().catch((error) => console.error('Could not load the instance state:', error));
         }
     });
 
@@ -139,7 +141,7 @@
     $effect(() => {
         if (current?.pendingInstall && !downloadBusy && !$busyInstanceIds.has(current.id) && pendingStartedFor !== current.id) {
             pendingStartedFor = current.id;
-            StartPendingInstall(current);
+            StartPendingInstall(current).catch((error) => console.error('Could not start the chosen install:', error));
         }
     });
 

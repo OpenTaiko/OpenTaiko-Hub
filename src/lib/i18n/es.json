@@ -358,6 +358,7 @@
       "updated": "Se {count, plural, one {actualizó # carpeta de género} other {actualizaron # carpetas de género}}"
     },
     "error": {
+      "audio_missing": "{name} ya no está en la carpeta de esta canción.",
       "open_folder": "No se pudo abrir la carpeta: {error}",
       "scanning": "No se pueden descargar canciones mientras se escanean las carpetas locales",
       "audio_failed": "No se pudo leer el audio de esta canción: {error}",
@@ -649,6 +650,7 @@
     "songs_link_failed": "No se pudo vincular la biblioteca de canciones a {name}, así que el juego no mostrará sus canciones."
   },
   "bulk": {
+    "finishing": "Terminando las carpetas de las canciones descargadas…",
     "status": "Descargando {done} / {total} · faltan {size}",
     "done": "Descargados {count} de {total}",
     "failed": "Descargados {count} de {total}. Fallidos: {failed}",

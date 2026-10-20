@@ -105,6 +105,18 @@ impl Jobs {
         }
     }
 
+    fn under_way(&self) -> bool {
+        self.in_flight.load(Ordering::SeqCst) > 0 || self.entries().values().any(|e| e.active)
+    }
+
+    fn refuse_while_closing(&self) -> Result<(), String> {
+        if self.closing.load(Ordering::SeqCst) {
+            Err(CANCELLED.to_string())
+        } else {
+            Ok(())
+        }
+    }
+
     /// Marks the window as closing. False when it already was.
     fn start_closing(&self) -> bool {
         !self.closing.swap(true, Ordering::SeqCst)
@@ -197,6 +209,20 @@ pub fn token<R: Runtime>(app: &AppHandle<R>, job: &Option<String>) -> CancelToke
 /// to be stopped, or files being moved, which a closing Hub would leave half old and half
 /// new. Counted while the guard lives.
 pub struct InFlight<R: Runtime>(AppHandle<R>);
+
+/// Fails with CANCELLED once the window is closing. Checked by work that has just been
+/// counted in flight and is about to place files: the close may have found nothing in
+/// flight a moment before, and destroys the window. Covers work that belongs to no
+/// operation, which cancelling every operation does not reach.
+pub fn check_not_closing<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+    app.state::<Jobs>().refuse_while_closing()
+}
+
+/// True while an operation runs or files are being moved: an exit now may leave
+/// something behind for the next start to sweep.
+pub fn work_under_way<R: Runtime>(app: &AppHandle<R>) -> bool {
+    app.state::<Jobs>().under_way()
+}
 
 pub fn in_flight<R: Runtime>(app: &AppHandle<R>) -> InFlight<R> {
     app.state::<Jobs>().in_flight.fetch_add(1, Ordering::SeqCst);
@@ -384,6 +410,25 @@ mod tests {
 
     // "Close anyway" cancels every job, so a second click on the close button found
     // nothing running and closed the window while an install was still moving files
+    // A shutdown, a logoff or Cmd+Q ends the Hub without the close prompt: what runs then
+    // counts as cut off, and work that belongs to no job is stopped once closing
+    #[test]
+    fn work_at_exit_is_seen_and_new_work_refused_once_closing() {
+        let jobs = Jobs::default();
+        assert!(!jobs.under_way());
+        jobs.begin("songs");
+        assert!(jobs.under_way());
+        jobs.end("songs");
+        jobs.in_flight.fetch_add(1, Ordering::SeqCst);
+        assert!(jobs.under_way());
+        jobs.in_flight.fetch_sub(1, Ordering::SeqCst);
+        assert!(!jobs.under_way());
+
+        assert!(jobs.refuse_while_closing().is_ok());
+        jobs.start_closing();
+        assert_eq!(jobs.refuse_while_closing(), Err(CANCELLED.to_string()));
+    }
+
     #[test]
     fn a_close_under_way_holds_every_later_one() {
         let jobs = Jobs::default();

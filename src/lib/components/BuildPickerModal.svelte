@@ -120,7 +120,9 @@
         {/if}
 
         <div class="flex gap-3 justify-end">
-            <button type="button" class="button-gray button-main" onclick={OnClose}>{$_('common.cancel')}</button>
+            <!-- Not while the pick is acted on: closed then, focus went back to a button about
+                 to disappear, and the instance was created anyway -->
+            <button type="button" class="button-gray button-main" disabled={picking} onclick={OnClose}>{$_('common.cancel')}</button>
             <button type="button" class="button-green button-main" disabled={loading || fetchFailed || picking} onclick={Confirm}>
                 <i class="fa-solid fa-download"></i> {$_('instances.picker.install')}
             </button>

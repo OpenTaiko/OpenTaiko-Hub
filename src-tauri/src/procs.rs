@@ -36,6 +36,26 @@ pub(crate) fn non_utf8_var(key: &str) -> Option<std::ffi::OsString> {
     std::env::var_os(key).filter(|value| value.to_str().is_none())
 }
 
+/// `list` without the entries inside the mounted AppImage, as `appimage_cleanup` does for
+/// a value it can read: kept as raw bytes, the bundled libraries and programs were passed
+/// on to the game and to dotnet.
+#[cfg(unix)]
+pub(crate) fn without_appimage_entries(list: &std::ffi::OsStr) -> std::ffi::OsString {
+    use std::os::unix::ffi::{OsStrExt, OsStringExt};
+    let appdir = std::env::var_os("APPDIR").filter(|dir| !dir.is_empty() && std::env::var_os("APPIMAGE").is_some());
+    std::ffi::OsString::from_vec(strip_entries(list.as_bytes(), appdir.as_ref().map(|dir| dir.as_bytes())))
+}
+
+/// The entries of a `:`-separated list not starting with `prefix`, empty ones dropped.
+#[cfg(unix)]
+fn strip_entries(list: &[u8], prefix: Option<&[u8]>) -> Vec<u8> {
+    let kept: Vec<&[u8]> = list
+        .split(|&b| b == b':')
+        .filter(|entry| !entry.is_empty() && prefix.map_or(true, |prefix| !entry.starts_with(prefix)))
+        .collect();
+    kept.join(&b':')
+}
+
 /// `list` with `dirs` added after it, kept as raw bytes.
 #[cfg(unix)]
 fn extend_raw_path(mut list: std::ffi::OsString, dirs: &[String]) -> std::ffi::OsString {
@@ -249,6 +269,43 @@ const INHERITED_BUILD_FILES: [&str; 7] = [
     "global.json",
 ];
 
+/// A build's source folder, and the files the downloaded archive brought into it.
+type SourceListing = (PathBuf, std::collections::HashSet<PathBuf>);
+
+/// The listing of each build's source folder (see fsops.rs `merge_move_dir`).
+fn sources() -> &'static std::sync::Mutex<Vec<SourceListing>> {
+    static SOURCES: std::sync::OnceLock<std::sync::Mutex<Vec<SourceListing>>> = std::sync::OnceLock::new();
+    SOURCES.get_or_init(Default::default)
+}
+
+pub(crate) fn remember_source(src: &Path, files: std::collections::HashSet<PathBuf>) {
+    sources().lock().unwrap_or_else(|e| e.into_inner()).push((src.to_path_buf(), files));
+}
+
+/// Refuses a source folder holding a file the downloaded archive did not bring, or one
+/// the Hub did not fill from a downloaded archive at all. MSBuild reads far more than the
+/// project: anything in `obj`, a `.csproj.user`, the props of a referenced project, and
+/// any `.cs` file is compiled into the game. A list of names to refuse could not keep up
+/// with that; the archive's own listing can.
+fn check_source(src: &Path) -> Result<(), String> {
+    let listed = {
+        let sources = sources().lock().unwrap_or_else(|e| e.into_inner());
+        sources
+            .iter()
+            .find(|(folder, _)| crate::guard::same_path(folder, src))
+            .map(|(_, files)| files.clone())
+    };
+    let Some(listed) = listed else {
+        return Err(format!("Refusing to build in {}: its source is not one the Hub downloaded", src.display()));
+    };
+    let mut added: Vec<PathBuf> = crate::fsops::files_under(src).into_iter().filter(|file| !listed.contains(file)).collect();
+    added.sort();
+    match added.first() {
+        Some(file) => Err(format!("Refusing to build: {} is not part of the downloaded source", src.join(file).display())),
+        None => Ok(()),
+    }
+}
+
 /// The first file of INHERITED_BUILD_FILES the build of `src` would read from a folder the
 /// page can fill: the project's folder and the source folder, which the build reads first
 /// (they were not checked at all), the build folder, and the temporary folder holding it.
@@ -298,6 +355,8 @@ pub async fn publish_game(
     if let Some(found) = inherited_build_file(&src) {
         return Err(format!("Refusing to build: {} would be read by the build", found.display()));
     }
+    let checked_src = src.clone();
+    crate::library::blocking(move || check_source(&checked_src)).await?;
     // Closing the window waits until a cancelled build is gone
     let _running = crate::jobs::in_flight(&app);
     run_dotnet(publish_args(&build_dir, &rid), Some(src), cancel, on_output).await
@@ -343,7 +402,7 @@ async fn run_dotnet(
             let home = env.get("HOME").map(String::as_str);
             match non_utf8_var("PATH") {
                 // Kept as it is: read as missing, the dotnet locations alone replaced it
-                Some(raw) => cmd.env("PATH", extend_raw_path(raw, &tool_dirs(home))),
+                Some(raw) => cmd.env("PATH", extend_raw_path(without_appimage_entries(&raw), &tool_dirs(home))),
                 None => cmd.env("PATH", augmented_tool_path(&base, home)),
             };
         }
@@ -417,6 +476,15 @@ async fn run_dotnet(
 #[cfg(test)]
 mod env_tests {
     use super::*;
+
+    #[cfg(unix)]
+    #[test]
+    fn a_raw_path_list_loses_the_appimage_entries() {
+        let list = b"/tmp/.mount_Hub/usr/lib:/home/ren\xe9/lib::/usr/lib";
+        assert_eq!(strip_entries(list, Some(b"/tmp/.mount_Hub")), b"/home/ren\xe9/lib:/usr/lib".to_vec());
+        assert_eq!(strip_entries(list, None), b"/tmp/.mount_Hub/usr/lib:/home/ren\xe9/lib:/usr/lib".to_vec());
+        assert!(strip_entries(b"/tmp/.mount_Hub/usr/lib", Some(b"/tmp/.mount_Hub")).is_empty());
+    }
 
     #[cfg(unix)]
     #[test]
@@ -545,7 +613,7 @@ mod batch_tests {
 
 #[cfg(test)]
 mod arg_tests {
-    use super::{inherited_build_file, publish_args, RUNTIMES};
+    use super::{check_source, inherited_build_file, publish_args, remember_source, RUNTIMES};
     use std::path::Path;
 
     #[test]
@@ -558,6 +626,30 @@ mod arg_tests {
         assert!(args.iter().any(|a| a.starts_with("-p:OutDir=") && a.contains("1a2b3c4d")));
         assert!(args.contains(&"-nodeReuse:false".to_string()));
         assert!(args.contains(&"-p:UseSharedCompilation=false".to_string()));
+    }
+
+    // MSBuild reads far more than the project: what an archive imported into the build
+    // folder put in `obj`, a `.csproj.user`, a referenced project's props
+    #[test]
+    fn only_the_downloaded_source_is_built() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("1a2b3c4d").join("s");
+        std::fs::create_dir_all(src.join("OpenTaiko")).unwrap();
+        std::fs::write(src.join("OpenTaiko").join("OpenTaiko.csproj"), "<Project/>").unwrap();
+        // Not filled from a downloaded archive at all
+        assert!(check_source(&src).is_err());
+
+        remember_source(&src, crate::fsops::files_under(&src));
+        assert!(check_source(&src).is_ok());
+        for planted in ["OpenTaiko/obj/OpenTaiko.csproj.evil.targets", "OpenTaiko/OpenTaiko.csproj.user", "FDK/Directory.Build.props"] {
+            let path = src.join(planted);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(&path, "<Project/>").unwrap();
+            let refused = check_source(&src).expect_err(planted);
+            assert!(refused.contains("not part of the downloaded source"), "{refused}");
+            std::fs::remove_file(&path).unwrap();
+        }
+        assert!(check_source(&src).is_ok());
     }
 
     #[test]

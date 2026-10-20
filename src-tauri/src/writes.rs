@@ -34,10 +34,23 @@ fn temp_path(path: &Path) -> PathBuf {
 
 /// True for a name `temp_path` gives: `<file>.<pid>-<n>.tmp`.
 fn is_temp_name(name: &str) -> bool {
-    let Some((_, id)) = name.strip_suffix(".tmp").and_then(|rest| rest.rsplit_once('.')) else { return false };
+    let Some((file, id)) = name.strip_suffix(".tmp").and_then(|rest| rest.rsplit_once('.')) else { return false };
     let Some((pid, n)) = id.split_once('-') else { return false };
-    [pid, n].iter().all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
+    ATOMIC_FILES.contains(&file) && [pid, n].iter().all(|part| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit()))
 }
+
+/// The files `write_atomic` writes. Only their temporary files are removed: an instance
+/// folder may be the user's own, holding anything with a name of that shape.
+const ATOMIC_FILES: [&str; 8] = [
+    "instances.json",
+    "instances.json.bak",
+    "settings.json",
+    "Saves.db3",
+    "version.json",
+    crate::guard::INSTANCE_ROOTS,
+    "session",
+    "session-dev",
+];
 
 /// How old a temporary file of `write_atomic` must be before it is taken for a leftover.
 const STALE_TEMP: std::time::Duration = std::time::Duration::from_secs(24 * 60 * 60);

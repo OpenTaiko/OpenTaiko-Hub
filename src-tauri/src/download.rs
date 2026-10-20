@@ -30,13 +30,21 @@ const READ_HOSTS: [&str; 3] = ["api.github.com", "raw.githubusercontent.com", "o
 /// Where GitHub sends the download of a release asset.
 const ASSET_HOSTS: [&str; 2] = ["objects.githubusercontent.com", "release-assets.githubusercontent.com"];
 
-/// Hosts that serve every GitHub account's repositories, the account being the first part
-/// of the path. A download from one of them must come from OWNERS: anyone can publish a
-/// file there, and what the Hub downloads is installed into games it then runs.
+/// Hosts that serve every GitHub account's repositories, the account and the repository
+/// being the first two parts of the path. A download from one of them must come from
+/// REPOSITORIES: anyone can publish a file there, and what the Hub downloads is installed
+/// into games it then runs.
 const GITHUB_HOSTS: [&str; 3] = ["github.com", "codeload.github.com", "raw.githubusercontent.com"];
 
-/// The OpenTaiko organisation, and the account game builds are published from (builds.ts).
-const OWNERS: [&str; 2] = ["opentaiko", "0aubsq"];
+/// The repositories the Hub downloads from (repos.ts), as "account/repository" in lower
+/// case. Whole accounts used to be trusted, and they also hold forks of other projects and
+/// repositories nothing in the Hub uses.
+const REPOSITORIES: [&str; 4] = [
+    "0aubsq/opentaiko",
+    "opentaiko/opentaiko-hub",
+    "opentaiko/opentaiko-soundtrack",
+    "opentaiko/opentaiko-skins",
+];
 
 const PROGRESS_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -88,15 +96,15 @@ fn host_allowed(url: &reqwest::Url, hosts: &[&str]) -> bool {
     url.scheme() == "https" && url.host_str().is_some_and(|h| hosts.contains(&h))
 }
 
-fn is_owner(owner: &str) -> bool {
-    OWNERS.contains(&owner.to_ascii_lowercase().as_str())
+fn is_listed(owner: &str, repo: &str) -> bool {
+    REPOSITORIES.contains(&format!("{owner}/{repo}").to_ascii_lowercase().as_str())
 }
 
 fn segments(url: &reqwest::Url) -> Vec<&str> {
     url.path_segments().map(|parts| parts.collect()).unwrap_or_default()
 }
 
-/// Commits seen as the head of a branch of one of OWNERS' repositories, as
+/// Commits seen as the head of a branch of one of REPOSITORIES, as
 /// "owner/repository/commit" in lower case (see `remember_branch_head`).
 fn branch_heads() -> &'static Mutex<HashSet<String>> {
     static HEADS: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
@@ -107,7 +115,7 @@ fn head_key(owner: &str, repo: &str, commit: &str) -> String {
     format!("{}/{}/{}", owner, repo, commit).to_ascii_lowercase()
 }
 
-/// Records the commit a branch of one of OWNERS' repositories points at, from the API's
+/// Records the commit a branch of one of REPOSITORIES points at, from the API's
 /// answer for `/repos/<owner>/<repository>/branches/<branch>`. A branch name is looked up
 /// in that repository only, so the commit is one its owners published there.
 fn remember_branch_head(url: &reqwest::Url, body: &[u8]) {
@@ -117,7 +125,7 @@ fn remember_branch_head(url: &reqwest::Url, body: &[u8]) {
         || parts.len() < 5
         || parts[0] != "repos"
         || parts[3] != "branches"
-        || !is_owner(parts[1])
+        || !is_listed(parts[1], parts[2])
     {
         return;
     }
@@ -148,11 +156,12 @@ fn reference_allowed(owner: &str, repo: &str, rest: &[&str]) -> bool {
         || (first.len() == 40 && is_hex(first) && branch_heads().lock().unwrap().contains(&head_key(owner, repo, first)))
 }
 
-/// Anything served from GITHUB_HOSTS must come from OWNERS, and from what they published.
+/// Anything served from GITHUB_HOSTS must come from REPOSITORIES, and from what their
+/// owners published there.
 fn source_allowed(url: &reqwest::Url) -> bool {
     let Some(host) = url.host_str().filter(|h| GITHUB_HOSTS.contains(h)) else { return true };
     let parts = segments(url);
-    if parts.len() < 3 || !is_owner(parts[0]) {
+    if parts.len() < 3 || !is_listed(parts[0], parts[1]) {
         return false;
     }
     match host {
@@ -394,6 +403,8 @@ async fn fetch_once(
         on_bytes(chunk.len() as i64);
     }
     file.flush().await.map_err(io_error)?;
+    // hyper already fails a body shorter than its announced size, before this; kept so the
+    // hash above is never taken for a whole file's, whatever the client does
     if announced.is_some_and(|len| len != received) {
         return Err(Failure::Retry { after: None, message: format!("Download of {label} was cut short") });
     }
@@ -490,6 +501,8 @@ async fn sleep_unless_cancelled(delay: Duration, cancel: &CancelToken) -> bool {
 /// those already replaced: the old files are set aside, not deleted, until every new one
 /// is in place. Partial files are removed either way.
 fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
+    // The startup sweep waits for this, and this for it (see commit_lock)
+    let _commits = commit_lock();
     let mut placed: Vec<(&Path, Option<PathBuf>)> = Vec::new();
     let mut failure = None;
     // A file that cannot be put back (held open by an antivirus, say) keeps its .hubold
@@ -540,8 +553,18 @@ fn commit(files: &[(PathBuf, PathBuf)]) -> Result<(), String> {
     if not_restored.is_empty() {
         Err(failure)
     } else {
+        // Their set-aside copies stay: the next start puts them back
+        crate::guard::mark_cut_off();
         Err(format!("{failure}. Could not put back as they were: {}", not_restored.join(", ")))
     }
+}
+
+/// Held while a commit moves files into place, and by the startup sweep while it looks
+/// at a folder's files: in between a commit's two renames, the file set aside is not dated
+/// yet, and the sweep took it for one a crash had left.
+pub(crate) fn commit_lock() -> std::sync::MutexGuard<'static, ()> {
+    static COMMITS: Mutex<()> = Mutex::new(());
+    COMMITS.lock().unwrap_or_else(|e| e.into_inner())
 }
 
 pub(crate) fn touch(path: &Path) -> std::io::Result<()> {
@@ -576,14 +599,11 @@ pub fn prune_cache(dir: &Path) {
         let name = entry.file_name().to_string_lossy().into_owned();
         let stale = if name.ends_with(".tmp") {
             older_than(&path, Duration::from_secs(24 * 60 * 60))
-        } else if let Some(key) = name.strip_suffix(".json") {
-            let unused = older_than(&path, CACHE_UNUSED);
-            if unused {
-                let _ = std::fs::remove_file(dir.join(format!("{key}.body")));
-            }
-            unused
+        } else if name.ends_with(".entry") {
+            older_than(&path, CACHE_UNUSED)
         } else {
-            false
+            // Kept in two files by earlier versions, which nothing reads any more
+            name.ends_with(".json") || name.ends_with(".body")
         };
         if stale {
             if let Err(e) = std::fs::remove_file(&path) {
@@ -665,7 +685,7 @@ pub async fn download_file<R: Runtime>(
     let _moving = crate::jobs::in_flight(&app);
     // Checked once counted in flight: a close that cancelled everything and found nothing
     // in flight is not followed by files being placed while the Hub exits
-    if let Err(e) = cancel.check() {
+    if let Err(e) = cancel.check().and_then(|()| crate::jobs::check_not_closing(&app)) {
         let _ = tokio::fs::remove_file(&part).await;
         return Err(e);
     }
@@ -698,6 +718,29 @@ pub(crate) fn archive_to_extract<R: Runtime>(app: &AppHandle<R>, zip_path: &str)
         Ok(zip)
     } else {
         Err(format!("Refusing to extract {zip_path}: not an archive the Hub downloaded"))
+    }
+}
+
+/// Folders `unzip_and_get_first_folder` extracted this session: the only ones that may be
+/// moved into a build folder (fsops.rs).
+fn extracted_folders() -> &'static Mutex<Vec<PathBuf>> {
+    static EXTRACTED: OnceLock<Mutex<Vec<PathBuf>>> = OnceLock::new();
+    EXTRACTED.get_or_init(Default::default)
+}
+
+pub(crate) fn remember_extracted(folder: &Path) {
+    extracted_folders().lock().unwrap_or_else(|e| e.into_inner()).push(folder.to_path_buf());
+}
+
+/// True, once, for a folder `unzip_and_get_first_folder` extracted this session.
+pub(crate) fn take_extracted(folder: &Path) -> bool {
+    let mut folders = extracted_folders().lock().unwrap_or_else(|e| e.into_inner());
+    match folders.iter().position(|f| crate::guard::same_path(f, folder)) {
+        Some(index) => {
+            folders.swap_remove(index);
+            true
+        }
+        None => false,
     }
 }
 
@@ -916,7 +959,7 @@ pub async fn install_files<R: Runtime>(
     }
     let _moving = crate::jobs::in_flight(&app);
     // As in download_file: cancelled by a close meanwhile, nothing is placed
-    if let Err(e) = cancel.check() {
+    if let Err(e) = cancel.check().and_then(|()| crate::jobs::check_not_closing(&app)) {
         for (part, _) in &arrived {
             let _ = tokio::fs::remove_file(part).await;
         }
@@ -949,9 +992,26 @@ fn cache_key(url: &reqwest::Url) -> Option<String> {
     }
 }
 
-fn cache_paths(dir: &Path, key: &str) -> (PathBuf, PathBuf) {
-    let key = hex::encode(Sha1::digest(key.as_bytes()));
-    (dir.join(format!("{key}.body")), dir.join(format!("{key}.json")))
+/// The file a cached answer is kept in: its details and its body together, written in one
+/// step. Kept in two files, written one after the other, two reads at once or a crash in
+/// between left one answer's body under another's details, served as that one.
+fn cache_entry(dir: &Path, key: &str) -> PathBuf {
+    dir.join(format!("{}.entry", hex::encode(Sha1::digest(key.as_bytes()))))
+}
+
+fn encode_entry(meta: &CacheMeta, body: &[u8]) -> Vec<u8> {
+    let meta = serde_json::to_vec(meta).unwrap_or_default();
+    let mut entry = Vec::with_capacity(4 + meta.len() + body.len());
+    entry.extend_from_slice(&u32::try_from(meta.len()).unwrap_or(0).to_le_bytes());
+    entry.extend_from_slice(&meta);
+    entry.extend_from_slice(body);
+    entry
+}
+
+fn decode_entry(entry: &[u8]) -> Option<(CacheMeta, Vec<u8>)> {
+    let length = usize::try_from(u32::from_le_bytes(entry.get(..4)?.try_into().ok()?)).ok()?;
+    let meta = serde_json::from_slice(entry.get(4..4 + length)?).ok()?;
+    Some((meta, entry[4 + length..].to_vec()))
 }
 
 /// Fetches a catalog, a database or a GitHub API response, keeping a copy on disk with
@@ -982,20 +1042,20 @@ async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest:
         .map_err(|e| e.to_string())?
         .join("http");
     let immutable = cache_key(&parsed);
-    let (body_path, meta_path) = cache_paths(&dir, immutable.as_deref().unwrap_or(url));
+    let entry_path = cache_entry(&dir, immutable.as_deref().unwrap_or(url));
 
-    let cached_meta: Option<CacheMeta> = match (tokio::fs::read(&meta_path).await, body_path.exists()) {
-        (Ok(bytes), true) => serde_json::from_slice::<CacheMeta>(&bytes)
-            .ok()
-            .filter(|meta| immutable.is_none() || meta.url.as_deref() == Some(url)),
-        _ => None,
-    };
-    if immutable.is_some() && cached_meta.is_some() {
-        let _ = touch(&meta_path);
-        if let Ok(body) = tokio::fs::read(&body_path).await {
+    let cached = tokio::fs::read(&entry_path)
+        .await
+        .ok()
+        .and_then(|entry| decode_entry(&entry))
+        .filter(|(meta, _)| immutable.is_none() || meta.url.as_deref() == Some(url));
+    if immutable.is_some() {
+        if let Some((_, body)) = cached {
+            let _ = touch(&entry_path);
             return Ok((body, false));
         }
     }
+    let (cached_meta, cached_body) = cached.unzip();
 
     let mut request = client()?.get(parsed);
     if let Some(meta) = &cached_meta {
@@ -1035,19 +1095,14 @@ async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest:
         Ok(Some(fresh)) => fresh,
         Ok(None) => {
             // Still in use: kept by `prune_cache`
-            let _ = touch(&meta_path);
-            return tokio::fs::read(&body_path)
-                .await
-                .map(|body| (body, false))
-                .map_err(|e| format!("Could not read the cached copy of {url}: {e}"));
+            let _ = touch(&entry_path);
+            return cached_body.map(|body| (body, false)).ok_or_else(|| format!("No cached copy of {url}"));
         }
         Err((status, message)) => {
             let fall_back = !current && status.map_or(true, |s| s == 403 || is_retryable_status(s));
-            if fall_back && cached_meta.is_some() {
-                if let Ok(body) = tokio::fs::read(&body_path).await {
-                    log::warn!("{message}; using the cached copy");
-                    return Ok((body, true));
-                }
+            if let Some(body) = cached_body.filter(|_| fall_back) {
+                log::warn!("{message}; using the cached copy");
+                return Ok((body, true));
             }
             return Err(message);
         }
@@ -1057,8 +1112,7 @@ async fn read_cached<R: Runtime>(app: &AppHandle<R>, url: &str, parsed: reqwest:
     if meta.etag.is_some() || meta.last_modified.is_some() || immutable.is_some() {
         let store = async {
             tokio::fs::create_dir_all(&dir).await?;
-            write_replacing(&body_path, &body).await?;
-            write_replacing(&meta_path, &serde_json::to_vec(&meta).unwrap_or_default()).await
+            write_replacing(&entry_path, &encode_entry(&meta, &body)).await
         };
         if let Err(e) = store.await {
             log::warn!("Could not cache {url}: {e}");
@@ -1196,6 +1250,17 @@ mod tests {
         crate::guard::allow_for_test(app.handle(), instance.path());
         downloaded_archives().lock().unwrap().push(elsewhere.clone());
         assert!(archive_to_extract(app.handle(), &elsewhere.to_string_lossy()).is_err());
+    }
+
+    #[test]
+    fn only_an_extracted_folder_is_handed_out_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let folder = tmp.path().join("OpenTaiko-0123456");
+        std::fs::create_dir_all(&folder).unwrap();
+        assert!(!take_extracted(&folder));
+        remember_extracted(&folder);
+        assert!(take_extracted(&folder));
+        assert!(!take_extracted(&folder));
     }
 
     #[test]
@@ -1351,14 +1416,15 @@ mod tests {
     fn a_file_is_hashed_as_it_arrives() {
         let tmp = tempfile::tempdir().unwrap();
         let part = tmp.path().join("song.ogg.hubpart");
-        let body: &'static [u8] = b"the audio of a song, hashed on the way";
+        // `git hash-object` of this content, not a copy of the formula
+        let body: &'static [u8] = b"hello\n";
         let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
         let (url, _) = runtime.block_on(serve(200, body));
         let hashed = runtime.block_on(async {
             let (mut total, mut bytes) = (|_: u64| {}, |_: i64| {});
             fetch_once(&url, &part, &CancelToken::default(), true, &mut total, &mut bytes).await
         });
-        assert_eq!(hashed.ok().flatten(), Some(git_sha_of(body)));
+        assert_eq!(hashed.ok().flatten().as_deref(), Some("ce013625030ba8dba906f756967f9e9ca394464a"));
         assert_eq!(std::fs::read(&part).unwrap(), body);
     }
 
@@ -1405,6 +1471,18 @@ mod tests {
         });
         assert!(matches!(failure, Err(Failure::Fatal { status: Some(404), .. })));
         assert_eq!(requests.load(std::sync::atomic::Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn a_cached_answer_is_kept_whole_in_one_file() {
+        let meta = CacheMeta { etag: Some("\"abc\"".into()), last_modified: None, url: Some("https://x/y".into()) };
+        let entry = encode_entry(&meta, b"{\"tree\":[]}");
+        let (read, body) = decode_entry(&entry).unwrap();
+        assert_eq!((read.etag.as_deref(), read.url.as_deref()), (Some("\"abc\""), Some("https://x/y")));
+        assert_eq!(body, b"{\"tree\":[]}");
+        // Cut short, or not one at all: no copy rather than a wrong one
+        assert!(decode_entry(&entry[..6]).is_none());
+        assert!(decode_entry(b"{}").is_none());
     }
 
     #[test]
@@ -1480,8 +1558,8 @@ mod tests {
     #[test]
     fn each_url_has_its_own_cache_entry() {
         let dir = Path::new("/cache");
-        let (a, _) = cache_paths(dir, "https://raw.githubusercontent.com/a.json");
-        let (b, _) = cache_paths(dir, "https://raw.githubusercontent.com/b.json");
+        let a = cache_entry(dir, "https://raw.githubusercontent.com/a.json");
+        let b = cache_entry(dir, "https://raw.githubusercontent.com/b.json");
         assert_ne!(a, b);
         assert_eq!(a.parent(), Some(dir));
     }

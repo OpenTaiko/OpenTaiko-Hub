@@ -56,7 +56,9 @@ pub(crate) fn rewrite_registry(registry: &Path, map: impl Fn(&str) -> Option<Str
     let Ok(text) = std::fs::read_to_string(registry) else { return Ok(0) };
     let mut json: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
     let mut changed = 0;
-    if let Some(list) = json.get_mut("instances").and_then(|l| l.as_array_mut()) {
+    // The Hub's own list also keeps the folders it could not reach yet (guard.rs)
+    for key in ["instances", "pending"] {
+        let Some(list) = json.get_mut(key).and_then(|l| l.as_array_mut()) else { continue };
         for instance in list {
             let Some(path) = instance.get("path").and_then(|p| p.as_str()) else { continue };
             if let Some(new_path) = map(path) {

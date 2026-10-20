@@ -39,6 +39,9 @@ tauri-plugin-log = "~2.9.2"
 dirs = "6"
 # writes.rs: the instance folder of a save write arrives as a percent-encoded header
 percent-encoding = "2"
+# One Hub at a time: a second one swept up what the first was still downloading. 2.5
+# needs Tauri 2.12.
+tauri-plugin-single-instance = "~2.4.5"
 
 # Linux and macOS: stopping a build's whole process group, and on Linux raising
 # RLIMIT_NOFILE. Kept target-scoped so Windows builds neither fetch nor compile it.

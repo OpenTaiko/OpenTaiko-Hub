@@ -358,6 +358,7 @@
       "updated": "已更新 {count} 個曲風資料夾"
     },
     "error": {
+      "audio_missing": "{name} 已不在這首歌的資料夾中。",
       "open_folder": "無法開啟資料夾：{error}",
       "scanning": "仍在掃描本機資料夾，因此無法下載歌曲",
       "audio_failed": "無法讀取這首歌的音訊：{error}",
@@ -649,6 +650,7 @@
     "songs_link_failed": "無法將曲庫連結到 {name}，遊戲中將不會顯示這些歌曲。"
   },
   "bulk": {
+    "finishing": "正在完善已下載歌曲的資料夾…",
     "status": "正在下載 {done} / {total} · 剩餘 {size}",
     "done": "已下載 {count} / {total}",
     "failed": "已下載 {count} / {total}。失敗：{failed}",

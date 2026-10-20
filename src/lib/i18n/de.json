@@ -358,6 +358,7 @@
       "updated": "{count} Genre-Ordner aktualisiert"
     },
     "error": {
+      "audio_missing": "{name} ist nicht mehr im Ordner dieses Songs.",
       "open_folder": "Ordner konnte nicht geöffnet werden: {error}",
       "scanning": "Songs können nicht heruntergeladen werden, während lokale Ordner gescannt werden",
       "audio_failed": "Das Audio dieses Songs konnte nicht gelesen werden: {error}",
@@ -649,6 +650,7 @@
     "songs_link_failed": "Die Songbibliothek konnte nicht mit {name} verknüpft werden, daher zeigt das Spiel ihre Songs nicht an."
   },
   "bulk": {
+    "finishing": "Die Ordner der heruntergeladenen Songs werden fertiggestellt…",
     "status": "Download {done} / {total} · noch {size}",
     "done": "{count} von {total} heruntergeladen",
     "failed": "{count} von {total} heruntergeladen. Fehlgeschlagen: {failed}",

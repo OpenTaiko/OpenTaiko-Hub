@@ -358,6 +358,7 @@
       "updated": "{count, plural, one {# dossier de genre mis à jour} other {# dossiers de genre mis à jour}}"
     },
     "error": {
+      "audio_missing": "{name} n'est plus dans le dossier de cette chanson.",
       "open_folder": "Impossible d'ouvrir le dossier : {error}",
       "scanning": "Impossible de télécharger des chansons pendant l'analyse des dossiers locaux",
       "audio_failed": "Impossible de lire l'audio de cette chanson : {error}",
@@ -649,6 +650,7 @@
     "songs_link_failed": "Impossible de lier la bibliothèque de chansons à {name} : le jeu n'affichera pas ses chansons."
   },
   "bulk": {
+    "finishing": "Finalisation des dossiers des chansons téléchargées…",
     "status": "Téléchargement {done} / {total} · {size} restants",
     "done": "{count} sur {total} téléchargés",
     "failed": "{count} sur {total} téléchargés. Échecs : {failed}",

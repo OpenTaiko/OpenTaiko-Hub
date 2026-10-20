@@ -210,8 +210,8 @@ pub async fn paths_are_same_dir(app: tauri::AppHandle, a: String, b: String) -> 
 
 #[tauri::command]
 pub async fn plan_migration(app: tauri::AppHandle, src_songs: String, dest_songs: String) -> Result<MigrationPlan, String> {
-    crate::guard::checked(&app, &src_songs)?;
-    crate::guard::checked(&app, &dest_songs)?;
+    crate::guard::songs_dir(&app, &src_songs)?;
+    crate::guard::songs_dir(&app, &dest_songs)?;
     tokio::task::spawn_blocking(move || build_plan(&PathBuf::from(&src_songs), &PathBuf::from(&dest_songs)))
         .await
         .map_err(|e| format!("Task failed: {e}"))
@@ -500,8 +500,8 @@ pub async fn find_duplicate_song_folders(
     instance_songs: String,
     global_songs: String,
 ) -> Result<Vec<DuplicateFolder>, String> {
-    crate::guard::checked(&app, &instance_songs)?;
-    crate::guard::checked(&app, &global_songs)?;
+    crate::guard::songs_dir(&app, &instance_songs)?;
+    crate::guard::songs_dir(&app, &global_songs)?;
     find_duplicates_in(instance_songs, global_songs).await
 }
 
@@ -551,7 +551,8 @@ pub async fn remove_duplicate_song_folders(
     global_songs: String,
     rel_paths: Vec<String>,
 ) -> Result<usize, String> {
-    crate::guard::checked(&app, &instance_songs)?;
+    crate::guard::songs_dir(&app, &instance_songs)?;
+    crate::guard::songs_dir(&app, &global_songs)?;
     remove_duplicates_in(instance_songs, global_songs, rel_paths).await
 }
 
@@ -602,8 +603,8 @@ pub async fn apply_migration(
     dest_songs: String,
     decisions: Vec<MigrationDecision>,
 ) -> Result<MigrateSummary, String> {
-    crate::guard::checked(&app, &src_songs)?;
-    crate::guard::checked(&app, &dest_songs)?;
+    crate::guard::songs_dir(&app, &src_songs)?;
+    crate::guard::songs_dir(&app, &dest_songs)?;
     let _moving = crate::jobs::in_flight(&app);
     tokio::task::spawn_blocking(move || {
         apply_plan(&PathBuf::from(&src_songs), &PathBuf::from(&dest_songs), &decisions)

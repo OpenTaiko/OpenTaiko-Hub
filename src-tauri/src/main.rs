@@ -97,9 +97,13 @@ async fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), 
         // was replaced by the game's folder alone
         if let Some(raw) = procs::non_utf8_var("LD_LIBRARY_PATH") {
             changes.retain(|(key, _)| key != "LD_LIBRARY_PATH");
+            let rest = procs::without_appimage_entries(&raw);
             let mut path = dir.as_os_str().to_os_string();
-            path.push(":");
-            path.push(raw);
+            // An empty entry would mean the current folder
+            if !rest.is_empty() {
+                path.push(":");
+                path.push(rest);
+            }
             command.env("LD_LIBRARY_PATH", path);
         }
         procs::apply_env(&mut command, changes);
@@ -320,7 +324,10 @@ async fn unzip_and_get_first_folder(
             }
         }
 
-        first_folder.ok_or_else(|| "ERR: No folder found in the ZIP archive".to_string())
+        let first_folder = first_folder.ok_or_else(|| "ERR: No folder found in the ZIP archive".to_string())?;
+        // The one folder that may then be moved into a build folder (fsops.rs)
+        download::remember_extracted(Path::new(&first_folder));
+        Ok(first_folder)
     })
     .await
     .map_err(|err| format!("ERR: Task failed: {}", err))?
@@ -534,8 +541,12 @@ fn main() {
     // folder, below) so the old ones can still move: a dev build's data out of
     // target/debug, and on Linux and macOS the Hub's folders out of Documents itself.
     let registry = dirs::config_dir().unwrap_or_default().join(APP_IDENTIFIER).join("instances.json");
-    // Where Tauri's app_local_data_dir puts it (guard.rs)
-    let roots = dirs::data_local_dir().unwrap_or_default().join(APP_IDENTIFIER).join(guard::INSTANCE_ROOTS);
+    // Tauri's app_local_data_dir. The roots file is moved to where guard.rs reads it
+    // before the relocation rewrites it: it used to rewrite the old one, which nothing
+    // read any more, and the instances it moved were refused
+    let local_data = dirs::data_local_dir().unwrap_or_default().join(APP_IDENTIFIER);
+    guard::move_into_private_dir(&local_data);
+    let roots = guard::roots_file_for(&local_data).unwrap_or_else(|| local_data.join(guard::INSTANCE_ROOTS));
     #[cfg(debug_assertions)]
     let relocation_report = std::env::current_exe()
         .ok()
@@ -583,7 +594,19 @@ fn main() {
         ));
     }
 
-    let app = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // An installed Hub runs once: starting it again brings the open window forward. Two at
+    // a time swept up what the other was still downloading, and wrote the same settings
+    // files. Registered first, as the plugin requires. Not in development builds, which
+    // share the installed Hub's app folders and must be able to start beside it.
+    #[cfg(not(debug_assertions))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+    let app = builder
         .plugin(
             tauri_plugin_log::Builder::new()
                 .targets(log_targets)

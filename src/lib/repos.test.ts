@@ -3,13 +3,14 @@ import { readFileSync } from 'node:fs';
 import { GAME_REPO, HUB_REPO, SKINS_REPO, SOUNDTRACK_REPO, apiUrl, pageUrl, rawUrl, sourceZipUrl } from './repos';
 
 describe('repositories', () => {
-    it('are all accounts the backend downloads from', () => {
-        // OWNERS in download.rs: an account missing there makes every download from it fail
+    it('are exactly the ones the backend downloads from', () => {
+        // REPOSITORIES in download.rs: one missing there makes every download from it
+        // fail, and one there that the Hub does not use is trusted for nothing
         const source = readFileSync(new URL('../../src-tauri/src/download.rs', import.meta.url), 'utf8');
-        const owners = source.match(/const OWNERS: \[&str; \d+\] = \[([^\]]*)\]/)?.[1] ?? '';
-        for (const repo of [GAME_REPO, HUB_REPO, SKINS_REPO, SOUNDTRACK_REPO]) {
-            expect(owners).toContain(`"${repo.owner.toLowerCase()}"`);
-        }
+        const list = source.match(/const REPOSITORIES: \[&str; \d+\] = \[([^\]]*)\]/)?.[1] ?? '';
+        const allowed = [...list.matchAll(/"([^"]+)"/g)].map((m) => m[1]).sort();
+        const used = [GAME_REPO, HUB_REPO, SKINS_REPO, SOUNDTRACK_REPO].map((r) => `${r.owner}/${r.name}`.toLowerCase()).sort();
+        expect(allowed).toEqual(used);
     });
 
     it('build the addresses the Hub used before', () => {

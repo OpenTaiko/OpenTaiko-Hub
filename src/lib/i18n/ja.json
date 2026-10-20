@@ -358,6 +358,7 @@
       "updated": "{count}個のジャンルフォルダを更新しました"
     },
     "error": {
+      "audio_missing": "{name} がこの曲のフォルダーにありません。",
       "open_folder": "フォルダーを開けませんでした: {error}",
       "scanning": "ローカルフォルダーのスキャン中は曲をダウンロードできません",
       "audio_failed": "この曲の音声を読み込めませんでした: {error}",
@@ -649,6 +650,7 @@
     "songs_link_failed": "{name} に楽曲ライブラリを関連付けできませんでした。ゲームに楽曲が表示されません。"
   },
   "bulk": {
+    "finishing": "ダウンロードした曲のフォルダーを仕上げています…",
     "status": "ダウンロード中 {done} / {total} · 残り {size}",
     "done": "{total} 件中 {count} 件をダウンロードしました",
     "failed": "{total} 件中 {count} 件をダウンロードしました。失敗: {failed}",

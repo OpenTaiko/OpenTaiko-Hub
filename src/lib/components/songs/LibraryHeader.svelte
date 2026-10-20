@@ -16,7 +16,7 @@
         Found?: number;
         Busy?: boolean;
         /** Set while a bulk download runs. */
-        Bulk?: { done: number; total: number; mbLeft: number } | null;
+        Bulk?: { done: number; total: number; mbLeft: number; finishing?: boolean } | null;
         CurrentScope?: Scope;
         Search?: string;
         OnScope?: (scope: Scope) => void;
@@ -113,7 +113,13 @@
             <!-- Counted here rather than per song, and in place: the rows that show each
                  song's own progress are often inside collapsed folders -->
             <i class="fa-solid fa-spinner fa-spin"></i>
-            {$_('bulk.status', { values: { done: Bulk.done, total: Bulk.total, size: formatSize(Bulk.mbLeft) } })}
+            <!-- After a cancel, only the folders of the songs that arrived are finished: said
+                 as such, rather than reading as if the download had resumed -->
+            {#if Bulk.finishing}
+                {$_('bulk.finishing', { values: { count: Bulk.done } })}
+            {:else}
+                {$_('bulk.status', { values: { done: Bulk.done, total: Bulk.total, size: formatSize(Bulk.mbLeft) } })}
+            {/if}
             <button type="button" class="button-gray button-main cancel" disabled={Cancelling} onclick={() => OnCancelBulk?.()}>
                 <i class="fa-solid {Cancelling ? 'fa-spinner fa-spin' : 'fa-xmark'}"></i> {Cancelling ? $_('jobs.cancelling') : $_('common.cancel')}
             </button>

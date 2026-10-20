@@ -358,6 +358,7 @@
       "updated": "已更新 {count} 个曲风文件夹"
     },
     "error": {
+      "audio_missing": "{name} 已不在这首歌的文件夹中。",
       "open_folder": "无法打开文件夹：{error}",
       "scanning": "正在扫描本地文件夹，无法下载歌曲",
       "audio_failed": "无法读取这首歌的音频：{error}",
@@ -649,6 +650,7 @@
     "songs_link_failed": "无法将曲库关联到 {name}，游戏中将不会显示这些歌曲。"
   },
   "bulk": {
+    "finishing": "正在完善已下载歌曲的文件夹…",
     "status": "正在下载 {done} / {total} · 剩余 {size}",
     "done": "已下载 {count} / {total}",
     "failed": "已下载 {count} / {total}。失败：{failed}",

@@ -90,7 +90,7 @@
     let songDLProgress = $state<Record<string, number>>({});
     let bulkBusy = $state(false);          // a bulk download is running
     // What the library header shows while a bulk download runs, and how to stop it
-    let bulkStatus = $state<{ done: number; total: number; mbLeft: number } | null>(null);
+    let bulkStatus = $state<{ done: number; total: number; mbLeft: number; finishing?: boolean } | null>(null);
     let bulkJob: Job | null = null;
     // Read by the Cancel button, which says it is cancelling until the run stops
     let bulkCancelRequested = $state(false);
@@ -106,6 +106,8 @@
     // counts a "not modified" answer too.
     let remoteIndexReadAt = 0;
     const INDEX_MAX_AGE_MS = 10 * 60 * 1000;
+    // Kept through a refused refresh up to this age
+    const INDEX_MAX_STALE_MS = 30 * 60 * 1000;
     // After a failed fetch (usually GitHub's hourly API limit), downloads go ahead with
     // the index they have, or without one, until this time instead of asking again for
     // every song
@@ -252,7 +254,11 @@
                 return null;
             }
             // Deleted since the scan: said, and looked for again on the next click
-            if (!audio) throw new Error(`${name} is no longer in ${forPath}`);
+            if (!audio) {
+                songAudioLoad = null;
+                TriggerError(get(_)('songs.error.audio_missing', { values: { name } }), { details: `${name} is no longer in ${forPath}` });
+                return null;
+            }
             songAudio = audio;
             return audio;
         } catch (error) {
@@ -807,6 +813,7 @@
                 metadataJob = startJob('songs');
                 bulkJob = metadataJob;
                 bulkCancelRequested = false;
+                bulkStatus = { done, total: pending.length, mbLeft: 0, finishing: true };
             }
             try {
                 const updated = await RefreshAllGenreMetadata(genres, metadataJob.id, !cancelled);
@@ -852,10 +859,14 @@
                     remoteIndex = await FetchSoundtrackIndex(remoteIndex);
                     remoteIndexReadAt = Date.now();
                 } catch (error) {
-                    // The index already read stays usable: its files are fetched from its
-                    // own commit
+                    // The index already read stays usable for a while: its files are fetched
+                    // from its own commit. Not past INDEX_MAX_STALE_MS: a song changed upstream
+                    // since then installed that old commit's files, reported as a success,
+                    // for as long as GitHub kept refusing. Without one, files come from the
+                    // branch, current but unchecked.
                     console.error('Failed to fetch the soundtrack repository tree:', error);
                     remoteIndexRetryAt = Date.now() + INDEX_COOLDOWN_MS;
+                    if (remoteIndex && Date.now() - remoteIndexReadAt > INDEX_MAX_STALE_MS) remoteIndex = null;
                 } finally {
                     remoteIndexFetch = null;
                 }
