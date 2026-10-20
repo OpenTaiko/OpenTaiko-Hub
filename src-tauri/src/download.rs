@@ -133,25 +133,19 @@ fn is_hex(s: &str) -> bool {
     !s.is_empty() && s.bytes().all(|b| b.is_ascii_hexdigit())
 }
 
+/// The branch the Hub reads files from by name.
+const BRANCHES: [&str; 1] = ["main"];
+
 /// Whether a git reference, `rest` being the path from the reference on, names something
-/// the repository's owners published: a branch, a tag, or a commit recorded by
-/// `remember_branch_head`. GitHub serves every commit of a repository's forks under the
-/// repository's own name, `refs/pull/<n>/head` included, so a commit or a pull request
-/// reference in an OpenTaiko path may well be anyone's.
+/// the repository's owners published: the branch the Hub reads from, or a commit recorded
+/// by `remember_branch_head`. Nothing else is accepted, however it is spelled: GitHub
+/// serves every commit of a repository's forks under the repository's own name, and
+/// resolves names nobody chose to publish there. `refs/pull/<n>/head` was refused, but
+/// `pull/<n>/head`, anyone's pull request, passed as a branch name.
 fn reference_allowed(owner: &str, repo: &str, rest: &[&str]) -> bool {
     let Some(first) = rest.first() else { return false };
-    if first.contains('%') {
-        return false;
-    }
-    if first.eq_ignore_ascii_case("refs") {
-        return rest.get(1).is_some_and(|kind| *kind == "heads" || *kind == "tags");
-    }
-    // Abbreviated commits are resolved too, so a branch named in hexadecimal is refused
-    // along with them
-    if first.len() >= 4 && is_hex(first) {
-        return first.len() == 40 && branch_heads().lock().unwrap().contains(&head_key(owner, repo, first));
-    }
-    true
+    BRANCHES.contains(first)
+        || (first.len() == 40 && is_hex(first) && branch_heads().lock().unwrap().contains(&head_key(owner, repo, first)))
 }
 
 /// Anything served from GITHUB_HOSTS must come from OWNERS, and from what they published.
@@ -1056,9 +1050,8 @@ mod tests {
     fn downloads_come_only_from_opentaiko_repositories() {
         let ok = |u: &str| parse_download_url(u).is_ok();
         assert!(ok("https://github.com/OpenTaiko/OpenTaiko-Skins/releases/download/system-assets/a.zip"));
-        assert!(ok("https://codeload.github.com/0AuBSQ/OpenTaiko/zip/refs/heads/main"));
+        assert!(ok("https://codeload.github.com/0AuBSQ/OpenTaiko/zip/main"));
         assert!(ok("https://raw.githubusercontent.com/opentaiko/OpenTaiko-Soundtrack/main/x.tja"));
-        assert!(ok("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/refs/tags/v1/x.tja"));
         assert!(ok("https://opentaiko.github.io/hof.db3"));
         assert!(!ok("https://raw.githubusercontent.com/someone/payload/main/OpenTaiko.exe"));
         assert!(!ok("https://github.com/someone/OpenTaiko/releases/download/v1/a.zip"));
@@ -1079,9 +1072,17 @@ mod tests {
         assert!(!ok(&raw));
         assert!(!ok(&zip));
         assert!(!ok("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/0b6a51e/README.md"));
-        assert!(!ok("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/refs/pull/22/head/README.md"));
-        assert!(!ok("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/refs%2Fpull%2F22%2Fhead/README.md"));
-        assert!(!ok("https://codeload.github.com/OpenTaiko/OpenTaiko-Soundtrack/zip/refs/pull/22/head"));
+        // Every spelling of a pull request: checked live, GitHub served the short one
+        // (`pull/22/head`), which an earlier check took for a branch name
+        for reference in ["refs/pull/22/head", "pull/22/head", "pull/22/merge", "refs%2Fpull%2F22%2Fhead", "PULL/22/head"] {
+            assert!(!ok(&format!("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/{reference}/README.md")), "{reference}");
+            assert!(!ok(&format!("https://codeload.github.com/0AuBSQ/OpenTaiko/zip/{reference}")), "{reference}");
+        }
+        // Any other name the Hub does not read from: GitHub resolves more of them than a
+        // list of what to refuse could keep up with
+        for reference in ["refs/heads/main", "refs/tags/v1", "v0.6.0", "feature", "HEAD", "Main", "main%2F..%2Fpull"] {
+            assert!(!ok(&format!("https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/{reference}/x.tja")), "{reference}");
+        }
         assert!(!ok("https://github.com/OpenTaiko/OpenTaiko/archive/main.zip"));
         assert!(!ok("https://github.com/OpenTaiko/OpenTaiko/raw/main/a.exe"));
 

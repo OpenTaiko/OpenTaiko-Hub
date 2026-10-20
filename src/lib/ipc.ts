@@ -89,8 +89,10 @@ export const ipc = {
     /** Shows the folder dialog itself; null when it was closed without a choice. */
     attachInstanceDir: (title: string) => invoke<string | null>('attach_instance_dir', { title }),
     /** Shows a file dialog for one kind of file; empty when it was closed without a choice. */
-    pickFiles: (kind: 'image' | 'chart_archive' | 'save', label: string, multiple = false) =>
+    pickFiles: (kind: 'image' | 'chart_archive', label: string, multiple = false) =>
         invoke<string[]>('pick_files', { kind, label, multiple }),
+    /** Shows a dialog for an exported save and returns its text; null when it was closed. */
+    pickSave: (label: string) => invoke<string | null>('pick_save', { label }),
     allowBuildDir: (path: string) => invoke<void>('allow_build_dir', { path }),
     openFolder: (path: string) => invoke<void>('open_folder', { path }),
     hubRoot: () => invoke<string>('hub_root'),

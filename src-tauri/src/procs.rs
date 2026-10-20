@@ -213,10 +213,9 @@ fn publish_args(build_dir: &Path, rid: &str) -> Vec<String> {
     ]
 }
 
-/// Files MSBuild, NuGet and the SDK look for in every folder above a project. The game's
-/// repository has none of its own, so one above the source folder would be picked up by
-/// the build: an `<Exec>` in a Directory.Build.targets, or a package feed in a NuGet.Config.
-/// The Hub's tmp folder is one of those folders.
+/// Files MSBuild, NuGet and the SDK look for in the project's folder and every folder
+/// above it: an `<Exec>` in a Directory.Build.targets, or a package feed in a NuGet.Config,
+/// would be picked up by the build. The game's repository has none of its own.
 const INHERITED_BUILD_FILES: [&str; 7] = [
     "directory.build.props",
     "directory.build.targets",
@@ -227,9 +226,15 @@ const INHERITED_BUILD_FILES: [&str; 7] = [
     "global.json",
 ];
 
-/// The first file of INHERITED_BUILD_FILES in `build_dir` or a folder above it.
-fn inherited_build_file(build_dir: &Path) -> Option<PathBuf> {
-    build_dir.ancestors().find_map(|dir| {
+/// The first file of INHERITED_BUILD_FILES the build of `src` would read from a folder the
+/// page can fill: the project's folder and the source folder, which the build reads first
+/// (they were not checked at all), the build folder, and the temporary folder holding it.
+/// Not above that: what the user keeps higher up (a global.json in their home folder) is
+/// theirs, as for any build they run, and refusing it blocked every build.
+fn inherited_build_file(src: &Path) -> Option<PathBuf> {
+    let build_dir = src.parent()?;
+    let folders = [src.join("OpenTaiko"), src.to_path_buf(), build_dir.to_path_buf(), build_dir.parent()?.to_path_buf()];
+    folders.iter().find_map(|dir| {
         std::fs::read_dir(dir).ok()?.flatten().map(|entry| entry.path()).find(|path| {
             path.file_name()
                 .and_then(|n| n.to_str())
@@ -267,11 +272,8 @@ pub async fn publish_game(
     }
     let src = crate::guard::build_source_dir(&app, &src_dir)?;
     let build_dir = src.parent().ok_or("The build folder could not be resolved")?.to_path_buf();
-    if let Some(found) = inherited_build_file(&build_dir) {
-        return Err(format!(
-            "Refusing to build: {} would be read by the build. Remove it, or move the Hub elsewhere.",
-            found.display()
-        ));
+    if let Some(found) = inherited_build_file(&src) {
+        return Err(format!("Refusing to build: {} would be read by the build", found.display()));
     }
     // Closing the window waits until a cancelled build is gone
     let _running = crate::jobs::in_flight(&app);
@@ -520,19 +522,28 @@ mod arg_tests {
     }
 
     #[test]
-    fn a_build_file_above_the_source_stops_the_build() {
+    fn a_build_file_where_the_page_can_reach_stops_the_build() {
         let tmp = tempfile::tempdir().unwrap();
         let build = tmp.path().join("tmp").join("1a2b3c4d");
-        std::fs::create_dir_all(build.join("s").join("OpenTaiko")).unwrap();
-        // The repository's own files are not inherited ones
-        std::fs::write(build.join("s").join("NuGet.Config"), "<configuration/>").unwrap();
-        // Unrelated to anything above the temporary folder of this test
-        let found = inherited_build_file(&build).filter(|p| p.starts_with(tmp.path()));
-        assert_eq!(found, None);
+        let src = build.join("s");
+        std::fs::create_dir_all(src.join("OpenTaiko")).unwrap();
+        assert_eq!(inherited_build_file(&src), None);
 
+        // What the build reads first: the project's folder and the source folder
+        for (dir, name) in [(src.join("OpenTaiko"), "Directory.Build.props"), (src.clone(), "NuGet.Config"), (build.clone(), "global.json")] {
+            let planted = dir.join(name);
+            std::fs::write(&planted, "<Project/>").unwrap();
+            assert_eq!(inherited_build_file(&src), Some(planted.clone()));
+            std::fs::remove_file(&planted).unwrap();
+        }
         let planted = tmp.path().join("tmp").join("Directory.Build.Targets");
         std::fs::write(&planted, "<Project/>").unwrap();
-        assert_eq!(inherited_build_file(&build), Some(planted));
+        assert_eq!(inherited_build_file(&src), Some(planted.clone()));
+        std::fs::remove_file(&planted).unwrap();
+
+        // Above the Hub's temporary folder is the user's own
+        std::fs::write(tmp.path().join("global.json"), "{}").unwrap();
+        assert_eq!(inherited_build_file(&src), None);
     }
 
     #[test]

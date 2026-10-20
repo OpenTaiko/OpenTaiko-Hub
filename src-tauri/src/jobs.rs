@@ -246,9 +246,12 @@ pub fn allow_close<R: Runtime>(window: &Window<R>) -> bool {
         return false;
     }
     let prompt = jobs.prompt.lock().unwrap_or_else(|e| e.into_inner()).clone();
+    // A job whose first command arrived before its registration has no question yet.
+    // Closing went through at once then, cutting off whatever it was moving.
     let Some(prompt) = prompt else {
         jobs.asking.store(false, Ordering::SeqCst);
-        return true;
+        close_when_settled(window.clone());
+        return false;
     };
     let window = window.clone();
     window

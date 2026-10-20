@@ -212,12 +212,13 @@
         busy = true;
         try {
             if (await GameRunning(inst)) return;
-            const [src] = await ipc.pickFiles('save', get(_)('files.optk_save'));
-            if (!src) return;
+            // Read by the backend: the file itself stays out of the page's reach
+            const text = await ipc.pickSave(get(_)('files.optk_save'));
+            if (text === null) return;
 
             let portable: Partial<PortableSave>;
             try {
-                portable = JSON.parse(new TextDecoder().decode(await readFile(src))) as Partial<PortableSave>;
+                portable = JSON.parse(text) as Partial<PortableSave>;
             } catch {
                 TriggerError(get(_)('saves.error.invalid_file'));
                 return;

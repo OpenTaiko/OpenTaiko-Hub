@@ -22,8 +22,8 @@ use tauri_plugin_fs::FsExt;
 const INSTANCE_REGISTRY: &str = "instances.json";
 
 /// Instance folders the Hub created, or the user picked in the Hub's own folder dialog,
-/// kept in the app local data folder in the same shape as the instance list. The page
-/// can neither write nor delete it (see `init`).
+/// kept in the private folder in the same shape as the instance list. The page can
+/// neither write nor delete it (see `private_dir`).
 pub const INSTANCE_ROOTS: &str = "instance-roots.json";
 
 /// The instance folders allowed this session: those in INSTANCE_ROOTS that the page's
@@ -95,8 +95,56 @@ fn page_instances(config: &Path) -> Option<Vec<PathBuf>> {
         .or_else(|| read_instances(&config.join(format!("{INSTANCE_REGISTRY}.bak"))))
 }
 
+/// The folder holding the files the page may not touch (the instance folders the Hub
+/// allows, the session state), inside the app local data folder. A folder of their own,
+/// forbidden as a whole: on macOS the app local data folder is the config folder the page
+/// uses, where it could create a folder in place of one of their temporary files, or
+/// remove the session file.
+fn private_dir<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    app.path().app_local_data_dir().ok().map(|dir| dir.join("private"))
+}
+
 fn roots_file<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
+    private_dir(app).map(|dir| dir.join(INSTANCE_ROOTS))
+}
+
+/// Where the roots file was kept before it had a folder of its own.
+fn moved_roots_file<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
     app.path().app_local_data_dir().ok().map(|dir| dir.join(INSTANCE_ROOTS))
+}
+
+/// Forbids the private folder and everything in it, and the folder holding it, which
+/// removing or moving away would take it along (the forbidden list is checked against the
+/// path named only). Before the page can make a request.
+fn protect_private_dir<R: Runtime>(app: &AppHandle<R>, private: &Path) {
+    let scope = app.fs_scope();
+    for spelling in [private.to_path_buf(), resolve_existing(private)] {
+        if let Err(e) = scope.forbid_directory(&spelling, true) {
+            log::warn!("Could not protect {}: {}", spelling.display(), e);
+        }
+    }
+    if let Some(parent) = private.parent() {
+        for spelling in [parent.to_path_buf(), resolve_existing(parent)] {
+            if let Err(e) = scope.forbid_file(&spelling) {
+                log::warn!("Could not protect {}: {}", spelling.display(), e);
+            }
+        }
+    }
+}
+
+/// A folder of the page's list taken over on the first start of a Hub that keeps its own:
+/// one the Hub made in its folder (`OpenTaiko-<uuid>`, or Hub 0.1's `OpenTaiko`), or a
+/// folder that holds a game or its settings and could be attached. Any folder the list
+/// named used to be taken, so a page that had rewritten the list was granted it.
+fn seedable<R: Runtime>(app: &AppHandle<R>, dir: &Path) -> bool {
+    let name = dir.file_name().and_then(|n| n.to_str()).unwrap_or("");
+    let in_root = dir.parent().is_some_and(|parent| root_spellings().iter().any(|root| same_path(root, parent)));
+    let made_by_hub = in_root && (name == "OpenTaiko" || name.strip_prefix("OpenTaiko-").is_some_and(is_uuid));
+    made_by_hub || (is_acceptable_instance_dir(app, dir) && holds_a_game(dir))
+}
+
+fn holds_a_game(dir: &Path) -> bool {
+    ["OpenTaiko.exe", "OpenTaiko", "Config.ini"].iter().any(|name| dir.join(name).is_file())
 }
 
 fn write_roots(file: &Path, roots: &[PathBuf]) -> Result<(), String> {
@@ -110,14 +158,14 @@ fn write_roots(file: &Path, roots: &[PathBuf]) -> Result<(), String> {
 /// The instance folders the Hub may use, of those `registered` (the page's list) names.
 ///
 /// The first time, before the Hub kept a list of its own, the folders the page's list
-/// names are taken over, except one holding the home folder, the Hub's folder or its
-/// settings (`protected`): a list the page had rewritten could otherwise grant it the whole
-/// disk. A page list that cannot be read takes over nothing and is not recorded, so a
-/// later start can still take it over; recording it as empty cut off every instance.
-fn load_roots(file: &Path, registered: Option<&[PathBuf]>, protected: &[PathBuf]) -> Vec<PathBuf> {
+/// names are taken over, those `seedable` accepts only: a list the page had rewritten
+/// could otherwise grant it any folder. A page list that cannot be read takes over nothing
+/// and is not recorded, so a later start can still take it over; recording it as empty
+/// cut off every instance.
+fn load_roots(file: &Path, registered: Option<&[PathBuf]>, seedable: impl Fn(&Path) -> bool) -> Vec<PathBuf> {
     if !file.exists() {
         let Some(registered) = registered else { return Vec::new() };
-        let roots: Vec<PathBuf> = registered.iter().filter(|dir| !holds_any(dir, protected)).cloned().collect();
+        let roots: Vec<PathBuf> = registered.iter().filter(|dir| seedable(dir)).cloned().collect();
         if let Err(e) = write_roots(file, &roots) {
             log::warn!("Could not record the instance folders: {}", e);
         }
@@ -136,6 +184,19 @@ fn load_roots(file: &Path, registered: Option<&[PathBuf]>, protected: &[PathBuf]
     }
 }
 
+/// Moves the roots file from where it was kept before into the private folder. A file
+/// that cannot be moved is copied, so its folders are not taken over again from the page.
+fn move_roots_file(old: Option<&Path>, new: &Path) {
+    let Some(old) = old.filter(|old| old.is_file() && !new.exists()) else { return };
+    let moved = new
+        .parent()
+        .map_or(Ok(()), std::fs::create_dir_all)
+        .and_then(|()| std::fs::rename(old, new).or_else(|_| std::fs::copy(old, new).map(|_| ())));
+    if let Err(e) = moved {
+        log::warn!("Could not move {} to {}: {}", old.display(), new.display(), e);
+    }
+}
+
 /// Called once from `setup`, before the page can make a request.
 pub fn init<R: Runtime>(app: &AppHandle<R>) {
     for root in root_spellings() {
@@ -146,22 +207,10 @@ pub fn init<R: Runtime>(app: &AppHandle<R>) {
     let mut roots = Vec::new();
     if let Ok(config) = app.path().app_config_dir() {
         allow_dir(app, &config);
-        if let Some(file) = roots_file(app) {
-            // On macOS the app local data folder is the config folder the page may use. The
-            // folder itself is protected too: removing it, or moving it away, would take the
-            // file with it, and the forbidden list is only checked against the path named.
-            let scope = app.fs_scope();
-            let mut protect = vec![file.clone()];
-            protect.extend(file.parent().map(Path::to_path_buf));
-            for path in protect {
-                let real = resolve_existing(&path);
-                for spelling in [path, real] {
-                    if let Err(e) = scope.forbid_file(&spelling) {
-                        log::warn!("Could not protect {}: {}", spelling.display(), e);
-                    }
-                }
-            }
-            roots = load_roots(&file, page_instances(&config).as_deref(), &protected_dirs(app));
+        if let (Some(private), Some(file)) = (private_dir(app), roots_file(app)) {
+            protect_private_dir(app, &private);
+            move_roots_file(moved_roots_file(app).as_deref(), &file);
+            roots = load_roots(&file, page_instances(&config).as_deref(), |dir| seedable(app, dir));
         }
     }
     for root in &roots {
@@ -298,13 +347,12 @@ pub async fn attach_instance_dir<R: Runtime>(
     Ok(Some(dir.to_string_lossy().into_owned()))
 }
 
-/// The files the page asks the user for, by kind: chart jackets, chart archives and
-/// exported saves.
+/// The files the page asks the user for, by kind: chart jackets and chart archives, which
+/// commands then read. An exported save is read by `pick_save` itself.
 fn pick_extensions(kind: &str) -> Option<&'static [&'static str]> {
     match kind {
         "image" => Some(&["png", "jpg", "jpeg", "webp"]),
         "chart_archive" => Some(&["zip"]),
-        "save" => Some(&["optksave", "json"]),
         _ => None,
     }
 }
@@ -327,6 +375,43 @@ pub async fn pick_files<R: Runtime>(
     multiple: bool,
 ) -> Result<Vec<String>, String> {
     let extensions = pick_extensions(&kind).ok_or_else(|| format!("Unknown kind of file: {}", kind))?;
+    let picked = pick(&app, window, label, extensions, multiple).await?;
+    let scope = app.fs_scope();
+    for path in &picked {
+        for spelling in [path.clone(), resolve_existing(path)] {
+            scope.allow_file(&spelling).map_err(|e| format!("Could not allow {}: {}", spelling.display(), e))?;
+        }
+    }
+    Ok(picked.iter().map(|path| path.to_string_lossy().into_owned()).collect())
+}
+
+/// Exported saves are small; a larger file is not one.
+const MAX_SAVE_FILE: u64 = 16 * 1024 * 1024;
+
+/// Asks the user for an exported save and returns its text, or `None` when the dialog was
+/// closed. Read here rather than allowed to the page: any `.json` the user picked stayed
+/// readable by the page for the rest of the session.
+#[tauri::command]
+pub async fn pick_save<R: Runtime>(app: AppHandle<R>, window: tauri::Window<R>, label: String) -> Result<Option<String>, String> {
+    let Some(path) = pick(&app, window, label, &["optksave", "json"], false).await?.pop() else { return Ok(None) };
+    crate::library::blocking(move || {
+        let size = std::fs::metadata(&path).map_err(|e| format!("Could not read {}: {}", path.display(), e))?.len();
+        if size > MAX_SAVE_FILE {
+            return Err(format!("{} is too large to be a save", path.display()));
+        }
+        std::fs::read_to_string(&path).map(Some).map_err(|e| format!("Could not read {}: {}", path.display(), e))
+    })
+    .await
+}
+
+/// The files picked in a dialog the Hub shows itself, none when it was closed.
+async fn pick<R: Runtime>(
+    app: &AppHandle<R>,
+    window: tauri::Window<R>,
+    label: String,
+    extensions: &'static [&'static str],
+    multiple: bool,
+) -> Result<Vec<PathBuf>, String> {
     let dialog_app = app.clone();
     let picked = crate::library::blocking(move || {
         let dialog = dialog_app.dialog().file().add_filter(label, extensions).set_parent(&window);
@@ -337,20 +422,18 @@ pub async fn pick_files<R: Runtime>(
         })
     })
     .await?;
-    let mut paths = Vec::with_capacity(picked.len());
-    for file in picked {
-        let path = file.into_path().map_err(|e| format!("Unusable file: {}", e))?;
-        // A name typed into the dialog is not held to its filter
-        if !has_extension(&path, extensions) || !path.is_file() {
-            return Err(format!("{} cannot be used here", path.display()));
-        }
-        let scope = app.fs_scope();
-        for spelling in [path.clone(), resolve_existing(&path)] {
-            scope.allow_file(&spelling).map_err(|e| format!("Could not allow {}: {}", spelling.display(), e))?;
-        }
-        paths.push(path.to_string_lossy().into_owned());
-    }
-    Ok(paths)
+    picked
+        .into_iter()
+        .map(|file| {
+            let path = file.into_path().map_err(|e| format!("Unusable file: {}", e))?;
+            // A name typed into the dialog is not held to its filter
+            if has_extension(&path, extensions) && path.is_file() {
+                Ok(path)
+            } else {
+                Err(format!("{} cannot be used here", path.display()))
+            }
+        })
+        .collect()
 }
 
 /// Canonicalizes the deepest part of `path` that exists and appends the rest, so a path
@@ -579,12 +662,12 @@ pub fn sweep_leftovers(instances: Vec<PathBuf>, old_tmp: Option<PathBuf>, deep: 
     }
 }
 
-/// Says, in the app local data folder, whether the Hub is running: "running" from start to
-/// exit, "stopped" after a normal exit.
+/// Says, in the private folder, whether the Hub is running: "running" from start to exit,
+/// "stopped" after a normal exit.
 const SESSION_FILE: &str = "session";
 
 fn session_file<R: Runtime>(app: &AppHandle<R>) -> Option<PathBuf> {
-    app.path().app_local_data_dir().ok().map(|dir| dir.join(SESSION_FILE))
+    private_dir(app).map(|dir| dir.join(SESSION_FILE))
 }
 
 /// Records that the Hub is running. True when the previous run did not end normally (a
@@ -800,24 +883,80 @@ mod tests {
         let file = tmp.path().join("data").join(INSTANCE_ROOTS);
         let (a, b, c) = (tmp.path().join("A"), tmp.path().join("B"), tmp.path().join("C"));
 
-        let home = tmp.path().join("home");
-        std::fs::create_dir_all(&home).unwrap();
-        let protected = [home.clone()];
-
-        // The first start takes over the page's list, except a folder holding a protected
-        // one, and records it
-        let page = [a.clone(), b.clone(), tmp.path().to_path_buf(), home.clone()];
-        assert_eq!(load_roots(&file, Some(&page), &protected), vec![a.clone(), b.clone()]);
+        // The first start takes over the folders of the page's list that `seedable`
+        // accepts, and records them
+        let seedable = |dir: &Path| dir == a || dir == b;
+        let page = [a.clone(), b.clone(), tmp.path().to_path_buf()];
+        assert_eq!(load_roots(&file, Some(&page), seedable), vec![a.clone(), b.clone()]);
         assert_eq!(registered_instances(&file), vec![a.clone(), b.clone()]);
 
         // Later, a folder only the page's list names is not allowed, and one the page's
         // list dropped (a detached instance) is not allowed this session but kept on file
         let page = [a.clone(), c.clone(), tmp.path().to_path_buf()];
-        assert_eq!(load_roots(&file, Some(&page), &protected), vec![a.clone()]);
+        assert_eq!(load_roots(&file, Some(&page), |_: &Path| true), vec![a.clone()]);
         assert_eq!(registered_instances(&file), vec![a.clone(), b.clone()]);
 
         // A page list that cannot be read hides nothing the Hub recorded
-        assert_eq!(load_roots(&file, None, &protected), vec![a, b]);
+        assert_eq!(load_roots(&file, None, |_: &Path| true), vec![a, b]);
+    }
+
+    // A page list rewritten by page script could name any folder, and the first start of
+    // a Hub keeping its own list took over every one that held no protected folder
+    #[test]
+    fn only_a_folder_that_looks_like_an_instance_is_taken_over() {
+        let app = mock_app();
+        let tmp = tempfile::tempdir().unwrap();
+        let game = tmp.path().join("Games").join("OpenTaiko");
+        let settings_only = tmp.path().join("Old");
+        let anything = tmp.path().join("Desktop").join("x");
+        for dir in [&game, &settings_only, &anything] {
+            std::fs::create_dir_all(dir).unwrap();
+        }
+        std::fs::write(game.join(if cfg!(windows) { "OpenTaiko.exe" } else { "OpenTaiko" }), "game").unwrap();
+        std::fs::write(settings_only.join("Config.ini"), "[System]").unwrap();
+        assert!(seedable(app.handle(), &game));
+        assert!(seedable(app.handle(), &settings_only));
+        assert!(!seedable(app.handle(), &anything));
+        assert!(!seedable(app.handle(), &tmp.path().join("missing")));
+        // An instance folder the Hub made in its own folder, empty while its install waits
+        if let Some(root) = crate::hub_root_dir() {
+            assert!(seedable(app.handle(), &root.join("OpenTaiko-0f8fad5b-d9cb-469f-a165-70867728950e")));
+            assert!(!seedable(app.handle(), &root.join("Songs")));
+        }
+    }
+
+    #[test]
+    fn the_private_folder_is_out_of_the_page_reach() {
+        let app = mock_app();
+        let tmp = tempfile::tempdir().unwrap();
+        let data = tmp.path().join("data");
+        let private = data.join("private");
+        std::fs::create_dir_all(&private).unwrap();
+        std::fs::write(private.join(INSTANCE_ROOTS), "{}").unwrap();
+        std::fs::write(data.join("settings.json"), "{}").unwrap();
+        // As on macOS, where this is the config folder the page reads its settings from
+        allow_dir(app.handle(), &data);
+        protect_private_dir(app.handle(), &private);
+        let text = |p: &Path| p.to_string_lossy().into_owned();
+
+        assert!(checked(app.handle(), &text(&data.join("settings.json"))).is_ok());
+        for path in [private.join(INSTANCE_ROOTS), private.join("session.123-4.tmp"), private.clone(), data.clone()] {
+            assert!(checked(app.handle(), &text(&path)).is_err(), "{}", path.display());
+        }
+    }
+
+    #[test]
+    fn the_roots_file_moves_into_the_private_folder_once() {
+        let tmp = tempfile::tempdir().unwrap();
+        let (old, new) = (tmp.path().join(INSTANCE_ROOTS), tmp.path().join("private").join(INSTANCE_ROOTS));
+        std::fs::write(&old, r#"{"instances":[]}"#).unwrap();
+        move_roots_file(Some(&old), &new);
+        assert!(!old.exists());
+        assert_eq!(std::fs::read_to_string(&new).unwrap(), r#"{"instances":[]}"#);
+        // A file already in place is never replaced by an old one
+        std::fs::write(&old, "old").unwrap();
+        move_roots_file(Some(&old), &new);
+        assert_eq!(std::fs::read_to_string(&new).unwrap(), r#"{"instances":[]}"#);
     }
 
     #[test]
@@ -838,13 +977,13 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let file = tmp.path().join("data").join(INSTANCE_ROOTS);
         // No page list to take over: nothing is recorded, so a later start still can
-        assert!(load_roots(&file, None, &[]).is_empty());
+        assert!(load_roots(&file, None, |_: &Path| true).is_empty());
         assert!(!file.exists());
 
         // A damaged record allows nothing and is left for the user to look at
         std::fs::create_dir_all(file.parent().unwrap()).unwrap();
         std::fs::write(&file, "{ not json").unwrap();
-        assert!(load_roots(&file, Some(&[tmp.path().join("A")]), &[]).is_empty());
+        assert!(load_roots(&file, Some(&[tmp.path().join("A")]), |_: &Path| true).is_empty());
         assert_eq!(std::fs::read_to_string(&file).unwrap(), "{ not json");
     }
 
@@ -883,6 +1022,8 @@ mod tests {
         assert!(!has_extension(Path::new("/a/OpenTaiko.exe"), images));
         assert!(!has_extension(Path::new("/a/png"), images));
         assert!(pick_extensions("folder").is_none());
+        // Read by pick_save instead of being allowed to the page
+        assert!(pick_extensions("save").is_none());
     }
 
     #[test]

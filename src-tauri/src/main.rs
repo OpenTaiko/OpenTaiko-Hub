@@ -608,6 +608,7 @@ fn main() {
             guard::create_instance_dir,
             guard::attach_instance_dir,
             guard::pick_files,
+            guard::pick_save,
             writes::write_settings_file,
             writes::write_version_json,
             writes::write_saves,
