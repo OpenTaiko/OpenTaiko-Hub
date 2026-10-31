@@ -375,6 +375,10 @@
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "Update {name}?",
+      "message": "The installed version of {name} is deleted before the new one is downloaded, so none of its old files are left behind. Any changes you made in its folder will be lost."
+    },
     "tab": {
       "skins": "Skins",
       "characters": "Characters",

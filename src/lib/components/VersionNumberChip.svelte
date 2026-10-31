@@ -5,8 +5,8 @@
     interface Props {
         LatestVersion?: string;
         CurrentVersion?: string;
-        /** "Error" marks an incompatible version in red, anything else in yellow. */
-        Strictness?: 'Error' | 'Warning';
+        /** "Error" marks an incompatible version in red, "Warning" in yellow, "None" not at all. */
+        Strictness?: 'Error' | 'Warning' | 'None';
     }
 
     let { LatestVersion = "Unknown", CurrentVersion = "Unknown", Strictness = "Error" }: Props = $props();
@@ -18,6 +18,8 @@
         {#if Strictness === "Error"}
             <!-- Error -->
             <p class="badge bg-red-100 text-red-800" title={$_('version_chip.incompatible')}>{LatestVersion}</p>
+        {:else if Strictness === "None"}
+            <p class="badge preset-tonal">{LatestVersion}</p>
         {:else}
             <!-- Warning -->
             <p class="badge bg-yellow-100 text-yellow-800" title={$_('version_chip.outdated')}>{LatestVersion}</p>

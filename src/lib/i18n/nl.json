@@ -375,6 +375,10 @@
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "{name} bijwerken?",
+      "message": "De geïnstalleerde versie van {name} wordt verwijderd voordat de nieuwe wordt gedownload, zodat er geen oude bestanden achterblijven. Wijzigingen die je in de map hebt gemaakt, gaan verloren."
+    },
     "tab": {
       "skins": "Skins",
       "characters": "Personages",

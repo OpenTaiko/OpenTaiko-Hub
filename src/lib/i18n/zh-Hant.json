@@ -375,6 +375,10 @@
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "更新 {name}？",
+      "message": "為避免留下舊檔案，下載新版本前會先刪除已安裝的 {name}。你在其資料夾中所做的變更將會遺失。"
+    },
     "tab": {
       "skins": "主題",
       "characters": "角色",

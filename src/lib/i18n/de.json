@@ -375,6 +375,10 @@
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "{name} aktualisieren?",
+      "message": "Die installierte Version von {name} wird gelöscht, bevor die neue heruntergeladen wird, damit keine alten Dateien zurückbleiben. Änderungen im Ordner des Skins gehen verloren."
+    },
     "tab": {
       "skins": "Skins",
       "characters": "Charaktere",

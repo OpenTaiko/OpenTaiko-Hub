@@ -21,6 +21,8 @@ You can update either through the OpenTaiko Hub, or directly from the releases t
 - [Enhance] Collection names are shown without the game's sort prefixes ("01", "S1"), with the real folder name kept underneath
 - [Enhance] A chart archive whose files are named in Japanese (Shift-JIS) installs with those names intact instead of garbled characters
 - [Enhance] A folder whose settings file was written in Japanese keeps its in-game name readable after you edit it from the Hub
+- [Enhance] Updating a skin asks first, then removes the old version before downloading the new one; skins can no longer be bulk downloaded
+- [Enhance] Character and Puchichara versions are no longer marked as incompatible with the game version
 - [Fix] The Songs tab was slow to open and to scroll: it listed the whole soundtrack at once, with an audio player on every row
 - [Fix] Song names showed the game's raw colour markup, such as `<c.#d3d3d3>`
 

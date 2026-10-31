@@ -375,6 +375,10 @@
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "Mettre à jour {name} ?",
+      "message": "La version installée de {name} est supprimée avant le téléchargement de la nouvelle, pour qu'aucun ancien fichier ne reste. Les modifications faites dans son dossier seront perdues."
+    },
     "tab": {
       "skins": "Skins",
       "characters": "Personnages",

@@ -7,7 +7,8 @@
     import { onMount } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir } from '@tauri-apps/plugin-fs';
+    import { mkdir, remove, exists } from '@tauri-apps/plugin-fs';
+    import { confirm } from '@tauri-apps/plugin-dialog';
     import { InstallZip } from '$lib/services/install';
     import { download, installFiles, fetchCachedJson, type InstallEntry } from '$lib/utils/download';
     import { startJob, isCancelled, InstanceInUse, type Job } from '$lib/stores/activity';
@@ -140,6 +141,8 @@
         Number((info as Record<string, unknown>)[`${prefix}Size`] ?? 0);
 
     const DownloadDisplayedAssets = async (assetType: AssetType) => {
+        // Skins are updated one at a time: each update asks before deleting the old version
+        if (assetType === "Skins") return;
         if (assetScanning === true) {
             const translatedType = get(_)(`assets.type.${assetType.toLowerCase()}`);
             TriggerWarning(get(_)('assets.error.scanning', { values: { type: translatedType } }));
@@ -233,16 +236,33 @@
         const instance = get(activeInstance);
         if (!instance) return 'skipped';
         if (!bulkJob && !CanWriteInto(instance)) return 'skipped';
+        // A skin update removes the old version first: files the new one no longer has
+        // were left behind and still read by the game
+        const replace = assetType === "Skins" && currentObj !== null
+            && currentObj.assetVersion !== Field(assetObj, 'skin', 'Version');
+        if (replace && !await ConfirmSkinUpdate(assetObj)) return 'skipped';
         const quiet = bulkJob !== undefined;
         const job = bulkJob ?? startJob('home', instance.id);
         try {
-            return await InstallAsset(instance.path, assetObj, assetType, quiet, job);
+            return await InstallAsset(instance.path, assetObj, assetType, quiet, job, replace);
         } finally {
             if (!bulkJob) job.end();
         }
     }
 
-    const InstallAsset = async (res: string, assetObj: AssetInfo, assetType: AssetType, quiet: boolean, job: Job): Promise<DownloadOutcome> => {
+    const ConfirmSkinUpdate = (assetObj: AssetInfo): Promise<boolean> => {
+        const t = get(_);
+        const name = Field(assetObj, 'skin', 'Name');
+        return confirm(t('assets.update_skin.message', { values: { name } }), {
+            title: t('assets.update_skin.title', { values: { name } }),
+            kind: 'warning',
+            okLabel: t('asset_cell.button.update'),
+            cancelLabel: t('common.cancel')
+        });
+    };
+
+    /** `replace`: the asset's folder is deleted before the new version is downloaded. */
+    const InstallAsset = async (res: string, assetObj: AssetInfo, assetType: AssetType, quiet: boolean, job: Job, replace = false): Promise<DownloadOutcome> => {
         const baseDir = assetBaseDirs[assetType];
         const assetPrefix = AssetPrefix(assetType);
         const assetRelpath = Field(assetObj, assetPrefix, 'Folder');
@@ -266,6 +286,15 @@
         // Any failure below clears the progress row, says so, and records nothing: a
         // half-installed asset must not show as up to date
         try {
+            if (replace) {
+                // Never a folder above the skin's own ("System/." would be System itself)
+                if (assetRelpath.split(/[\\/]/).some((part) => part === '' || part === '.')) {
+                    throw new Error(`Refusing to delete ${localPath}`);
+                }
+                if (await exists(assetFullPath)) await remove(assetFullPath, { recursive: true });
+                // Shown as not downloaded should the new version fail to arrive
+                delete currentAssets[assetType][assetRelpath];
+            }
             await mkdir(assetFullPath, { recursive: true });
 
             if (assetType === "Skins") {
@@ -400,7 +429,7 @@
 						<ProgressBar value={assetCountProgressBar[AssetTabType(currentAsset)]} max={100} />
 						<button type="button" onclick={() => CancelBulk(AssetTabType(currentAsset))} class="button-gray button-main" disabled={bulkCancelRequested[AssetTabType(currentAsset)]} title={bulkCancelRequested[AssetTabType(currentAsset)] ? $_('jobs.cancelling') : $_('common.cancel')} aria-label={bulkCancelRequested[AssetTabType(currentAsset)] ? $_('jobs.cancelling') : $_('common.cancel')}><i class="fa-solid {bulkCancelRequested[AssetTabType(currentAsset)] ? 'fa-spinner fa-spin' : 'fa-xmark'}"></i></button>
 					</div>
-					{:else}
+					{:else if AssetTabType(currentAsset) !== 'Skins'}
 					<button type="button" onclick={() => DownloadDisplayedAssets(AssetTabType(currentAsset))} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('assets.button.bulk_download')}</button>
 					{/if}
 				</th>
@@ -411,7 +440,8 @@
 			<tr>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Name')}</td>
 				<td>
-					<VersionNumberChip LatestVersion={Field(info, AssetTabPrefix(currentAsset), 'Version')} CurrentVersion={optk_version} Strictness="Error" />
+					<!-- Characters and puchicharas do not follow the game's versions the way skins do -->
+					<VersionNumberChip LatestVersion={Field(info, AssetTabPrefix(currentAsset), 'Version')} CurrentVersion={optk_version} Strictness={AssetTabType(currentAsset) === 'Skins' ? 'Error' : 'None'} />
 				</td>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Resolution')}</td>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Creator')}</td>

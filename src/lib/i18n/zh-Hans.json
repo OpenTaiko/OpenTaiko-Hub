@@ -375,6 +375,10 @@
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "更新 {name}？",
+      "message": "为避免留下旧文件，下载新版本前会先删除已安装的 {name}。你在其文件夹中所做的更改将会丢失。"
+    },
     "tab": {
       "skins": "皮肤",
       "characters": "角色",

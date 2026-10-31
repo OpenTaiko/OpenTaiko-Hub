@@ -375,6 +375,10 @@
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "¿Actualizar {name}?",
+      "message": "La versión instalada de {name} se elimina antes de descargar la nueva, para que no queden archivos antiguos. Se perderán los cambios que hayas hecho en su carpeta."
+    },
     "tab": {
       "skins": "Skins",
       "characters": "Personajes",
