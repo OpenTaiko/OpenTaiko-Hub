@@ -202,9 +202,12 @@ ${SCRIPT_CLOSE}`;
 
 <style>
     .docs-frame {
+        /* Inline, it sat on a text line and stood a few pixels taller than its box */
+        display: block;
         width: 100%;
         height: 100%;
-        min-height: 75vh;
+        /* Its box is the height left under the Home bars; 75vh was more than that */
+        min-height: 12rem;
         border: none;
         border-radius: 0.5rem;
         background: #fff;

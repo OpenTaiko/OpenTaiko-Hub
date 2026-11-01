@@ -177,9 +177,13 @@
       </aside>
       <!-- Main Content -->
       <!-- tabindex: where focus returns when a dialog closes and its opener is gone -->
-      <main class="h-screen space-y-4 p-4" tabindex="-1">
-        <!-- OpenTaiko instance management (Home only: the songs library is global) -->
-        <div class="w-full h-full space-y-4" style:display={currentTile === 0 ? null : 'none'}>
+      <!-- One page at a time: spacing lives inside each page. Spaced as siblings, the
+           Home page, sized to the whole area, got a margin below it (the Songs page
+           follows it, hidden) and the window scrolled by that much -->
+      <main class="h-screen p-4" tabindex="-1">
+        <!-- OpenTaiko instance management (Home only: the songs library is global).
+             A column, so a sub-page can take the height the bars above it leave -->
+        <div class="w-full h-full flex flex-col gap-4" style:display={currentTile === 0 ? null : 'none'}>
             {#if $instancesReady}
                 <InstanceBar OnManage={() => showInstanceManager = true} />
                 <HomeTab />
@@ -195,7 +199,7 @@
 
         <!-- Tools -->
         {#if currentTile === 3}
-            <ToolsTab />
+            <div class="space-y-4"><ToolsTab /></div>
         {/if}
 
         <!-- Secrets -->
@@ -205,7 +209,7 @@
 
         <!-- Information -->
         {#if currentTile === 5}
-            <InformationTab />
+            <div class="space-y-4"><InformationTab /></div>
         {/if}
 
         <!-- Links -->

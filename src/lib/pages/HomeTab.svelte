@@ -771,7 +771,7 @@
      while another tab is shown: mounted from the start, it fetched the catalog and
      scanned the instance at every launch, whether the tab was opened or not -->
 {#if assetsAvailable && assetsOpened}
-<div class="w-full h-full" style:display={homeSubTab >= 1 && homeSubTab <= 3 ? null : 'none'}>
+<div class="w-full" style:display={homeSubTab >= 1 && homeSubTab <= 3 ? null : 'none'}>
     <!-- Only sub-tabs 1..3 map to an asset type; any other value (Docs/Saves active
          while this stays mounted) must never reach AssetsTab as an out-of-range index -->
     <AssetsTab ShowTabs={false} currentAsset={homeSubTab >= 1 && homeSubTab <= 3 ? homeSubTab - 1 : 0} />
@@ -781,7 +781,8 @@
 <!-- Documentation of the selected instance (mounted only when viewed: the inlined docs
      can be large, so it is not kept alive in the background) -->
 {#if docsAvailable && homeSubTab === 4}
-<div class="w-full h-full">
+<!-- The height the bars above leave (the page is a column, see +page.svelte) -->
+<div class="w-full flex-1 min-h-0">
     <DocsTab />
 </div>
 {/if}
