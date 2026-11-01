@@ -1,10 +1,14 @@
 <script lang="ts">
+    import Modal from '$lib/components/Modal.svelte';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
+    import { formatDateTime } from '$lib/utils/format.svelte';
+    import { ipc } from '$lib/ipc';
+    import { startJob } from '$lib/stores/activity';
     // Resolves an instance's local Songs folder into the shared library. New charts are
     // moved, byte-identical charts are dropped, and charts that clash with a different
     // version already in the library are resolved by the user — per chart (showing each
     // side's hash and last-edited date) or in bulk.
     import { onMount, getContext } from 'svelte';
-    import { invoke } from '@tauri-apps/api/core';
     import { _, locale } from 'svelte-i18n';
     import { get } from 'svelte/store';
     import { localizedTitle } from '$lib/utils/titles';
@@ -49,15 +53,12 @@
 
     onMount(async () => {
         try {
-            plan = await invoke<MigrationPlan>('plan_migration', {
-                srcSongs: Candidate.srcPath,
-                destSongs: GlobalPath
-            });
+            plan = await ipc.planMigration(Candidate.srcPath, GlobalPath);
             conflicts = plan.items.filter((item) => item.status === 'conflict');
             // Default: keep the version already in the shared library
             choices = Object.fromEntries(conflicts.map((item) => [item.src.relPath, 'keep_global' as const]));
         } catch (error) {
-            TriggerError(get(_)('songs.migrate.error', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.migrate.error', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
             OnClose();
         }
         loading = false;
@@ -74,7 +75,7 @@
     };
     const EditedDate = (entry: MigrationSongEntry | null): string => {
         if (!entry?.modified) return '—';
-        return new Date(entry.modified * 1000).toLocaleString();
+        return formatDateTime(new Date(entry.modified * 1000));
     };
 
     const SetAll = (action: ConflictChoice) => {
@@ -84,6 +85,8 @@
     const Apply = async () => {
         if (!plan) return;
         applying = true;
+        // A job, so closing the window asks first, and then waits for the move to finish
+        const job = startJob('songs', Candidate.instance.id);
         try {
             const decisions: MigrationDecision[] = plan.items.map((item) => {
                 let action: MigrationAction;
@@ -97,29 +100,26 @@
                 };
             });
 
-            const summary = await invoke<MigrateSummary>('apply_migration', {
-                srcSongs: Candidate.srcPath,
-                destSongs: GlobalPath,
-                decisions
-            });
+            const summary = await ipc.applyMigration(Candidate.srcPath, GlobalPath, decisions);
             TriggerSuccess(get(_)('songs.migrate.applied', {
                 values: { moved: summary.moved, replaced: summary.replaced, discarded: summary.discarded }
             }));
             OnApplied();
         } catch (error) {
-            TriggerError(get(_)('songs.migrate.error', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.migrate.error', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+        } finally {
+            job.end();
         }
         applying = false;
     };
 </script>
 
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={OnClose}>
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
+<!-- Busy while applying: closing then would hide a move that is still running -->
+<Modal Label={$_('songs.migrate.modal_title', { values: { instance: Candidate.instance.name } })} OnClose={OnClose} Busy={applying}>
+    <div class="p-6 space-y-4 modal-body">
         <div class="flex justify-between items-center">
             <h2 class="h3">{$_('songs.migrate.modal_title', { values: { instance: Candidate.instance.name } })}</h2>
-            <button class="btn-icon btn-icon-sm preset-filled" onclick={OnClose} aria-label={$_('common.cancel')}>✕</button>
+            <button type="button" class="btn-icon btn-icon-sm preset-tonal" onclick={OnClose} disabled={applying} aria-label={$_('hof.close')} title={$_('hof.close')}><i class="fa-solid fa-xmark"></i></button>
         </div>
 
         {#if loading}
@@ -182,30 +182,18 @@
             {/if}
 
             <div class="flex gap-3 justify-end">
-                <button type="button" class="button-gray button-main" onclick={OnClose}>{$_('common.cancel')}</button>
+                <button type="button" class="button-gray button-main" onclick={OnClose} disabled={applying}>{$_('common.cancel')}</button>
                 <button type="button" class="button-green button-main" disabled={applying} onclick={Apply}>
                     <i class="fa-solid fa-right-left"></i> {$_('songs.migrate.apply')}
                 </button>
             </div>
         {/if}
     </div>
-</div>
+</Modal>
 
 <style>
-    .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 10000;
-    }
-    .modal-card {
-        max-width: 900px;
-        width: 94%;
-        max-height: 85vh;
-        overflow-y: auto;
+    .modal-body {
+        width: min(900px, calc(100vw - 2rem));
     }
     .conflict-list {
         display: flex;

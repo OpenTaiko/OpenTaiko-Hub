@@ -50,7 +50,7 @@
 		<div class="w-full grid grid-cols-2 md:grid-cols-2 gap-4">
 			<div class="card bg-initial card-hover overflow-hidden">
 				<header>
-					<lite-youtube width="100%" videoid="U0i-z-tpxY8" playlabel="Play: Keynote (Google I/O '18)"></lite-youtube>
+					<lite-youtube width="100%" videoid="U0i-z-tpxY8" playlabel={$_('player.play')}></lite-youtube>
 				</header>
 				<div class="p-4 space-y-4 text-black dark:text-white">
 					<h2 data-toc-ignore="">{$_('tools.charting.tutorial.title')}</h2>

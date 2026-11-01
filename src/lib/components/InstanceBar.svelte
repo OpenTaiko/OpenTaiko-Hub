@@ -1,6 +1,6 @@
 <script lang="ts">
     import { _ } from 'svelte-i18n';
-    import { openPath } from '@tauri-apps/plugin-opener';
+    import { OpenFolder } from '$lib/utils/path';
     import { instances, activeInstanceId, activeInstance, setActiveInstance, instanceVersions } from '$lib/stores/instances';
     import type { Instance } from '$lib/types';
 
@@ -14,7 +14,7 @@
         const inst = $activeInstance;
         if (!inst) return;
         try {
-            await openPath(inst.path);
+            await OpenFolder(inst.path);
         } catch (error) {
             console.error('Failed to open the instance folder:', error);
         }
@@ -33,6 +33,7 @@
     {:else}
         <select
             class="select flex-1 max-w-md"
+            aria-label={$_('instances.label')}
             value={$activeInstanceId}
             onchange={(e) => setActiveInstance(e.currentTarget.value)}
         >
@@ -57,7 +58,7 @@
             {#if $instanceVersions[$activeInstance.id]}
                 <span class="opacity-70 text-sm whitespace-nowrap">{$instanceVersions[$activeInstance.id]}</span>
             {/if}
-            <button type="button" class="button-blue button-main" title={$_('instances.open_folder')} onclick={OpenActiveFolder}>
+            <button type="button" class="button-blue button-main" title={$_('instances.open_folder')} aria-label={$_('instances.open_folder')} onclick={OpenActiveFolder}>
                 <i class="fa-solid fa-folder-open"></i>
             </button>
         {/if}

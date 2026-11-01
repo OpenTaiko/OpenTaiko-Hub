@@ -1,5 +1,6 @@
 <script lang="ts">
-    import { onMount } from 'svelte';
+    import { onMount, tick } from 'svelte';
+    import { listen } from '@tauri-apps/api/event';
     import { Navigation } from '@skeletonlabs/skeleton-svelte';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -25,6 +26,14 @@
         refreshInstanceVersion,
         linkGlobalSongs
     } from '$lib/stores/instances';
+    import { busyAreas, type ActivityArea } from '$lib/stores/activity';
+    import { ipc } from '$lib/ipc';
+    import { toaster } from '$lib/utils/toaster';
+
+    // Operations a previous load of the page started (a reload, a crashed renderer) have
+    // nobody left to show or end them. Here rather than in onMount, which runs after the
+    // tabs mounted and may already have started one of their own.
+    ipc.resetJobs().catch((error) => console.warn('Could not reset operations:', error));
 
     // Themes
     const themetarget = document.getElementById('themetarget');
@@ -36,8 +45,21 @@
         tooltip: string;
     }
 
+    // Tiles whose page runs work in the background (installs, bulk downloads) show a
+    // spinner, so leaving the page does not make that work look finished
+    const tileArea: Partial<Record<number, ActivityArea>> = { 0: 'home', 1: 'songs' };
+
     // Navigation (tile ids are stable: ThemesTab compares against 7)
     let currentTile = $state(0);
+
+    // The Songs tab is mounted the first time it is opened, then kept, so its downloads
+    // go on while another tab is shown. Mounted from the start, it scanned the library
+    // and fetched the catalog, the Hall of Fame and the artists at every launch, whether
+    // it was opened or not.
+    let songsOpened = $state(false);
+    $effect(() => {
+        if (currentTile === 1) songsOpened = true;
+    });
     let showInstanceManager = $state(false);
 
     const mainTiles: NavTile[] = [
@@ -49,8 +71,38 @@
     const trailTiles: NavTile[] = [
         { value: 5, icon: 'fa-regular fa-file-lines', label: 'nav.information', tooltip: 'nav.tooltip.information' },
         { value: 6, icon: 'fa-solid fa-globe', label: 'nav.links', tooltip: 'nav.tooltip.links' },
-        { value: 7, icon: 'fa-solid fa-palette', label: 'nav.themes', tooltip: 'nav.tooltip.themes' }
+        { value: 7, icon: 'fa-solid fa-gear', label: 'nav.themes', tooltip: 'nav.tooltip.themes' }
     ];
+
+    // The Hub moved its data into a folder of its own at startup (Linux and macOS, from
+    // Documents). Said once, so the songs and games are not simply gone from where the
+    // user knew them; and a move that failed is said every start until it is sorted out,
+    // since the library looks empty meanwhile.
+    const ReportRelocation = async () => {
+        const report = await ipc.takeRelocationReport().catch(() => null);
+        if (!report) return;
+        const t = get(_);
+        const folder = report.newRoot;
+        if (report.moved.length > 0) {
+            toaster.info({ description: t('relocate.moved', { values: { count: report.moved.length, folder } }), duration: 20000 });
+        }
+        if (report.problems.length > 0) {
+            toaster.error({
+                description: t('relocate.failed', { values: { folder } }),
+                duration: Infinity,
+                meta: { details: report.problems.join('\n') }
+            });
+        }
+    };
+
+    // Closing waits for files still being moved (an install), with the window left open
+    // meanwhile: said, so the close button does not seem to have done nothing
+    onMount(() => {
+        const pending = listen('hub-closing', () => {
+            toaster.info({ id: 'hub-closing', description: get(_)('jobs.closing'), duration: Infinity });
+        });
+        return () => { pending.then((unlisten) => unlisten()); };
+    });
 
     onMount(async () => {
         try {
@@ -61,12 +113,19 @@
                 refreshInstanceVersion(inst.id);
                 linkGlobalSongs(inst);
             }
+            await ReportRelocation();
         } catch (error) {
             console.error('Instance initialization failed:', error);
         } finally {
             // The body starts hidden (app.html) to avoid a theme flash; always unhide
             themetarget?.setAttribute("style", "");
         }
+        // Home and the instance bar render once the instances are loaded: from here on,
+        // what fails goes to the log, not to the box app.html shows when the app cannot
+        // start. Detached earlier (from the layout, before the translations loaded; then
+        // before the instances), an error in their first render left nothing on screen.
+        await tick();
+        window.__hubStarted?.();
     });
 </script>
 
@@ -85,7 +144,14 @@
                             data-active={currentTile === tile.value ? '' : undefined}
                             onclick={() => currentTile = tile.value}
                         >
-                            <i class={tile.icon}></i>
+                            <span class="tile-icon">
+                                <i class={tile.icon}></i>
+                                {#if tileArea[tile.value] && $busyAreas.has(tileArea[tile.value]!)}
+                                    <!-- Text, since a label on an <i> without a role is not read out -->
+                                    <i class="fa-solid fa-spinner fa-spin tile-busy" aria-hidden="true"></i>
+                                    <span class="sr-only">{$_('jobs.busy')}</span>
+                                {/if}
+                            </span>
                             <Navigation.TriggerText>{$_(tile.label)}</Navigation.TriggerText>
                         </Navigation.Trigger>
                     {/each}
@@ -110,9 +176,14 @@
         </Navigation>
       </aside>
       <!-- Main Content -->
-      <main class="h-screen space-y-4 p-4">
-        <!-- OpenTaiko instance management (Home only: the songs library is global) -->
-        <div class="w-full h-full space-y-4" style:display={currentTile === 0 ? null : 'none'}>
+      <!-- tabindex: where focus returns when a dialog closes and its opener is gone -->
+      <!-- One page at a time: spacing lives inside each page. Spaced as siblings, the
+           Home page, sized to the whole area, got a margin below it (the Songs page
+           follows it, hidden) and the window scrolled by that much -->
+      <main class="h-screen p-4" tabindex="-1">
+        <!-- OpenTaiko instance management (Home only: the songs library is global).
+             A column, so a sub-page can take the height the bars above it leave -->
+        <div class="w-full h-full flex flex-col gap-4" style:display={currentTile === 0 ? null : 'none'}>
             {#if $instancesReady}
                 <InstanceBar OnManage={() => showInstanceManager = true} />
                 <HomeTab />
@@ -121,14 +192,14 @@
 
         <!-- Songs -->
         <div class="w-full h-full" style:display={currentTile === 1 ? null : 'none'}>
-            {#if $instancesReady}
+            {#if $instancesReady && songsOpened}
             <SongsTab />
             {/if}
         </div>
 
         <!-- Tools -->
         {#if currentTile === 3}
-            <ToolsTab />
+            <div class="space-y-4"><ToolsTab /></div>
         {/if}
 
         <!-- Secrets -->
@@ -138,7 +209,7 @@
 
         <!-- Information -->
         {#if currentTile === 5}
-            <InformationTab />
+            <div class="space-y-4"><InformationTab /></div>
         {/if}
 
         <!-- Links -->
@@ -146,7 +217,7 @@
             <LinksTab />
         {/if}
 
-        <!-- OpTk Hub Themes -->
+        <!-- Settings: theme, mode and language -->
         <ThemesTab {currentTile} />
       </main>
     </div>
@@ -156,5 +227,7 @@
 
 <style>
     /* Main CSS */
-    main {overflow-y: auto;}
+    main {overflow-y: auto; outline: none;}
+    .tile-icon {position: relative; display: inline-block;}
+    .tile-busy {position: absolute; top: -0.4rem; right: -0.9rem; font-size: 0.7rem;}
 </style>

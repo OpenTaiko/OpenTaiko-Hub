@@ -1,27 +1,39 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod library;
 mod assetscan;
 mod binver;
 mod configini;
+#[cfg(debug_assertions)]
+mod devdata;
+mod download;
 mod fsops;
+mod guard;
 mod health;
+mod jobs;
 mod migrate;
 mod procs;
+mod relocate;
 mod scan;
+mod writes;
 
 use std::fs::File;
 use std::io::{BufReader, Read};
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::sync::Arc;
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, Manager};
+use tauri_plugin_opener::OpenerExt;
 use tokio::task;
 use zip::ZipArchive;
 
 /// Stderr kept from a launched game, enough to identify a missing library or a bad
 /// interpreter without letting a chatty process grow this unboundedly.
 const CHILD_STDERR_CAP: usize = 8 * 1024;
+
+/// How long the error output of a game that exited is still read.
+const STDERR_GRACE: std::time::Duration = std::time::Duration::from_secs(2);
 
 /// Payload of the `game-exited` event.
 #[derive(Clone, serde::Serialize)]
@@ -36,12 +48,23 @@ struct GameExit {
     stderr: String,
 }
 
+/// The game binary's name without extension. Launching is limited to it, inside a folder
+/// the Hub manages, so this command cannot be used to start anything else.
+const GAME_BINARY: &str = "OpenTaiko";
+
+/// Launches the game of an instance. Only the game binary of one of the Hub's instances
+/// starts: a path to launch used to be accepted from anywhere the page could write,
+/// including the Hub's temporary folder.
+// Async, so off the main thread: checking the instance reads the disk, which an instance
+// on a network drive that went away can hold up, with the window frozen meanwhile
 #[tauri::command]
-fn execute_external_app(os: String, path: String, app_handle: AppHandle) -> Result<(), String> {
-    let full_path = if os == "Win" {
-        format!("{}.exe", path)
+async fn launch_game(instance_dir: String, app_handle: AppHandle) -> Result<(), String> {
+    let instance = guard::instance_dir(&app_handle, &instance_dir)?;
+    let path = instance.join(GAME_BINARY);
+    let full_path = if cfg!(windows) {
+        path.with_extension("exe").to_string_lossy().into_owned()
     } else {
-        path
+        path.to_string_lossy().into_owned()
     };
 
     // Extract the directory from the full path
@@ -65,38 +88,77 @@ fn execute_external_app(os: String, path: String, app_handle: AppHandle) -> Resu
     // stderr is captured rather than inherited: a game that dies immediately (missing
     // shared library, noexec mount, wrong architecture) used to be reported as a
     // successful launch, so users experienced it as "the Hub crashed" with nothing to go on.
-    let mut child = Command::new(&full_path)
-        .current_dir(dir)
-        .stderr(Stdio::piped())
+    let mut command = Command::new(&full_path);
+    command.current_dir(dir).stderr(Stdio::piped());
+    #[cfg(target_os = "linux")]
+    {
+        let mut changes = procs::game_env(&procs::utf8_env(), &dir.to_string_lossy());
+        // A library path that is not valid UTF-8 is extended as it is: read as missing, it
+        // was replaced by the game's folder alone
+        if let Some(raw) = procs::non_utf8_var("LD_LIBRARY_PATH") {
+            changes.retain(|(key, _)| key != "LD_LIBRARY_PATH");
+            let rest = procs::without_appimage_entries(&raw);
+            let mut path = dir.as_os_str().to_os_string();
+            // An empty entry would mean the current folder
+            if !rest.is_empty() {
+                path.push(":");
+                path.push(rest);
+            }
+            command.env("LD_LIBRARY_PATH", path);
+        }
+        procs::apply_env(&mut command, changes);
+    }
+    let mut child = command
         .spawn()
         .map_err(|e| format!("Failed to execute the app: {}", e))?;
 
     log::info!("Launched {} (pid {})", full_path, child.id());
+    running_games(&app_handle).push(instance.clone());
 
     // Watching in a thread also reaps the child, which previously became a zombie for as
     // long as the Hub stayed open.
     std::thread::spawn(move || {
         let started = std::time::Instant::now();
-        let mut stderr_tail = String::new();
-        if let Some(mut stream) = child.stderr.take() {
-            // Keep the first CHILD_STDERR_CAP bytes but keep draining, so the child can
-            // never block writing into a full pipe.
-            let mut buf = [0u8; 4096];
-            let mut kept: Vec<u8> = Vec::new();
-            while let Ok(n) = stream.read(&mut buf) {
-                if n == 0 {
-                    break;
+        // Read in a thread of its own: the game is over when it exits, which is not when
+        // its error output closes. A program it started (a file manager it opened a
+        // folder in) keeps that open, and the game counted as running, its saves locked,
+        // until that program was closed too.
+        let kept = Arc::new(std::sync::Mutex::new(Vec::<u8>::new()));
+        let drained = child.stderr.take().map(|mut stream| {
+            let kept = kept.clone();
+            let (done, drained) = std::sync::mpsc::channel::<()>();
+            std::thread::spawn(move || {
+                // Keep the first CHILD_STDERR_CAP bytes but keep draining, so the child
+                // can never block writing into a full pipe.
+                let mut buf = [0u8; 4096];
+                while let Ok(n) = stream.read(&mut buf) {
+                    if n == 0 {
+                        break;
+                    }
+                    let mut kept = kept.lock().unwrap_or_else(|e| e.into_inner());
+                    if kept.len() < CHILD_STDERR_CAP {
+                        let room = CHILD_STDERR_CAP - kept.len();
+                        kept.extend_from_slice(&buf[..n.min(room)]);
+                    }
                 }
-                if kept.len() < CHILD_STDERR_CAP {
-                    let room = CHILD_STDERR_CAP - kept.len();
-                    kept.extend_from_slice(&buf[..n.min(room)]);
-                }
-            }
-            stderr_tail = String::from_utf8_lossy(&kept).trim().to_string();
-        }
+                let _ = done.send(());
+            });
+            drained
+        });
 
         let status = child.wait();
         let ran_for_secs = started.elapsed().as_secs();
+        {
+            let mut running = running_games(&app_handle);
+            if let Some(at) = running.iter().position(|dir| dir == &instance) {
+                running.remove(at);
+            }
+        }
+        // The last lines a crash wrote, without waiting on a program still holding the output
+        if let Some(drained) = drained {
+            let _ = drained.recv_timeout(STDERR_GRACE);
+        }
+        let stderr_tail = String::from_utf8_lossy(&kept.lock().unwrap_or_else(|e| e.into_inner())).trim().to_string();
         let code = status.as_ref().ok().and_then(|s| s.code());
         let success = status.as_ref().map(|s| s.success()).unwrap_or(false);
 
@@ -137,11 +199,38 @@ fn execute_external_app(os: String, path: String, app_handle: AppHandle) -> Resu
     Ok(())
 }
 
+/// Instance folders whose game the Hub started and that is still running, once per copy.
+#[derive(Default)]
+struct RunningGames(std::sync::Mutex<Vec<std::path::PathBuf>>);
+
+fn running_games<R: tauri::Runtime>(app: &tauri::AppHandle<R>) -> std::sync::MutexGuard<'_, Vec<std::path::PathBuf>> {
+    app.state::<RunningGames>().inner().0.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// True while a game the Hub started from `dir` runs. A game started some other way is
+/// not known.
+pub(crate) fn game_is_running<R: tauri::Runtime>(app: &tauri::AppHandle<R>, dir: &Path) -> bool {
+    running_games(app).iter().any(|running| migrate::is_same_dir(running, dir))
+}
+
+/// For the saves page: the game keeps its save database open and writes it back when it
+/// exits, which undid any change made meanwhile.
+#[tauri::command]
+fn game_running(instance_dir: String, app_handle: AppHandle) -> bool {
+    game_is_running(&app_handle, Path::new(&instance_dir))
+}
+
 #[tauri::command]
 async fn unzip_and_get_first_folder(
     zip_path: String,
+    job: Option<String>,
+    on_progress: tauri::ipc::Channel<f64>,
     app_handle: AppHandle,
 ) -> Result<String, String> {
+    // The archive is extracted next to itself, so only one the Hub downloaded into a
+    // temporary folder of its own (see archive_to_extract)
+    download::archive_to_extract(&app_handle, &zip_path).map_err(|e| format!("ERR: {}", e))?;
+    let cancel = jobs::token(&app_handle, &job);
     let zip_path_clone = zip_path.clone();
 
     task::spawn_blocking(move || {
@@ -150,8 +239,9 @@ async fn unzip_and_get_first_folder(
         let mut archive = ZipArchive::new(BufReader::new(file))
             .map_err(|err| format!("ERR: Failed to read zip archive: {}", err))?;
 
-        let total_files = archive.len();
+        let total_files = archive.len().max(1);
         let mut extracted_files = 0;
+        let mut last_percent = usize::MAX;
 
         let zip_parent_dir = Path::new(&zip_path_clone)
             .parent()
@@ -160,6 +250,7 @@ async fn unzip_and_get_first_folder(
         let mut first_folder: Option<String> = None;
 
         for i in 0..archive.len() {
+            cancel.check()?;
             let mut file = archive
                 .by_index(i)
                 .map_err(|err| format!("ERR: Failed to read file in archive: {}", err))?;
@@ -177,14 +268,23 @@ async fn unzip_and_get_first_folder(
                     ))
                 }
             };
-            let out_path = zip_parent_dir.join(relative);
+            let out_path = zip_parent_dir.join(&relative);
+
+            // The archive's top folder, taken from the first entry that sits in a folder.
+            // Many zip tools write no entries for folders themselves, so waiting for a
+            // folder entry failed on those archives with "No folder found".
+            if first_folder.is_none() {
+                let mut parts = relative.components();
+                if let Some(std::path::Component::Normal(top)) = parts.next() {
+                    if is_dir || parts.next().is_some() {
+                        first_folder = Some(zip_parent_dir.join(top).to_string_lossy().to_string());
+                    }
+                }
+            }
 
             if is_dir {
                 std::fs::create_dir_all(&out_path)
                     .map_err(|err| format!("ERR: Failed to create directory: {}", err))?;
-                if first_folder.is_none() {
-                    first_folder = Some(out_path.to_string_lossy().to_string());
-                }
             } else {
                 if let Some(parent) = out_path.parent() {
                     std::fs::create_dir_all(parent).map_err(|err| {
@@ -192,10 +292,18 @@ async fn unzip_and_get_first_folder(
                     })?;
                 }
 
-                let mut out_file = File::create(&out_path)
-                    .map_err(|err| format!("ERR: Failed to create file: {}", err))?;
+                // Buffered: unbuffered, a game build of a gigabyte and more was written in
+                // one system call per 8 KiB read from the archive. Never over an existing
+                // file: the folder is a fresh one, and nothing in it is to be replaced.
+                let created = std::fs::OpenOptions::new().write(true).create_new(true).open(&out_path);
+                let mut out_file = std::io::BufWriter::with_capacity(
+                    library::COPY_BUFFER,
+                    created.map_err(|err| format!("ERR: Failed to create {}: {}", out_path.display(), err))?,
+                );
                 std::io::copy(&mut file, &mut out_file)
+                    .and_then(|_| std::io::Write::flush(&mut out_file))
                     .map_err(|err| format!("ERR: Failed to write file: {}", err))?;
+                drop(out_file);
 
                 // Preserve unix permissions (e.g. the executable bit of the game binary)
                 #[cfg(unix)]
@@ -205,15 +313,21 @@ async fn unzip_and_get_first_folder(
                 }
             }
 
-            // Update progress after each file is extracted
+            // Progress goes to this call's own channel, and only when the whole percentage
+            // changes: an archive holds thousands of files, and a message per file was a
+            // script evaluation per file in the page.
             extracted_files += 1;
-            let progress = (extracted_files as f64 / total_files as f64) * 100.0;
-            app_handle
-                .emit("extract-progress", progress)
-                .map_err(|err| format!("ERR: Failed to emit progress: {}", err))?;
+            let percent = extracted_files * 100 / total_files;
+            if percent != last_percent {
+                last_percent = percent;
+                let _ = on_progress.send(percent as f64);
+            }
         }
 
-        first_folder.ok_or_else(|| "ERR: No folder found in the ZIP archive".to_string())
+        let first_folder = first_folder.ok_or_else(|| "ERR: No folder found in the ZIP archive".to_string())?;
+        // The one folder that may then be moved into a build folder (fsops.rs)
+        download::remember_extracted(Path::new(&first_folder));
+        Ok(first_folder)
     })
     .await
     .map_err(|err| format!("ERR: Task failed: {}", err))?
@@ -241,36 +355,39 @@ fn install_panic_hook() {
     }));
 }
 
-/// Raises the open-file soft limit to the hard limit on Linux.
-///
-/// WebKitGTK opens a lot of descriptors: its web and network processes inherit ours, and
-/// every media element on the page gets a GStreamer pipeline holding several. On the many
-/// distributions that still ship a 1024 soft limit, users hit
-/// `Failed to create shared memory: Too many open files` and the page process dies,
-/// leaving a blank window (reported on issues #4 and #15). Raising the soft limit is what
-/// those users did by hand with `ulimit -n`; doing it here, before any child process
-/// exists, means they inherit the higher limit too.
 /// Bundle identifier, which decides where the log file lives. Kept in step with
 /// tauri.conf.json by a test below.
 const APP_IDENTIFIER: &str = "com.opentaiko.hub";
 
-/// The folder the Hub keeps its working data in, matching `GetRootPath()` in the
-/// frontend: the executable's own folder on Windows, the user's Documents folder
-/// elsewhere. `tmp/` and the shared `Songs/` library already live here.
+/// The folder the Hub keeps its working data in (`tmp/`, the shared `Songs/` library,
+/// new instances, logs): the executable's own folder on Windows, an "OpenTaiko Hub"
+/// folder in Documents elsewhere. Dev builds use their own folder instead (devdata.rs).
+/// The page asks for it through `hub_root` rather than working it out a second way.
 fn hub_root_dir() -> Option<std::path::PathBuf> {
-    #[cfg(target_os = "windows")]
+    #[cfg(debug_assertions)]
+    {
+        Some(devdata::dev_root())
+    }
+    #[cfg(all(not(debug_assertions), target_os = "windows"))]
     {
         // What Tauri's resourceDir() resolves to on Windows.
         std::env::current_exe()
             .ok()
             .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
     }
-    #[cfg(not(target_os = "windows"))]
+    #[cfg(all(not(debug_assertions), not(target_os = "windows")))]
     {
-        // documentDir() with the same home-directory fallback the frontend uses, for
-        // minimal installs where XDG_DOCUMENTS_DIR is not configured.
-        dirs::document_dir().or_else(dirs::home_dir)
+        // A folder of its own in Documents, or in the home directory on minimal installs
+        // where XDG_DOCUMENTS_DIR is not configured. Not Documents itself: generic names
+        // such as Songs or tmp there are often the user's own (relocate.rs).
+        old_shared_root().map(|dir| dir.join("OpenTaiko Hub"))
     }
+}
+
+/// Where Linux and macOS kept the Hub's data before it had a folder of its own.
+#[cfg(all(not(debug_assertions), not(target_os = "windows")))]
+fn old_shared_root() -> Option<std::path::PathBuf> {
+    dirs::document_dir().or_else(dirs::home_dir)
 }
 
 /// True when the log plugin will actually be able to write here. Creating the folder is
@@ -324,7 +441,56 @@ fn log_directory(dir: tauri::State<'_, LogDirectory>) -> Option<String> {
     dir.0.as_ref().map(|d| d.display().to_string())
 }
 
-/// Outcome of the descriptor-limit change, reported once the logger exists.
+/// What moving the Hub's data did at startup, when there is something to tell the user.
+struct RelocationReport(std::sync::Mutex<Option<relocate::Report>>);
+
+/// Taken once by the page, which tells the user: a move that partly failed used to be
+/// written to the log only, leaving an empty library and nothing to explain it.
+#[tauri::command]
+fn take_relocation_report(report: tauri::State<'_, RelocationReport>) -> Option<relocate::Report> {
+    report.0.lock().unwrap_or_else(|e| e.into_inner()).take()
+}
+
+#[tauri::command]
+fn hub_root() -> Result<String, String> {
+    hub_root_dir()
+        .map(|dir| dir.to_string_lossy().into_owned())
+        .ok_or_else(|| "The Hub folder could not be resolved".to_string())
+}
+
+/// Opens a folder in the system file manager. Only folders are accepted: handing a file
+/// to the system opener runs it when it is a program. The page has no opener permission
+/// for paths, so this is the only way it can open one.
+#[tauri::command]
+fn open_folder(
+    path: String,
+    app_handle: AppHandle,
+    logs: tauri::State<'_, LogDirectory>,
+) -> Result<(), String> {
+    let is_log_dir = logs.0.as_deref().is_some_and(|d| migrate::is_same_dir(d, Path::new(&path)));
+    if !is_log_dir {
+        guard::checked(&app_handle, &path)?;
+    }
+    if !Path::new(&path).is_dir() {
+        return Err(format!("{} is not a folder", path));
+    }
+    app_handle
+        .opener()
+        .open_path(path, None::<&str>)
+        .map_err(|e| e.to_string())
+}
+
+/// Raises the open-file soft limit to the hard limit on Linux.
+///
+/// WebKitGTK opens a lot of descriptors: its web and network processes inherit ours, and
+/// every media element on the page gets a GStreamer pipeline holding several. On the many
+/// distributions that still ship a 1024 soft limit, users hit
+/// `Failed to create shared memory: Too many open files` and the page process dies,
+/// leaving a blank window (reported on issues #4 and #15). Raising the soft limit is what
+/// those users did by hand with `ulimit -n`; doing it here, before any child process
+/// exists, means they inherit the higher limit too.
+///
+/// Returns the outcome of the change, reported once the logger exists.
 #[cfg(target_os = "linux")]
 fn raise_open_file_limit() -> Option<String> {
     // SAFETY: plain libc calls on a stack-allocated struct; no pointers escape.
@@ -368,8 +534,229 @@ fn raise_open_file_limit() -> Option<String> {
     None
 }
 
+fn main() {
+    install_panic_hook();
+
+    // Data moved to a new root folder, before anything creates folders there (the log
+    // folder, below) so the old ones can still move: a dev build's data out of
+    // target/debug, and on Linux and macOS the Hub's folders out of Documents itself.
+    let registry = dirs::config_dir().unwrap_or_default().join(APP_IDENTIFIER).join("instances.json");
+    // Tauri's app_local_data_dir. The roots file is moved to where guard.rs reads it
+    // before the relocation rewrites it: it used to rewrite the old one, which nothing
+    // read any more, and the instances it moved were refused
+    let local_data = dirs::data_local_dir().unwrap_or_default().join(APP_IDENTIFIER);
+    guard::move_into_private_dir(&local_data);
+    let roots = guard::roots_file_for(&local_data).unwrap_or_else(|| local_data.join(guard::INSTANCE_ROOTS));
+    #[cfg(debug_assertions)]
+    let relocation_report = std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(std::path::Path::to_path_buf))
+        .map(|old_root| devdata::migrate_from(&old_root, &devdata::dev_root(), &registry, &roots))
+        .unwrap_or_default();
+    #[cfg(all(not(debug_assertions), not(target_os = "windows")))]
+    let relocation_report = match (old_shared_root(), hub_root_dir()) {
+        (Some(old_root), Some(new_root)) => relocate::migrate_documents_layout(&old_root, &new_root, &registry, &roots),
+        _ => relocate::Report::default(),
+    };
+    #[cfg(all(not(debug_assertions), target_os = "windows"))]
+    let relocation_report = { let _ = (&registry, &roots); relocate::Report::default() };
+    for line in &relocation_report.lines {
+        eprintln!("{}", line);
+    }
+
+    // WebKitGTK 2.42+ renders a blank window on several Linux setups (notably NVIDIA
+    // and some Mesa drivers) unless the DMABUF renderer is disabled. Apply the standard
+    // workaround by default, while still letting a user override it from the environment.
+    #[cfg(target_os = "linux")]
+    {
+        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
+    // Must happen before the webview exists so its helper processes inherit the limit.
+    let fd_limit_outcome = raise_open_file_limit();
+
+    let ui_health = Arc::new(health::UiHealth::new());
+
+    // Stderr is always available; the file target is added only when its folder could be
+    // created, so logging can never be the reason the app fails to start.
+    let mut log_targets = vec![tauri_plugin_log::Target::new(
+        tauri_plugin_log::TargetKind::Stderr,
+    )];
+    let log_dir = usable_log_dir();
+    if let Some(dir) = log_dir.clone() {
+        log_targets.push(tauri_plugin_log::Target::new(
+            tauri_plugin_log::TargetKind::Folder {
+                path: dir,
+                file_name: Some("OpenTaiko-Hub".to_string()),
+            },
+        ));
+    }
+
+    let builder = tauri::Builder::default();
+    // An installed Hub runs once: starting it again brings the open window forward. Two at
+    // a time swept up what the other was still downloading, and wrote the same settings
+    // files. Registered first, as the plugin requires. Not in development builds, which
+    // share the installed Hub's app folders and must be able to start beside it.
+    #[cfg(not(debug_assertions))]
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.unminimize();
+            let _ = window.set_focus();
+        }
+    }));
+    let app = builder
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets(log_targets)
+                .level(log::LevelFilter::Info)
+                .max_file_size(2 * 1024 * 1024)
+                // The default (KeepOne) deletes the log the moment it reaches the size
+                // cap, which would discard the startup block — version, log folder,
+                // file-descriptor limit — that a bug report is written to carry. Keeping
+                // the previous file under a dated name costs one extra file at most.
+                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(2))
+                .build(),
+        )
+        .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_http::init())
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_os::init())
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            unzip_and_get_first_folder,
+            launch_game,
+            game_running,
+            open_folder,
+            hub_root,
+            binver::get_game_version,
+            scan::scan_songs,
+            scan::count_songs,
+            assetscan::scan_asset_versions,
+            procs::list_dotnet_sdks,
+            procs::publish_game,
+            download::download_file,
+            download::install_files,
+            download::fetch_cached,
+            guard::allow_build_dir,
+            guard::create_instance_dir,
+            guard::attach_instance_dir,
+            guard::pick_files,
+            guard::pick_save,
+            writes::write_settings_file,
+            writes::write_version_json,
+            writes::write_saves,
+            writes::export_save,
+            jobs::begin_job,
+            jobs::cancel_job,
+            jobs::end_job,
+            jobs::reset_jobs,
+            fsops::merge_move_dir,
+            migrate::plan_migration,
+            migrate::paths_are_same_dir,
+            migrate::apply_migration,
+            migrate::find_duplicate_song_folders,
+            migrate::strip_song_content,
+            migrate::remove_duplicate_song_folders,
+            configini::ensure_config_tjapath,
+            library::read_box_def,
+            library::write_box_def,
+            library::create_genre_folder,
+            library::delete_library_entry,
+            library::import_chart_archives,
+            library::set_folder_jacket,
+            library::read_song_media,
+            library::set_song_preimage,
+            health::ui_heartbeat,
+            log_directory,
+            take_relocation_report
+        ])
+        .manage(ui_health.clone())
+        .manage(LogDirectory(log_dir.clone()))
+        .manage(RelocationReport(std::sync::Mutex::new(
+            (!relocation_report.is_quiet()).then(|| relocation_report.clone()),
+        )))
+        .manage(jobs::Jobs::default())
+        .manage(RunningGames::default())
+        .on_window_event(|window, event| {
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                if !jobs::allow_close(window) {
+                    api.prevent_close();
+                }
+            }
+        })
+        .setup(move |app| {
+            // Everything here runs after the plugin installed the global logger, so
+            // anything recorded before startup is reported from this point instead.
+            log::info!(
+                "OpenTaiko Hub {} starting on {}",
+                app.package_info().version,
+                std::env::consts::OS
+            );
+            match &log_dir {
+                Some(dir) => log::info!("Logging to {}", dir.display()),
+                None => log::warn!("No writable log folder; logging to stderr only"),
+            }
+            if let Some(outcome) = &fd_limit_outcome {
+                log::info!("{}", outcome);
+            }
+            for line in &relocation_report.lines {
+                log::info!("{}", line);
+            }
+            health::spawn_watcher(ui_health.clone());
+            guard::init(app.handle());
+            let instances = guard::instance_roots(app.handle());
+            // Linux and macOS kept tmp in Documents itself before the Hub had a folder
+            #[cfg(all(not(debug_assertions), not(target_os = "windows")))]
+            let old_tmp = old_shared_root().map(|root| root.join("tmp"));
+            #[cfg(any(debug_assertions, target_os = "windows"))]
+            let old_tmp = None;
+            // After a run that did not end normally, what downloads left before this start
+            let deep_before = guard::begin_session(app.handle()).then(std::time::SystemTime::now);
+            let cache_dir = app.path().app_cache_dir().ok();
+            let write_dirs = guard::atomic_write_dirs(app.handle());
+            std::thread::spawn(move || {
+                guard::sweep_leftovers(instances, old_tmp, deep_before);
+                for dir in &write_dirs {
+                    writes::remove_stale_temps(dir);
+                }
+                if let Some(dir) = cache_dir {
+                    scan::prune_cache(&dir.join("scan"));
+                    download::prune_cache(&dir.join("http"));
+                }
+            });
+            Ok(())
+        })
+        .build(tauri::generate_context!());
+
+    // A startup failure used to abort with a message only a terminal would show. Record
+    // it, then tell the user something instead of vanishing.
+    match app {
+        Ok(app) => app.run(|app_handle, event| {
+            if let tauri::RunEvent::Exit = event {
+                guard::end_session(app_handle);
+            }
+        }),
+        Err(error) => {
+            log::error!("The Hub could not start: {}", error);
+            eprintln!("The Hub could not start: {}", error);
+            std::process::exit(1);
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    /// The Hub's version is written in three places. The crate's one is the version
+    /// downloads announce (download.rs), and it was left at 0.1.0 while the others moved.
+    #[test]
+    fn the_version_is_the_same_everywhere() {
+        let expected = format!("\"version\": \"{}\"", env!("CARGO_PKG_VERSION"));
+        assert!(include_str!("../tauri.conf.json").contains(&expected), "Cargo.toml and tauri.conf.json disagree on the version");
+        assert!(include_str!("../../package.json").contains(&expected), "Cargo.toml and package.json disagree on the version");
+    }
+
     /// The log folder is resolved from this identifier, so a change in tauri.conf.json
     /// that is not mirrored here would silently write logs somewhere else.
     #[test]
@@ -403,124 +790,13 @@ mod tests {
     }
 
     /// The log has to land beside the Hub's other working data (`tmp/`, `Songs/`), which
-    /// is where a user looks for it. On Windows that is the executable's own folder, the
-    /// same place the frontend's GetRootPath() resolves to.
+    /// is where a user looks for it: the Hub root the frontend also uses.
     #[test]
     fn the_log_folder_sits_with_the_hubs_other_data() {
         let dir = super::usable_log_dir().expect("a writable log folder must be found");
         assert!(super::log_file_is_writable(&dir));
         assert_eq!(dir.file_name().unwrap(), "logs");
 
-        #[cfg(target_os = "windows")]
-        {
-            let exe_dir = std::env::current_exe().unwrap().parent().unwrap().to_path_buf();
-            assert_eq!(dir, exe_dir.join("logs"));
-        }
-    }
-}
-
-fn main() {
-    install_panic_hook();
-
-    // WebKitGTK 2.42+ renders a blank window on several Linux setups (notably NVIDIA
-    // and some Mesa drivers) unless the DMABUF renderer is disabled. Apply the standard
-    // workaround by default, while still letting a user override it from the environment.
-    #[cfg(target_os = "linux")]
-    {
-        if std::env::var_os("WEBKIT_DISABLE_DMABUF_RENDERER").is_none() {
-            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-        }
-    }
-
-    // Must happen before the webview exists so its helper processes inherit the limit.
-    let fd_limit_outcome = raise_open_file_limit();
-
-    let ui_health = Arc::new(health::UiHealth::new());
-
-    // Stderr is always available; the file target is added only when its folder could be
-    // created, so logging can never be the reason the app fails to start.
-    let mut log_targets = vec![tauri_plugin_log::Target::new(
-        tauri_plugin_log::TargetKind::Stderr,
-    )];
-    let log_dir = usable_log_dir();
-    if let Some(dir) = log_dir.clone() {
-        log_targets.push(tauri_plugin_log::Target::new(
-            tauri_plugin_log::TargetKind::Folder {
-                path: dir,
-                file_name: Some("OpenTaiko-Hub".to_string()),
-            },
-        ));
-    }
-
-    let app = tauri::Builder::default()
-        .plugin(
-            tauri_plugin_log::Builder::new()
-                .targets(log_targets)
-                .level(log::LevelFilter::Info)
-                .max_file_size(2 * 1024 * 1024)
-                // The default (KeepOne) deletes the log the moment it reaches the size
-                // cap, which would discard the startup block — version, log folder,
-                // file-descriptor limit — that a bug report is written to carry. Keeping
-                // the previous file under a dated name costs one extra file at most.
-                .rotation_strategy(tauri_plugin_log::RotationStrategy::KeepSome(2))
-                .build(),
-        )
-        .plugin(tauri_plugin_store::Builder::new().build())
-        .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_http::init())
-        .plugin(tauri_plugin_upload::init())
-        .plugin(tauri_plugin_fs::init())
-        .plugin(tauri_plugin_os::init())
-        .plugin(tauri_plugin_shell::init())
-        .plugin(tauri_plugin_dialog::init())
-        .invoke_handler(tauri::generate_handler![
-            unzip_and_get_first_folder,
-            execute_external_app,
-            binver::get_game_version,
-            scan::scan_songs,
-            assetscan::scan_asset_versions,
-            procs::run_streamed,
-            fsops::merge_move_dir,
-            migrate::plan_migration,
-            migrate::paths_are_same_dir,
-            migrate::apply_migration,
-            migrate::find_duplicate_song_folders,
-            migrate::strip_song_content,
-            migrate::remove_duplicate_song_folders,
-            configini::ensure_config_tjapath,
-            health::ui_heartbeat,
-            log_directory
-        ])
-        .manage(ui_health.clone())
-        .manage(LogDirectory(log_dir.clone()))
-        .setup(move |app| {
-            // Everything here runs after the plugin installed the global logger, so
-            // anything recorded before startup is reported from this point instead.
-            log::info!(
-                "OpenTaiko Hub {} starting on {}",
-                app.package_info().version,
-                std::env::consts::OS
-            );
-            match &log_dir {
-                Some(dir) => log::info!("Logging to {}", dir.display()),
-                None => log::warn!("No writable log folder; logging to stderr only"),
-            }
-            if let Some(outcome) = &fd_limit_outcome {
-                log::info!("{}", outcome);
-            }
-            health::spawn_watcher(ui_health.clone());
-            Ok(())
-        })
-        .build(tauri::generate_context!());
-
-    // A startup failure used to abort with a message only a terminal would show. Record
-    // it, then tell the user something instead of vanishing.
-    match app {
-        Ok(app) => app.run(|_app_handle, _event| {}),
-        Err(error) => {
-            log::error!("The Hub could not start: {}", error);
-            eprintln!("The Hub could not start: {}", error);
-            std::process::exit(1);
-        }
+        assert_eq!(dir, super::hub_root_dir().unwrap().join("logs"));
     }
 }

@@ -1,30 +1,33 @@
 // Shared domain types of the Hub frontend. The scan / migration / asset shapes mirror
 // the Rust structs in src-tauri/src (serde renames every field to camelCase).
 
-import type { download } from '@tauri-apps/plugin-upload';
-
 // ---------------------------------------------------------------------------------------
 // Platform
 // ---------------------------------------------------------------------------------------
 
 export type HubOS = 'Win' | 'Linux' | 'Mac' | 'Unsupported';
 
-/** Progress payload of the upload plugin's download(), which does not export the type. */
-export type ProgressPayload = Parameters<NonNullable<Parameters<typeof download>[2]>>[0];
+/** Progress of a download (download.rs). `progress` is the bytes received since the previous message. */
+export interface ProgressPayload {
+    progress: number;
+    progressTotal: number;
+    total: number;
+    transferSpeed: number;
+}
+
+export interface ErrorToastOptions {
+    /** Technical text for a bug report; copied by the toast's button. Defaults to the message. */
+    details?: string;
+    /** An extra button, such as opening a download page. */
+    action?: { label: string; run: () => void };
+}
 
 /** Provided by the root layout through `getContext('toast')`. */
 export interface ToastContext {
-    TriggerError(message: string): void;
+    /** Stays until dismissed, with a button copying `details` (the raw error) for a report. */
+    TriggerError(message: string, options?: ErrorToastOptions): void;
     TriggerWarning(message: string): void;
     TriggerSuccess(message: string): void;
-    /** Downloads with retries; resolves to false once every attempt failed. */
-    backoffDownload(
-        url: string,
-        path: string,
-        onProgress?: (progress: ProgressPayload) => void,
-        attempts?: number,
-        delayMs?: number
-    ): Promise<boolean>;
     wait(ms: number): Promise<void>;
 }
 

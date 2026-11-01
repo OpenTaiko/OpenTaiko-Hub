@@ -1,38 +1,32 @@
 {
   "common": {
-    "fetch_error": "取得エラー",
+    "fetch_error": "サーバーに接続できませんでした。接続を確認してから、もう一度お試しください。",
     "retry": "再試行",
     "reload": "再読み込み",
-    "cancel": "キャンセル"
+    "cancel": "キャンセル",
+    "clear": "クリア"
   },
   "dl": {
     "error": {
       "failed_abort": "ダウンロードに失敗しました。中止します。"
-    },
-    "warn": {
-      "failed_retry": "ダウンロードに失敗しました。再試行中... ({attempt}/{max})"
     }
   },
   "nav": {
     "home": "ホーム",
     "songlist": "曲一覧",
-    "skins": "スキン",
-    "docs": "ドキュメント",
     "tools": "ツール",
     "secrets": "シークレット",
     "information": "情報",
     "links": "リンク",
-    "themes": "Hubテーマ",
+    "themes": "設定",
     "tooltip": {
       "home": "OpenTaikoとOpenTaiko Hubを管理します。",
       "songlist": "OpenTaikoの曲を更新し、最新の曲をダウンロードします。",
-      "skins": "最新のOpenTaikoスキンと関連アセットを取得します。",
-      "docs": "選択中のOpenTaikoビルドに含まれるドキュメントを閲覧します。",
       "tools": "OpenTaikoの体験を向上させるツールです。",
       "secrets": "???",
       "information": "更新履歴、ドキュメント、またはトラブルシューティングの参照に。",
       "links": "OpenTaikoのSNSとウェブサイトをチェック！",
-      "themes": "OpenTaiko Hubのテーマを変更します。",
+      "themes": "OpenTaiko Hubのテーマと言語を変更します。",
       "github": "OpenTaiko HubのソースコードをGitHubで見る。"
     }
   },
@@ -88,19 +82,20 @@
     },
     "button": {
       "reload": "再読み込み",
-      "download": "OpenTaikoをダウンロード",
-      "download_stable": "安定版をダウンロード",
-      "download_experimental": "実験版をダウンロード",
+      "check_updates": "更新を確認",
       "launch": "OpenTaikoを起動",
-      "explorer": "エクスプローラーで開く",
       "update": "OpenTaikoを更新",
       "redownload": "OpenTaikoを再ダウンロード",
       "rebuild": "再ビルド",
       "retry": "再試行",
-      "install": "ビルドをインストール..."
+      "install": "ビルドをインストール...",
+      "change_build": "ビルドを変更"
     },
     "warn": {
-      "skin_update": "（更新にはスキンの更新が必要です）"
+      "newer_release": "OpenTaiko {version} が公開されています。「{button}」からインストールできます。",
+      "skin_update": "（更新にはスキンの更新が必要です）",
+      "skin_update_confirm": "この更新の後、インストール済みのスキンも更新が必要になります。今すぐ OpenTaiko を更新しますか？",
+      "redownload_confirm": "OpenTaiko {version} を再ダウンロードして、このインスタンスに再インストールしますか？"
     },
     "hint": {
       "first_start": "初めてゲームを起動する前に、スキン（「スキン」タブ）と曲（「曲一覧」タブ）をダウンロードしてください！",
@@ -108,7 +103,7 @@
     },
     "experimental": {
       "unavailable": "現在利用可能な実験版ビルドはありません",
-      "requires_dotnet": "実験版のビルドには .NET SDK 8 が必要です。https://dotnet.microsoft.com/download/dotnet/8.0 からインストールして再試行してください。",
+      "requires_dotnet": "実験版のビルドには .NET SDK 8 以降が必要です。インストールしてから、もう一度お試しください。",
       "update_available": "新しい実験版ビルドが利用可能です！",
       "up_to_date": "この実験版ビルドは最新の状態です。",
       "stage": {
@@ -130,6 +125,9 @@
       "fetch_release": "最新のOpenTaikoリリースの取得に失敗しました：{error}",
       "build_failed": "OpenTaiko のビルドに失敗しました: {error}。下のビルド出力を確認してください。",
       "download_failed": "OpenTaikoのダウンロードに失敗しました：{error}",
+      "instance_busy": "別の処理がまだこのインスタンスに書き込んでいます。完了してから、もう一度お試しください。",
+      "branch_head": "実験版ブランチの最新バージョンが見つかりませんでした",
+      "build_exit": "ビルドはエラーコード {code} で停止しました",
       "incomplete_build": "インストールされたビルドは不完全です（ゲームファイルが不足しています）。再インストールしてください。"
     },
     "success": {
@@ -139,7 +137,10 @@
     },
     "tab": {
       "overview": "概要"
-    }
+    },
+    "first_run_text": "OpenTaikoはまだインストールされていません。",
+    "first_run_install": "OpenTaikoをインストール",
+    "first_run_folder": "インストール先: {folder}"
   },
   "docs": {
     "title": "ドキュメント",
@@ -171,7 +172,9 @@
       "deleted": "セーブ「{name}」を削除しました。"
     },
     "error": {
+      "timeout": "セーブデータベースの読み込みに時間がかかりすぎました。",
       "no_db": "このインスタンスにはまだセーブデータベースがありません。",
+      "game_running": "セーブデータを変更する前に OpenTaiko を終了してください。終了時にゲームが変更を上書きしてしまいます。",
       "load": "セーブデータベースを読み込めませんでした。",
       "invalid_file": "有効な OpenTaiko セーブファイルではありません。",
       "export": "セーブの書き出しに失敗しました：{error}",
@@ -208,46 +211,128 @@
     }
   },
   "songs": {
-    "col": {
-      "name": "曲名",
-      "folder": "フォルダ",
-      "difficulties": "難易度",
-      "charter": "譜面作成：",
-      "size": "サイズ",
-      "status": "状態"
+    "box": {
+        "language": "言語",
+        "genre_help": "ゲーム内の解放条件に使われます。",
+        "title": "フォルダー設定",
+        "official_locked": "OpenTaiko サウンドトラックのフォルダーです。Hub が同期します。",
+        "name": "ゲーム内の表示名",
+        "genre": "ジャンル",
+        "description": "説明（3行）",
+        "line": "{n} 行目",
+        "colors": "色",
+        "box_color": "ボックス",
+        "back_color": "背面",
+        "bg_color": "背景",
+        "fore_color": "文字",
+        "appearance": "外観",
+        "box_type": "ボックス種別",
+        "bg_type": "背景種別",
+        "box_chara": "キャラクター",
+        "scene": "シーンプリセット",
+        "translations": "翻訳された名前",
+        "others": "その他の設定（{count}）",
+        "others_note": "保存してもこれらはそのまま保持されます。",
+        "clear": "クリア",
+        "jacket": "フォルダー画像",
+        "jacket_hint": "ゲーム内のボックスに表示されます。PNG・JPG・WebP に対応。",
+        "jacket_pick": "画像を選択...",
+        "jacket_saved": "{name} として保存しました",
+        "jacket_failed": "画像を設定できませんでした: {error}",
+      "discard_title": "未保存の変更",
+      "discard_message": "フォルダ設定に保存されていない変更があります。破棄しますか？",
+      "discard": "破棄"
     },
-    "filter": {
-      "song": "曲を検索...",
-      "folder": "フォルダを検索..."
+    "folder": {
+        "loading": "楽曲を読み込んでいます。",
+        "name_taken": "「{name}」はすでに存在します。",
+        "not_downloaded": "このフォルダーはまだダウンロードされていません。",
+        "new_folder": "新しいフォルダー",
+        "new_subfolder": "サブフォルダーを作成",
+        "new_prompt": "新しいフォルダーの名前",
+        "new_placeholder": "例: マイチャート",
+        "create": "作成",
+        "created": "「{name}」を作成しました",
+        "create_failed": "フォルダーを作成できませんでした: {error}",
+        "delete": "削除",
+        "delete_confirm": "「{name}」と、その中の {count} 曲を削除しますか？元に戻せません。",
+        "delete_song_confirm": "「{name}」を削除しますか？元に戻せません。",
+        "deleted": "「{name}」を削除しました",
+        "delete_failed": "削除できませんでした: {error}",
+        "box_missing": "box.def はまだありません",
+        "box_loading": "読み込み中...",
+        "save_box": "保存",
+        "unsaved": "未保存の変更",
+        "box_saved": "box.def を保存しました",
+        "box_save_failed": "box.def を保存できませんでした: {error}",
+        "drop_hint": "譜面の .zip をここにドロップするとこのフォルダーに追加されます",
+        "browse_zip": "ファイルを選択...",
+        "importing": "譜面を追加中...",
+        "imported": "{count} 曲を追加しました",
+        "import_rejected": "譜面のアーカイブではありません: {names}",
+        "import_failed": "譜面を追加できませんでした: {error}",
+        "drop_needs_folder": "先に自分のフォルダーを選択してから、ファイルをドロップしてください。"
+    },
+    "start": {
+        "title": "ライブラリは空です",
+        "body": "OpenTaiko の楽曲をダウンロードして始めましょう。自作譜面は楽曲フォルダーに入れてください。"
+    },
+    "detail": {
+        "help_title": "曲を選ぶと詳細が表示されます",
+        "help_installed": "所持・最新",
+        "help_available": "ダウンロード可能",
+        "help_outdated": "新しいバージョンがあります",
+        "help_custom": "自作譜面",
+        "help_hint": "フォルダーを開いて閲覧するか、「取得」で不足分をまとめてダウンロードできます。",
+        "get_size": "ダウンロード（{size}）",
+        "open_song_folder": "フォルダーを開く",
+        "set_jacket": "ジャケットを設定",
+      "website": "ウェブサイト"
+    },
+    "course": {
+        "easy": "かんたん",
+        "normal": "ふつう",
+        "hard": "むずかしい",
+        "oni": "おに（表）",
+        "edit": "おに（裏）",
+        "tower": "タワー",
+        "dan": "段位"
+    },
+    "scope": {
+        "all": "すべて",
+        "installed": "所持",
+        "updates": "更新"
+    },
+    "library": {
+        "title": "楽曲ライブラリ",
+        "summary": "{total} 曲中 {installed} 曲インストール済み",
+        "get_everything": "{count} 曲すべて取得",
+        "updates_waiting": "{count} 曲に更新あり",
+        "search": "曲・フォルダーを検索..."
     },
     "status": {
-      "scanning": "スキャン中...",
+      "installed_short": "所持",
       "not_downloaded": "未ダウンロード",
       "up_to_date": "最新",
       "outdated": "古い"
     },
     "button": {
-      "bulk_download": "一括ダウンロード",
-      "download": "ダウンロード",
-      "redownload": "再ダウンロード",
       "update": "更新",
       "open_folder": "曲フォルダを開く"
     },
-    "view": {
-      "list": "リスト",
-      "tree": "ツリー"
-    },
     "scan": {
-      "progress": "曲をスキャン中...（{count}曲見つかりました）",
-      "done": "ライブラリに{count}曲あります"
+      "progress": "曲をスキャン中...（{count}曲見つかりました）"
     },
     "tree": {
-      "soundtrack": "OpenTaiko サウンドトラック",
+      "show_more": "さらに {count} 件を表示",
+      "get_n": "{count} 曲取得",
+      "nothing_here": "現在の絞り込みに一致するものはありません。",
+      "installed_of": "{total} 曲中 {installed} 曲",
+      "no_match": "検索に一致する曲がありません。",
+      "open_folder_tip": "このフォルダーを開く",
       "custom": "カスタム",
-      "songs_count": "{count}曲",
-      "empty": "ライブラリにはまだ曲がありません。",
-      "spicy": "辛口",
-      "sweet": "甘口"
+      "all_updated": "すべて最新です。",
+      "none_installed": "まだ楽曲がインストールされていません。"
     },
     "migrate": {
       "banner": "「{instance}」内に {count} 個の曲フォルダが見つかりました。共有曲ライブラリに移動しますか？",
@@ -270,17 +355,17 @@
       "error": "曲の移動に失敗しました：{error}"
     },
     "metadata": {
-      "updated": "{count}個のジャンルフォルダを更新しました（box.def / preimages）"
+      "updated": "{count}個のジャンルフォルダを更新しました"
     },
-    "experimental_note": "選択中のインスタンスは実験版ビルドです。専用の曲が同梱されており、共有曲ライブラリは使用しません。",
     "error": {
+      "audio_missing": "{name} がこの曲のフォルダーにありません。",
+      "open_folder": "フォルダーを開けませんでした: {error}",
       "scanning": "ローカルフォルダーのスキャン中は曲をダウンロードできません",
+      "audio_failed": "この曲の音声を読み込めませんでした: {error}",
       "scan_failed": "曲ライブラリのスキャンに失敗しました：{error}"
     },
     "success": {
-      "all_up_to_date": "すべての曲は最新の状態です",
-      "download_complete": "ダウンロード完了",
-      "download_nb": "曲 {nb}/{total} をダウンロードしました"
+      "download_complete": "ダウンロード完了"
     },
     "duplicates": {
       "banner": "「{instance}」に空の重複フォルダが {count} 個あります。削除しますか？",
@@ -290,6 +375,10 @@
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "{name} を更新しますか？",
+      "message": "古いファイルが残らないよう、新しいバージョンをダウンロードする前に、インストール済みの {name} を削除します。フォルダー内で変更した内容は失われます。"
+    },
     "tab": {
       "skins": "スキン",
       "characters": "キャラクター",
@@ -317,12 +406,12 @@
     },
     "error": {
       "scanning": "ローカルフォルダーのスキャン中は{type}をダウンロードできません",
-      "zip_not_found": "スキンパッケージがサーバーに見つかりませんでした。5分後に再試行してください。問題が解決しない場合は、OpenTaikoチームにお問い合わせください。"
+      "zip_not_found": "スキンパッケージがサーバーに見つかりませんでした。5分後に再試行してください。問題が解決しない場合は、OpenTaikoチームにお問い合わせください。",
+      "instance_busy": "このインスタンスに OpenTaiko をインストール中です。完了してから、もう一度お試しください。"
     },
     "success": {
       "all_up_to_date": "{type}はすべて最新の状態です",
-      "download_complete": "ダウンロード完了",
-      "download_nb": "{type} {nb}/{total} をダウンロードしました"
+      "download_complete": "ダウンロード完了"
     }
   },
   "asset_cell": {
@@ -356,7 +445,9 @@
       "perfect": "全良",
       "full_combo": "フルコンボ",
       "clear": "クリア"
-    }
+    },
+    "modal_title": "殿堂入り: {title}（{course} #{rank}）",
+    "crown": "殿堂入り"
   },
   "version_chip": {
     "incompatible": "現在のOpenTaikoバージョンと互換性がありません",
@@ -364,13 +455,13 @@
   },
   "player": {
     "play": "再生",
-    "pause": "一時停止"
+    "pause": "一時停止",
+    "position": "再生位置"
   },
   "info": {
     "tab": {
       "changelog_game": "更新履歴（ゲーム）",
       "changelog_hub": "更新履歴（Hub）",
-      "documentation": "ドキュメント",
       "troubleshooting": "トラブルシューティング",
       "credits": "クレジット"
     },
@@ -491,7 +582,6 @@
   },
   "themes": {
     "title": "テーマを選択してください。",
-    "title_debug": "テーマを選択してください。（デバッグモードON）",
     "optgroup": {
       "optk": "OpenTaiko Hubテーマ：",
       "skeleton": "Skeletonプリセットテーマ："
@@ -521,20 +611,6 @@
       "dark": "ダーク",
       "light": "ライト",
       "current": "現在のモード：{mode}"
-    },
-    "debug": {
-      "disable_btn": "デバッグモードを無効にする"
-    },
-    "error": {
-      "theme_json": "theme.jsonファイル（または設定フォルダー）が存在しないか破損しています！<br>OpenTaiko Hubを再インストールして修正してください。",
-      "thememode_json": "thememode.jsonファイル（または設定フォルダー）が存在しないか破損しています！<br>OpenTaiko Hubを再インストールして修正してください。"
-    },
-    "warn": {
-      "same_theme": "選択されたテーマは現在のテーマと同じです。",
-      "same_theme_debug": "DEBUG：選択されたテーマは現在のテーマと同じです。"
-    },
-    "success": {
-      "debug_disabled": "<b>デバッグモードが無効になりました。</b><br><p class=\"smalltext\">（注意：デバッグモードを完全に無効にするには「debugMode」の値を変更する必要があります！）</p>"
     }
   },
   "lang": {
@@ -549,5 +625,48 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "処理中",
+    "close_title": "処理中です",
+    "close_message": "ダウンロードまたはビルドが実行中です。Hubを閉じると中断されます。",
+    "close": "閉じる",
+    "keep": "閉じない",
+    "cancelling": "キャンセル中…",
+    "installing_into": "{name} にインストール中",
+    "install_cancelled": "インストールを中止しました",
+    "dotnet_page": ".NET 8 を入手",
+    "instance_busy": "このインスタンスでインストールが実行中です",
+    "closing": "現在の処理が終わり次第、閉じます…"
+  },
+  "toast": {
+    "copy": "詳細をコピー",
+    "copied": "コピーしました",
+    "open_logs": "ログフォルダーを開く"
+  },
+  "errors": {
+    "rate_limited": "GitHubへのリクエストが制限されています。しばらくしてから再試行してください。",
+    "not_found": "サーバー上にファイルが見つかりません。",
+    "offline": "サーバーに接続できません。インターネット接続を確認してください。",
+    "disk_full": "ディスクの空き容量がありません。",
+    "access_denied": "ファイルへのアクセスが拒否されました。ゲームが起動中の場合は終了してから再試行してください。",
+    "no_build_for_system": "このリリースには {system} 向けのダウンロードがありません。",
+    "songs_link_failed": "{name} に楽曲ライブラリを関連付けできませんでした。ゲームに楽曲が表示されません。"
+  },
+  "bulk": {
+    "finishing": "ダウンロードした曲のフォルダーを仕上げています…",
+    "status": "ダウンロード中 {done} / {total} · 残り {size}",
+    "done": "{total} 件中 {count} 件をダウンロードしました",
+    "failed": "{total} 件中 {count} 件をダウンロードしました。失敗: {failed}",
+    "cancelled": "中止しました。{total} 件中 {count} 件をダウンロード済み"
+  },
+  "files": {
+    "images": "画像",
+    "chart_archives": "譜面アーカイブ",
+    "optk_save": "OpenTaikoのセーブ"
+  },
+  "relocate": {
+    "moved": "OpenTaiko Hub は曲とゲームを {folder} に保存するようになりました。{count} 個のフォルダーをそこへ移動しました。",
+    "failed": "Hub のデータの一部を {folder} に移動できなかったため、曲やゲームが見つからない場合があります。詳細をコピーすると、移動が残っているものを確認できます。"
   }
 }

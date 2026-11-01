@@ -1,49 +1,11 @@
 <script lang="ts">
     import { onMount } from 'svelte';
-    import { readTextFile, writeTextFile, mkdir } from '@tauri-apps/plugin-fs';
-
-    import { getContext } from 'svelte';
-    import type { ToastContext } from '$lib/types';
-    const { TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
-
-    import { GetPreferencesPath } from "$lib/utils/path";
+    import { LoadSettings, SaveSettings } from '$lib/settings';
     import { applyTheme, applyMode, getAppliedTheme, normalizeThemeName, DEFAULT_THEME, DEFAULT_MODE, type ThemeMode } from "$lib/utils/appearance";
-
-    import { path } from '@tauri-apps/api';
 
     import { SegmentedControl } from '@skeletonlabs/skeleton-svelte';
 
     import { _ , locale } from 'svelte-i18n';
-    import { get } from 'svelte/store';
-
-    // Debug mode code
-    let debugMode = $state(false);
-
-    const DisableDebugMode = async () => {
-        TriggerSuccess(get(_)('themes.success.debug_disabled'));
-        debugMode = false;
-    }
-
-    let currentThemeModeDebug = $state<ThemeMode>('dark');
-
-    const ThemeChangerDebug = async (e: Event) => {
-        const themevalue = (e.currentTarget as HTMLSelectElement).value;
-
-        if (getAppliedTheme() == themevalue) {
-            TriggerWarning(get(_)('themes.warn.same_theme_debug'));
-        }
-        else {
-            currentTheme = themevalue;
-            applyTheme(themevalue);
-            console.log("DEBUG: theme has been changed")
-        }
-    }
-
-    const ThemeModeChangerDebug = async (mode: string) => {
-        currentThemeModeDebug = mode === 'light' ? 'light' : 'dark';
-        applyMode(mode);
-        console.log(`DEBUG: mode has been changed to ${mode}`)
-    }
 
     interface Props {
         /** Selected navigation tile; the tab renders only while it is the Themes one. */
@@ -55,82 +17,43 @@
     let currentTheme = $state<string>(DEFAULT_THEME);
 
     const TryFetchingCurrentTheme = async () => {
-        const prefsDir = await GetPreferencesPath();
-        await mkdir(prefsDir, { recursive: true });
-        const themeFilePath = await path.join(prefsDir, 'theme.json');
-        try {
-            const fileContentTheme = await readTextFile(themeFilePath);
-            const jsonDataTheme = JSON.parse(fileContentTheme) as { theme?: string };
-            // Preferences written by older Hub versions use the Skeleton v2 preset names
-            currentTheme = normalizeThemeName(jsonDataTheme.theme);
-        } catch {
-            // File missing on first run — silently use default and write it
-            currentTheme = DEFAULT_THEME;
-            try { await writeTextFile(themeFilePath, JSON.stringify({ theme: currentTheme })); } catch {}
-        }
+        // Preferences written by older Hub versions use the Skeleton v2 preset names;
+        // none saved yet means the default
+        const { theme } = await LoadSettings();
+        currentTheme = theme ? normalizeThemeName(theme) : DEFAULT_THEME;
         applyTheme(currentTheme);
     }
 
     const ThemeChanger = async (e: Event) => {
         const themevalue = (e.currentTarget as HTMLSelectElement).value;
+        // Picking the theme already in use is not a mistake worth a warning
+        if (getAppliedTheme() == themevalue) return;
 
-        if (getAppliedTheme() == themevalue) {
-            TriggerWarning(get(_)('themes.warn.same_theme'));
-        }
-        else {
-            const prefsDir = await GetPreferencesPath();
-            await mkdir(prefsDir, { recursive: true });
-            const theme_settings = await path.join(prefsDir, 'theme.json');
-            await writeTextFile(theme_settings, JSON.stringify({ theme: themevalue }));
+        await SaveSettings({ theme: themevalue });
 
-            currentTheme = themevalue;
-            applyTheme(themevalue);
-            console.log("theme has been changed")
-        }
+        currentTheme = themevalue;
+        applyTheme(themevalue);
     }
 
     // Theme mode
     let currentThemeMode = $state<ThemeMode | 'Loading...'>('Loading...');
 
     const TryFetchingCurrentThemeMode = async () => {
-        const prefsDir = await GetPreferencesPath();
-        await mkdir(prefsDir, { recursive: true });
-        const modeFilePath = await path.join(prefsDir, 'thememode.json');
-        try {
-            const fileContentMode = await readTextFile(modeFilePath);
-            const jsonDataMode = JSON.parse(fileContentMode) as { thememode?: string };
-            currentThemeMode = jsonDataMode.thememode === 'light' ? 'light' : DEFAULT_MODE;
-        } catch {
-            // File missing on first run — silently use default and write it
-            currentThemeMode = DEFAULT_MODE;
-            try { await writeTextFile(modeFilePath, JSON.stringify({ thememode: currentThemeMode })); } catch {}
-        }
-
+        const { mode } = await LoadSettings();
+        currentThemeMode = mode === 'light' ? 'light' : DEFAULT_MODE;
         applyMode(currentThemeMode);
-        console.log(`mode has been changed to ${currentThemeMode}`)
     }
 
     const ThemeModeChanger = async (mode: string) => {
         currentThemeMode = mode === 'light' ? 'light' : 'dark';
-        const prefsDir = await GetPreferencesPath();
-        await mkdir(prefsDir, { recursive: true });
-        const thememode_settings = await path.join(prefsDir, 'thememode.json');
-        await writeTextFile(thememode_settings, JSON.stringify({ thememode: mode }));
+        await SaveSettings({ mode });
 
         applyMode(mode);
-        console.log(`mode has been changed to ${mode}`)
     }
 
     // Language persistence
     const SaveLocale = async (selectedLocale: string | null | undefined) => {
-        try {
-            const prefsDir = await GetPreferencesPath();
-            await mkdir(prefsDir, { recursive: true });
-            const langFilePath = await path.join(prefsDir, 'language.json');
-            await writeTextFile(langFilePath, JSON.stringify({ locale: selectedLocale }));
-        } catch (err) {
-            console.error('Failed to save locale:', err);
-        }
+        await SaveSettings({ locale: selectedLocale ?? undefined });
     }
 
     onMount(async () => {
@@ -143,9 +66,10 @@
         <div id="themetab">
             <section class="card w-full">
                 <div class="p-4 space-y-4">
-                    <h1>{debugMode ? $_('themes.title_debug') : $_('themes.title')}</h1>
+                    <h1>{$_('nav.themes')}</h1>
+                    <h2>{$_('themes.title')}</h2>
                     <div class="flex gap-2">
-                        <select size="11" class="select w-full max-w-[265px]" value={currentTheme} onchange={debugMode ? ThemeChangerDebug : ThemeChanger} onclick={debugMode ? () => {} : TryFetchingCurrentTheme}>
+                        <select size="11" class="select w-full max-w-[265px]" aria-label={$_('themes.title')} value={currentTheme} onchange={ThemeChanger}>
                             <optgroup label={$_('themes.optgroup.optk')}>
                                 <option value="gleamingsky">Gleaming Sky</option>
                                 <option value="dashy">888</option>
@@ -210,30 +134,14 @@
                             <h2>{$_('themes.credits.title')}</h2>
                             <p>{$_('themes.credits.text')}</p>
                             <a href="https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md" target="_blank">https://github.com/OpenTaiko/OpenTaiko-Hub/blob/main/README.md</a>
-
-                            <hr class="m-4">
-
-                            <h2>{$_('lang.label')}</h2>
-                            <select class="select w-full max-w-[200px]" bind:value={$locale} onchange={() => SaveLocale($locale)}>
-                                <option value="en">{$_('lang.en')}</option>
-                                <option value="ja">{$_('lang.ja')}</option>
-                                <option value="zh-Hans">{$_('lang.zh_Hans')}</option>
-                                <option value="zh-Hant">{$_('lang.zh_Hant')}</option>
-                                <option value="fr">{$_('lang.fr')}</option>
-                                <option value="es">{$_('lang.es')}</option>
-                                <option value="de">{$_('lang.de')}</option>
-                                <option value="nl">{$_('lang.nl')}</option>
-                                <option value="ko">{$_('lang.ko')}</option>
-                                <option value="ru">{$_('lang.ru')}</option>
-                            </select>
                         </div>
                     </div>
 
-                    <div class={debugMode ? "flex gap-2" : ""}>
+                    <div>
                         <div class="flex items-center gap-2">
                             <SegmentedControl
-                                value={debugMode ? currentThemeModeDebug : currentThemeMode}
-                                onValueChange={(details) => (debugMode ? ThemeModeChangerDebug : ThemeModeChanger)(details.value ?? DEFAULT_MODE)}
+                                value={currentThemeMode}
+                                onValueChange={(details) => ThemeModeChanger(details.value ?? DEFAULT_MODE)}
                             >
                                 <SegmentedControl.Control>
                                     <SegmentedControl.Indicator />
@@ -248,17 +156,30 @@
                                 </SegmentedControl.Control>
                             </SegmentedControl>
 
-                            {#if (debugMode ? currentThemeModeDebug : currentThemeMode) === "dark"}
+                            {#if currentThemeMode === "dark"}
                                 <p class="flex items-center px-2">{$_('themes.mode.current', { values: { mode: $_('themes.mode.dark') } })}</p>
-                            {:else if (debugMode ? currentThemeModeDebug : currentThemeMode) === "light"}
+                            {:else if currentThemeMode === "light"}
                                 <p class="flex items-center px-2">{$_('themes.mode.current', { values: { mode: $_('themes.mode.light') } })}</p>
                             {/if}
                         </div>
-
-                        {#if debugMode}
-                            <button type="button" onclick={DisableDebugMode} class="button-red button-main"><i class="fa-solid fa-code"></i> {$_('themes.debug.disable_btn')}</button>
-                        {/if}
                     </div>
+
+                    <!-- Its own section: it used to sit inside the theme preview, as if it
+                         were part of the theme -->
+                    <hr>
+                    <h2>{$_('lang.label')}</h2>
+                    <select class="select w-full max-w-[200px]" aria-label={$_('lang.label')} bind:value={$locale} onchange={() => SaveLocale($locale)}>
+                        <option value="en">{$_('lang.en')}</option>
+                        <option value="ja">{$_('lang.ja')}</option>
+                        <option value="zh-Hans">{$_('lang.zh_Hans')}</option>
+                        <option value="zh-Hant">{$_('lang.zh_Hant')}</option>
+                        <option value="fr">{$_('lang.fr')}</option>
+                        <option value="es">{$_('lang.es')}</option>
+                        <option value="de">{$_('lang.de')}</option>
+                        <option value="nl">{$_('lang.nl')}</option>
+                        <option value="ko">{$_('lang.ko')}</option>
+                        <option value="ru">{$_('lang.ru')}</option>
+                    </select>
                 </div>
             </section>
         </div>

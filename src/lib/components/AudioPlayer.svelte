@@ -1,20 +1,68 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import { _, locale } from 'svelte-i18n';
 	import type { SoundtrackEntry } from '$lib/types';
 	import { localizedTitle, localizedSubtitle } from '$lib/utils/titles';
+	import { SOUNDTRACK_REPO, rawUrl } from '$lib/repos';
 
 	interface Props {
-		songInfo: SoundtrackEntry;
+		/** The catalog entry, or null for a song of the user's own that the soundtrack
+		 *  does not have: it plays from disk and shows Title and Subtitle instead. */
+		songInfo: SoundtrackEntry | null;
+		/** Local audio for an installed chart. Falls back to the soundtrack repo only
+		 *  when the chart is not on disk, so a downloaded library plays offline and
+		 *  does not hammer the repository. */
+		Src?: string | null;
+		/** Reads the local audio when it is first played, for an installed chart: read on
+		 *  selection, browsing the library read every song's whole audio file. Src then
+		 *  carries what it read. */
+		LoadSrc?: () => Promise<string | null>;
+		Title?: string;
+		Subtitle?: string | null;
 	}
 
-	let { songInfo }: Props = $props();
+	let { songInfo, Src = null, LoadSrc, Title = '', Subtitle = null }: Props = $props();
+
+	// A chart whose audio is on disk never streams it from the repository meanwhile
+	let source = $derived(
+		Src
+		?? (LoadSrc ? null : songInfo ? rawUrl(SOUNDTRACK_REPO, songInfo.chartAudioFilePath) : null)
+	);
+
+	// Clicks while the audio is being read are ignored: each one used to toggle once the
+	// read ended, so a double click played and paused at once
+	let loadingSrc = false;
+	const TogglePlay = async () => {
+		if (loadingSrc) return;
+		if (paused && !source && LoadSrc) {
+			loadingSrc = true;
+			try {
+				if (!(await LoadSrc())) return;
+				// Src arrives as a prop: let it reach the <audio> before playing
+				await tick();
+			} finally {
+				loadingSrc = false;
+			}
+		}
+		paused = !paused;
+	};
 
 	let time = $state(0);
 	let duration = $state(0);
 	let paused = $state(true);
 
-	let title = $derived(localizedTitle(songInfo, $locale));
-	let subtitle = $derived(localizedSubtitle(songInfo, $locale));
+	// Changing the src on a live <audio> keeps `paused` false, so picking another song
+	// while one played left the button showing Pause for a track that was not playing.
+	let loadedId = $state<string | null>(null);
+	$effect(() => {
+		if (source === loadedId) return;
+		loadedId = source;
+		paused = true;
+		time = 0;
+	});
+
+	let title = $derived(songInfo ? localizedTitle(songInfo, $locale) : Title);
+	let subtitle = $derived(songInfo ? localizedSubtitle(songInfo, $locale) : (Subtitle ?? ''));
 
 	function format(time: number): string {
 		if (isNaN(time)) return '...';
@@ -28,7 +76,7 @@
 
 <div class="player" class:paused>
 	<audio
-		src="https://github.com/OpenTaiko/OpenTaiko-Soundtrack/raw/refs/heads/main/{songInfo.chartAudioFilePath}"
+		src={source}
 		bind:currentTime={time}
 		bind:duration
 		bind:paused
@@ -41,7 +89,7 @@
 	<button
 		class="play"
 		aria-label={paused ? $_('player.play') : $_('player.pause')}
-		onclick={() => paused = !paused}
+		onclick={TogglePlay}
 	></button>
 
 	<div class="info">
@@ -56,10 +104,20 @@
 				class="slider"
 				role="slider"
 				tabindex="0"
-				aria-label={$_('player.play')}
+				aria-label={$_('player.position')}
 				aria-valuemin={0}
 				aria-valuemax={duration || 0}
 				aria-valuenow={time}
+				aria-valuetext={format(time)}
+				onkeydown={(e) => {
+					if (!duration) return;
+					const step = { ArrowLeft: -5, ArrowDown: -5, ArrowRight: 5, ArrowUp: 5 }[e.key];
+					if (step !== undefined) time = Math.min(duration, Math.max(0, time + step));
+					else if (e.key === 'Home') time = 0;
+					else if (e.key === 'End') time = duration;
+					else return;
+					e.preventDefault();
+				}}
 				onpointerdown={e => {
 					const div = e.currentTarget;
 					

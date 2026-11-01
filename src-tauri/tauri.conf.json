@@ -2,7 +2,7 @@
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "productName": "OpenTaiko Hub",
   "identifier": "com.opentaiko.hub",
-  "version": "0.2.10",
+  "version": "0.3.0",
   "build": {
     "beforeBuildCommand": "npm run build",
     "beforeDevCommand": "npm run dev",
@@ -37,11 +37,6 @@
         "providerShortName": null,
         "signingIdentity": null
       },
-      "resources": { 
-        "settings/theme.json": "settings/theme.json",
-        "settings/thememode.json": "settings/thememode.json",
-        "settings/**/*": "settings/"
-      },
       "shortDescription": "",
       "targets": ["nsis","deb","appimage"],
       "windows": {
@@ -57,9 +52,14 @@
     },
   "app": {
     "security": {
-      "csp": null
+      "csp": {
+        "object-src": "'none'",
+        "base-uri": "'none'",
+        "form-action": "'none'"
+      },
+      "dangerousDisableAssetCspModification": ["script-src", "style-src"]
     },
-    "withGlobalTauri": true,
+    "withGlobalTauri": false,
     "windows": [
       {
         "title": "OpenTaiko Hub",
@@ -69,7 +69,8 @@
         "height": 700,
         "minWidth": 1130,
         "minHeight": 648,
-        "theme": "Dark"
+        "theme": "Dark",
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disk-cache-size=104857600"
       }
     ]
   }

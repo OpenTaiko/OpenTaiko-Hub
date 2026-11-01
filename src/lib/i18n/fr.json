@@ -1,38 +1,32 @@
 {
   "common": {
-    "fetch_error": "Erreur de récupération",
+    "fetch_error": "Impossible de joindre le serveur. Vérifiez votre connexion, puis réessayez.",
     "retry": "Réessayer",
     "reload": "Recharger",
-    "cancel": "Annuler"
+    "cancel": "Annuler",
+    "clear": "Effacer"
   },
   "dl": {
     "error": {
       "failed_abort": "Échec du téléchargement, abandon"
-    },
-    "warn": {
-      "failed_retry": "Échec du téléchargement, nouvelle tentative... ({attempt}/{max})"
     }
   },
   "nav": {
     "home": "Accueil",
     "songlist": "Chansons",
-    "skins": "Skins",
-    "docs": "Docs",
     "tools": "Outils",
     "secrets": "Secrets",
     "information": "Informations",
     "links": "Liens",
-    "themes": "Thèmes OpTk Hub",
+    "themes": "Réglages",
     "tooltip": {
       "home": "Gérez OpenTaiko et l'OpenTaiko Hub.",
       "songlist": "Mettez à jour vos chansons OpenTaiko et téléchargez les plus récentes.",
-      "skins": "Obtenez les derniers skins OpenTaiko et les ressources associées.",
-      "docs": "Parcourez la documentation incluse dans le build OpenTaiko sélectionné.",
       "tools": "Des outils pour améliorer votre expérience OpenTaiko.",
       "secrets": "???",
       "information": "Pour consulter les changelogs, la documentation, ou en cas de problème.",
       "links": "Découvrez les réseaux sociaux et les sites web d'OpenTaiko !",
-      "themes": "Changez le thème de l'OpenTaiko Hub.",
+      "themes": "Thème et langue de l'OpenTaiko Hub.",
       "github": "Voir le code source de l'OpenTaiko Hub."
     }
   },
@@ -88,19 +82,20 @@
     },
     "button": {
       "reload": "Recharger",
-      "download": "Télécharger OpenTaiko",
-      "download_stable": "Télécharger le build Stable",
-      "download_experimental": "Télécharger le build Expérimental",
+      "check_updates": "Rechercher des mises à jour",
       "launch": "Lancer OpenTaiko",
-      "explorer": "Ouvrir dans l'explorateur",
       "update": "Mettre à jour OpenTaiko",
       "redownload": "Retélécharger OpenTaiko",
       "rebuild": "Recompiler",
       "retry": "Réessayer",
-      "install": "Installer un build..."
+      "install": "Installer un build...",
+      "change_build": "Changer de version"
     },
     "warn": {
-      "skin_update": "(La mise à jour nécessitera une mise à jour du skin)"
+      "newer_release": "OpenTaiko {version} est disponible : utilisez « {button} » pour l’installer.",
+      "skin_update": "(La mise à jour nécessitera une mise à jour du skin)",
+      "skin_update_confirm": "Vos skins installés devront ensuite être mis à jour aussi. Mettre à jour OpenTaiko maintenant ?",
+      "redownload_confirm": "Retélécharger OpenTaiko {version} et le réinstaller dans cette instance ?"
     },
     "hint": {
       "first_start": "Pensez à télécharger un skin (onglet \"Skins\") et des chansons (onglet \"Chansons\") avant de lancer le jeu pour la première fois !",
@@ -108,7 +103,7 @@
     },
     "experimental": {
       "unavailable": "Aucun build expérimental n'est actuellement disponible",
-      "requires_dotnet": "La compilation des versions expérimentales nécessite le .NET SDK 8. Veuillez l'installer depuis https://dotnet.microsoft.com/download/dotnet/8.0 puis réessayer.",
+      "requires_dotnet": "La compilation des versions expérimentales nécessite le .NET SDK 8 ou plus récent. Installez-le, puis réessayez.",
       "update_available": "Un nouveau build expérimental est disponible !",
       "up_to_date": "Ce build expérimental est à jour.",
       "stage": {
@@ -130,6 +125,9 @@
       "fetch_release": "Échec de la récupération de la dernière version d'OpenTaiko : {error}",
       "build_failed": "Échec de la compilation d'OpenTaiko : {error}. Consultez la sortie de compilation ci-dessous.",
       "download_failed": "Échec du téléchargement d'OpenTaiko : {error}",
+      "instance_busy": "Une autre tâche écrit encore dans cette instance. Attendez la fin, puis réessayez.",
+      "branch_head": "Impossible de trouver la dernière version de la branche expérimentale",
+      "build_exit": "La compilation s'est arrêtée avec le code d'erreur {code}",
       "incomplete_build": "Le build installé est incomplet (fichiers du jeu manquants), veuillez le réinstaller."
     },
     "success": {
@@ -139,7 +137,10 @@
     },
     "tab": {
       "overview": "Vue d'ensemble"
-    }
+    },
+    "first_run_text": "OpenTaiko n'est pas encore installé.",
+    "first_run_install": "Installer OpenTaiko",
+    "first_run_folder": "Il sera installé dans {folder}"
   },
   "docs": {
     "title": "Documentation",
@@ -171,7 +172,9 @@
       "deleted": "Sauvegarde « {name} » supprimée."
     },
     "error": {
+      "timeout": "La lecture de la base de sauvegarde a pris trop de temps.",
       "no_db": "Cette instance n'a pas encore de base de sauvegarde.",
+      "game_running": "Fermez OpenTaiko avant de modifier ses sauvegardes : le jeu écraserait la modification en quittant.",
       "load": "Impossible de lire la base de sauvegarde.",
       "invalid_file": "Fichier de sauvegarde OpenTaiko invalide.",
       "export": "Échec de l'export de la sauvegarde : {error}",
@@ -208,54 +211,136 @@
     }
   },
   "songs": {
-    "col": {
-      "name": "Nom de la chanson",
-      "folder": "Dossier",
-      "difficulties": "Difficultés",
-      "charter": "Charteur : ",
-      "size": "Taille",
-      "status": "Statut"
+    "box": {
+        "language": "Langue",
+        "genre_help": "Le jeu s'en sert pour débloquer du contenu.",
+        "title": "Réglages du dossier",
+        "official_locked": "Dossier de la bande-son OpenTaiko, synchronisé par le Hub.",
+        "name": "Nom affiché en jeu",
+        "genre": "Genre",
+        "description": "Description (3 lignes)",
+        "line": "Ligne {n}",
+        "colors": "Couleurs",
+        "box_color": "Boîte",
+        "back_color": "Arrière",
+        "bg_color": "Fond",
+        "fore_color": "Texte",
+        "appearance": "Apparence",
+        "box_type": "Type de boîte",
+        "bg_type": "Type de fond",
+        "box_chara": "Personnage",
+        "scene": "Préréglage de scène",
+        "translations": "Noms traduits",
+        "others": "Autres réglages ({count})",
+        "others_note": "Ces réglages sont conservés tels quels à l'enregistrement.",
+        "clear": "Effacer",
+        "jacket": "Image du dossier",
+        "jacket_hint": "Affichée sur la boîte en jeu. PNG, JPG ou WebP.",
+        "jacket_pick": "Choisir une image...",
+        "jacket_saved": "Enregistrée sous {name}",
+        "jacket_failed": "Impossible de définir l'image : {error}",
+      "discard_title": "Modifications non enregistrées",
+      "discard_message": "Les réglages du dossier ont des modifications non enregistrées. Les abandonner ?",
+      "discard": "Abandonner"
     },
-    "filter": {
-      "song": "Rechercher une chanson...",
-      "folder": "Rechercher un dossier..."
+    "folder": {
+        "loading": "Les chansons sont en cours de chargement.",
+        "name_taken": "« {name} » existe déjà ici.",
+        "not_downloaded": "Ce dossier n'est pas encore téléchargé.",
+        "new_folder": "Nouveau dossier",
+        "new_subfolder": "Nouveau sous-dossier",
+        "new_prompt": "Nom du nouveau dossier",
+        "new_placeholder": "Par exemple : Mes cartes",
+        "create": "Créer",
+        "created": "« {name} » créé",
+        "create_failed": "Impossible de créer le dossier : {error}",
+        "delete": "Supprimer",
+        "delete_confirm": "Supprimer « {name} »{count, plural, =0 { ?} one { et la chanson qu'il contient ?} other { et les # chansons qu'il contient ?}} Action irréversible.",
+        "delete_song_confirm": "Supprimer « {name} » ? Action irréversible.",
+        "deleted": "« {name} » supprimé",
+        "delete_failed": "Suppression impossible : {error}",
+        "box_missing": "pas encore de box.def",
+        "box_loading": "Chargement...",
+        "save_box": "Enregistrer",
+        "unsaved": "modifications non enregistrées",
+        "box_saved": "box.def enregistré",
+        "box_save_failed": "Impossible d'enregistrer box.def : {error}",
+        "drop_hint": "Déposez des .zip de fichiers ici pour les ajouter à ce dossier",
+        "browse_zip": "Choisir des fichiers...",
+        "importing": "Ajout des fichiers...",
+        "imported": "{count, plural, one {# chanson ajoutée} other {# chansons ajoutées}}",
+        "import_rejected": "Pas une archive de fichiers : {names}",
+        "import_failed": "Impossible d'ajouter les fichiers : {error}",
+        "drop_needs_folder": "Sélectionnez d'abord un de vos dossiers, puis déposez-y les fichiers."
+    },
+    "start": {
+        "title": "Votre bibliothèque est vide",
+        "body": "Téléchargez les chansons OpenTaiko pour commencer, ou déposez vos propres fichiers dans le dossier des chansons."
+    },
+    "detail": {
+        "help_title": "Choisissez une chanson pour voir ses détails",
+        "help_installed": "Installée et à jour",
+        "help_available": "Disponible au téléchargement",
+        "help_outdated": "Une version plus récente existe",
+        "help_custom": "Votre propre fichier",
+        "help_hint": "Ouvrez un dossier pour le parcourir, ou utilisez Télécharger pour récupérer ce qui manque.",
+        "get_size": "Télécharger ({size})",
+        "open_song_folder": "Ouvrir le dossier",
+        "set_jacket": "Définir la jaquette",
+      "website": "Site web"
+    },
+    "course": {
+        "easy": "Facile",
+        "normal": "Normal",
+        "hard": "Difficile",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "Tour",
+        "dan": "Dan"
+    },
+    "scope": {
+        "all": "Tout",
+        "installed": "Installées",
+        "updates": "Mises à jour"
+    },
+    "library": {
+        "title": "Bibliothèque de chansons",
+        "summary": "{installed, plural, one {# chanson installée} other {# chansons installées}} sur {total}",
+        "get_everything": "Tout télécharger ({count})",
+        "updates_waiting": "{count} à mettre à jour",
+        "search": "Rechercher chansons et dossiers..."
     },
     "status": {
-      "scanning": "Analyse...",
+      "installed_short": "Installée",
       "not_downloaded": "Non téléchargée",
       "up_to_date": "À jour",
       "outdated": "Obsolète"
     },
     "button": {
-      "bulk_download": "Tout télécharger",
-      "download": "Télécharger",
-      "redownload": "Retélécharger",
       "update": "Mettre à jour",
       "open_folder": "Ouvrir le dossier des chansons"
     },
-    "view": {
-      "list": "Liste",
-      "tree": "Arborescence"
-    },
     "scan": {
-      "progress": "Analyse des chansons... ({count} trouvées)",
-      "done": "{count} chansons dans la bibliothèque"
+      "progress": "Analyse des chansons... ({count} trouvées)"
     },
     "tree": {
-      "soundtrack": "Bande-son OpenTaiko",
+      "show_more": "Afficher {count} de plus",
+      "get_n": "Télécharger {count}",
+      "nothing_here": "Rien ici ne correspond au filtre actuel.",
+      "installed_of": "{installed} / {total} installés",
+      "no_match": "Aucune chanson ne correspond à cette recherche.",
+      "open_folder_tip": "Ouvrir ce dossier",
       "custom": "Personnalisé",
-      "songs_count": "{count} chansons",
-      "empty": "Aucune chanson trouvée dans la bibliothèque pour le moment.",
-      "spicy": "Épicé",
-      "sweet": "Doux"
+      "all_updated": "Tout est à jour.",
+      "none_installed": "Aucune chanson n'est encore installée."
     },
     "migrate": {
-      "banner": "{count} dossier(s) de chansons trouvé(s) dans « {instance} ». Les transférer vers la bibliothèque de chansons partagée ?",
+      "banner": "{count, plural, one {# dossier de chansons trouvé} other {# dossiers de chansons trouvés}} dans « {instance} ». {count, plural, one {Le transférer} other {Les transférer}} vers la bibliothèque de chansons partagée ?",
       "button": "Transférer les chansons",
       "later": "Plus tard",
       "modal_title": "Transférer les chansons de « {instance} »",
-      "summary_new": "{count} nouveau(x) dossier(s) de chanson seront ajoutés à la bibliothèque partagée.",
-      "summary_identical": "{count} dossier(s) de chanson identiques seront retirés de cette instance.",
+      "summary_new": "{count, plural, one {# nouveau dossier de chanson sera ajouté} other {# nouveaux dossiers de chanson seront ajoutés}} à la bibliothèque partagée.",
+      "summary_identical": "{count, plural, one {# dossier de chanson identique sera retiré} other {# dossiers de chanson identiques seront retirés}} de cette instance.",
       "nothing": "Cette instance n'a aucun chart à transférer.",
       "conflicts_title": "Conflits ({count})",
       "conflicts_hint": "Ces chansons existent déjà dans la bibliothèque partagée avec un contenu différent. Choisissez la version à conserver.",
@@ -270,26 +355,30 @@
       "error": "Échec du transfert des chansons : {error}"
     },
     "metadata": {
-      "updated": "{count} dossier(s) de genre mis à jour (box.def / preimages)"
+      "updated": "{count, plural, one {# dossier de genre mis à jour} other {# dossiers de genre mis à jour}}"
     },
-    "experimental_note": "L'instance sélectionnée est un build expérimental : elle inclut ses propres chansons et n'utilise pas la bibliothèque de chansons partagée.",
     "error": {
+      "audio_missing": "{name} n'est plus dans le dossier de cette chanson.",
+      "open_folder": "Impossible d'ouvrir le dossier : {error}",
       "scanning": "Impossible de télécharger des chansons pendant l'analyse des dossiers locaux",
+      "audio_failed": "Impossible de lire l'audio de cette chanson : {error}",
       "scan_failed": "Échec de l'analyse de la bibliothèque de chansons : {error}"
     },
     "success": {
-      "all_up_to_date": "Toutes les chansons sont déjà à jour",
-      "download_complete": "Téléchargement terminé",
-      "download_nb": "Chanson {nb} sur {total} téléchargée"
+      "download_complete": "Téléchargement terminé"
     },
     "duplicates": {
-      "banner": "{count} dossier(s) vides en double dans « {instance} ». Les supprimer ?",
+      "banner": "{count, plural, one {# dossier vide en double} other {# dossiers vides en double}} dans « {instance} ». {count, plural, one {Le supprimer ?} other {Les supprimer ?}}",
       "button": "Nettoyer",
-      "success": "{count} dossier(s) en double supprimé(s).",
+      "success": "{count, plural, one {# dossier en double supprimé} other {# dossiers en double supprimés}}.",
       "error": "Échec de la suppression des dossiers en double : {error}"
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "Mettre à jour {name} ?",
+      "message": "La version installée de {name} est supprimée avant le téléchargement de la nouvelle, pour qu'aucun ancien fichier ne reste. Les modifications faites dans son dossier seront perdues."
+    },
     "tab": {
       "skins": "Skins",
       "characters": "Personnages",
@@ -317,12 +406,12 @@
     },
     "error": {
       "scanning": "Impossible de télécharger des {type} pendant l'analyse des dossiers locaux",
-      "zip_not_found": "Le paquet du skin est introuvable sur le serveur. Veuillez réessayer dans 5 minutes. Si le problème persiste, veuillez contacter l'équipe OpenTaiko."
+      "zip_not_found": "Le paquet du skin est introuvable sur le serveur. Veuillez réessayer dans 5 minutes. Si le problème persiste, veuillez contacter l'équipe OpenTaiko.",
+      "instance_busy": "OpenTaiko est en cours d'installation dans cette instance. Attendez la fin, puis réessayez."
     },
     "success": {
       "all_up_to_date": "Tous les {type} sont déjà à jour",
-      "download_complete": "Téléchargement terminé",
-      "download_nb": "{type} : {nb} sur {total} téléchargé(s)"
+      "download_complete": "Téléchargement terminé"
     }
   },
   "asset_cell": {
@@ -356,7 +445,9 @@
       "perfect": "Perfect",
       "full_combo": "Full Combo",
       "clear": "Clear"
-    }
+    },
+    "modal_title": "Hall of Fame : {title} ({course} #{rank})",
+    "crown": "Hall of Fame"
   },
   "version_chip": {
     "incompatible": "Non compatible avec la version actuelle d'OpenTaiko",
@@ -364,13 +455,13 @@
   },
   "player": {
     "play": "lecture",
-    "pause": "pause"
+    "pause": "pause",
+    "position": "Position"
   },
   "info": {
     "tab": {
       "changelog_game": "Changelogs (Jeu)",
       "changelog_hub": "Changelogs (Hub)",
-      "documentation": "Documentation",
       "troubleshooting": "Dépannage",
       "credits": "Crédits"
     },
@@ -491,7 +582,6 @@
   },
   "themes": {
     "title": "Sélectionnez un thème.",
-    "title_debug": "Sélectionnez un thème. (MODE DEBUG ACTIVÉ)",
     "optgroup": {
       "optk": "Thèmes OpenTaiko Hub :",
       "skeleton": "Thèmes prédéfinis Skeleton :"
@@ -521,24 +611,10 @@
       "dark": "Sombre",
       "light": "Clair",
       "current": "Mode actuel : {mode}"
-    },
-    "debug": {
-      "disable_btn": "Désactiver le mode debug"
-    },
-    "error": {
-      "theme_json": "Le fichier theme.json (ou le dossier settings) n'existe pas ou est corrompu !<br>Veuillez réinstaller l'OpenTaiko Hub pour corriger cela.",
-      "thememode_json": "Le fichier thememode.json (ou le dossier settings) n'existe pas ou est corrompu !<br>Veuillez réinstaller l'OpenTaiko Hub pour corriger cela."
-    },
-    "warn": {
-      "same_theme": "Le thème sélectionné est identique au thème actuel.",
-      "same_theme_debug": "DEBUG : Le thème sélectionné est identique au thème actuel."
-    },
-    "success": {
-      "debug_disabled": "<b>Le mode debug a été désactivé.</b><br><p class=\"smalltext\">(Note : Vous devez changer la valeur \"debugMode\" pour désactiver complètement le mode debug !)</p>"
     }
   },
   "lang": {
-    "label": "Language",
+    "label": "Langue",
     "en": "English",
     "ja": "日本語",
     "zh_Hans": "中文 (简体)",
@@ -549,5 +625,48 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "En cours",
+    "close_title": "Opération en cours",
+    "close_message": "Un téléchargement ou une compilation est en cours. Fermer le Hub l'arrêtera.",
+    "close": "Fermer",
+    "keep": "Laisser ouvert",
+    "cancelling": "Annulation…",
+    "installing_into": "Installation dans {name}",
+    "install_cancelled": "Installation annulée",
+    "dotnet_page": "Obtenir .NET 8",
+    "instance_busy": "Une installation est en cours dans cette instance",
+    "closing": "Fermeture dès que l'étape en cours est terminée…"
+  },
+  "toast": {
+    "copy": "Copier les détails",
+    "copied": "Copié",
+    "open_logs": "Ouvrir le dossier des journaux"
+  },
+  "errors": {
+    "rate_limited": "GitHub limite les requêtes de votre connexion. Réessayez plus tard.",
+    "not_found": "Le fichier est introuvable sur le serveur.",
+    "offline": "Impossible de joindre le serveur. Vérifiez votre connexion internet.",
+    "disk_full": "Le disque est plein.",
+    "access_denied": "L'accès à un fichier a été refusé. Si le jeu est lancé, fermez-le et réessayez.",
+    "no_build_for_system": "Cette version n'a pas de téléchargement pour {system}.",
+    "songs_link_failed": "Impossible de lier la bibliothèque de chansons à {name} : le jeu n'affichera pas ses chansons."
+  },
+  "bulk": {
+    "finishing": "Finalisation des dossiers des chansons téléchargées…",
+    "status": "Téléchargement {done} / {total} · {size} restants",
+    "done": "{count} sur {total} téléchargés",
+    "failed": "{count} sur {total} téléchargés. Échecs : {failed}",
+    "cancelled": "Annulé. {count} sur {total} téléchargés"
+  },
+  "files": {
+    "images": "Images",
+    "chart_archives": "Archives de charts",
+    "optk_save": "Sauvegarde OpenTaiko"
+  },
+  "relocate": {
+    "moved": "OpenTaiko Hub range désormais ses chansons et ses jeux dans {folder}. {count, plural, one {# dossier y a été déplacé} other {# dossiers y ont été déplacés}}.",
+    "failed": "Certaines données du Hub n'ont pas pu être déplacées vers {folder} : des chansons ou des jeux peuvent manquer. Copiez les détails pour voir ce qu'il reste à déplacer."
   }
 }

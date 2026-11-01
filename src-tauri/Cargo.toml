@@ -1,10 +1,10 @@
 [package]
 name = "OpenTaiko-Hub"
-version = "0.1.0"
+version = "0.3.0"
 description = "Update manager and launcher for OpenTaiko"
 authors = ["OpenTaiko Team"]
-license = ""
-repository = ""
+license = "MIT"
+repository = "https://github.com/OpenTaiko/OpenTaiko-Hub"
 default-run = "OpenTaiko-Hub"
 edition = "2021"
 rust-version = "1.80"
@@ -22,11 +22,10 @@ tauri-plugin-fs = "~2.5.2"
 tauri-plugin-http = "~2.6.0"
 tauri-plugin-opener = "~2.5.5"
 tauri-plugin-os = "~2.3.2"
-tauri-plugin-shell = "~2.3.6"
-tauri-plugin-store = "~2.4.4"
-tauri-plugin-upload = "~2.4.1"
 zip = "4.2.0"
-tokio = "1.51.1"
+# download.rs: streams to disk (fs, io-util), runs transfers side by side (rt, sync), waits between retries (time),
+# and stops waiting on the network the moment a download is cancelled (macros: select!)
+tokio = { version = "1.51.1", features = ["fs", "io-util", "macros", "rt", "sync", "time"] }
 tauri-plugin-dialog = "~2.7.3"
 pelite = "0.10"
 md-5 = "0.10"
@@ -38,17 +37,46 @@ log = "0.4"
 tauri-plugin-log = "~2.9.2"
 # Resolves the log folder the same way Tauri does, so logging cannot abort startup.
 dirs = "6"
+# writes.rs: the instance folder of a save write arrives as a percent-encoded header
+percent-encoding = "2"
+# One Hub at a time: a second one swept up what the first was still downloading. 2.5
+# needs Tauri 2.12.
+tauri-plugin-single-instance = "~2.4.5"
 
-# Linux-only: raising RLIMIT_NOFILE needs libc. Keep this target-scoped so Windows and
-# macOS builds neither fetch nor compile it.
-[target.'cfg(target_os = "linux")'.dependencies]
+# Linux and macOS: stopping a build's whole process group, and on Linux raising
+# RLIMIT_NOFILE. Kept target-scoped so Windows builds neither fetch nor compile it.
+[target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [dev-dependencies]
 tempfile = "3"
+# Tests of the commands that check paths, on Tauri's mock runtime
+tauri = { version = "~2.11.5", features = ["test"] }
+# A local server standing in for GitHub in the download tests
+tokio = { version = "1.51.1", features = ["net", "rt"] }
 
 [features]
 # this feature is used for production builds or when `devPath` points to the filesystem and the built-in dev server is disabled.
 # If you use cargo directly instead of tauri's cli you can use this feature flag to switch between tauri's `dev` and `build` modes.
 # DO NOT REMOVE!!
 custom-protocol = [ "tauri/custom-protocol" ]
+
+# Debug info is most of what makes target/ grow to tens of gigabytes: every dependency
+# gets full symbols and a PDB on Windows, rebuilt into a new copy on every version or
+# feature change. Our own crate keeps line tables, so panics and backtraces still name
+# the file and line; dependencies get none, since nobody steps through Tauri's internals.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
+# Smaller shipped binary. Symbols are stripped (a panic still logs its file and line:
+# the panic hook reads those from the panic itself, not from symbols), and link-time
+# optimisation across all crates removes the parts of the dependencies the Hub never
+# calls. Release builds take longer for it. Panics keep unwinding: with "abort", one
+# failing command would take the whole app down instead of failing alone.
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1

@@ -1,9 +1,15 @@
+/// <reference types="vitest/config" />
 import { sveltekit } from '@sveltejs/kit/vite';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
 	plugins: [tailwindcss(), sveltekit()],
+	// Unit tests cover the modules that run without the Tauri backend (npm test)
+	test: {
+		include: ['src/**/*.test.ts'],
+		environment: 'node',
+	},
 	resolve: {
 		dedupe: ['svelte'],
 	},
@@ -16,7 +22,8 @@ export default defineConfig({
 			// Never watch the Rust build tree: in dev mode the Hub's working data
 			// (downloads, experimental build sources) lives under src-tauri/target,
 			// and watching it crashes the dev server (EBUSY) during builds.
-			ignored: ['**/src-tauri/**'],
+			// dev-hub holds the dev build's instances and songs (devdata.rs), same reason.
+			ignored: ['**/src-tauri/**', '**/dev-hub/**'],
 		},
 	},
 });

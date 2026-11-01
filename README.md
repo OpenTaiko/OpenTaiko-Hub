@@ -31,7 +31,9 @@ Open terminal, `cd` into the OpenTaiko-Hub directory, run `npm install` to insta
 
 Then run `npm run tauri dev`, and then wait the project to build and the OpenTaiko-Hub window to boot.
 
-The frontend is TypeScript: run `npm run check` to type-check it (the Rust backend is checked with `cargo check` in `src-tauri`).
+The frontend is TypeScript: run `npm run check` to type-check it (the Rust backend is checked with `cargo check` in `src-tauri`). `npm test` runs the frontend unit tests, and `cargo test` in `src-tauri` the backend ones.
+
+A dev build keeps its instances, songs and logs in `dev-hub/` at the root of the repository (ignored by git), so `cargo clean` never deletes them. Set `OTK_HUB_ROOT` to use another folder.
 
 ## How to Build Locally
 

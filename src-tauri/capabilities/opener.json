@@ -1,0 +1,14 @@
+{
+    "identifier": "opener",
+    "description": "Opening links in the browser. Folders are opened through the open_folder command, which accepts folders only.",
+    "local": true,
+    "windows": ["main"],
+    "permissions": [
+      {
+        "identifier": "opener:allow-open-url",
+        "allow": [
+          { "url": "https://*" }
+        ]
+      }
+    ]
+  }

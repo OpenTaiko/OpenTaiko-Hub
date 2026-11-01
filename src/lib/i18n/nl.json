@@ -1,38 +1,32 @@
 {
   "common": {
-    "fetch_error": "Ophaalfout",
+    "fetch_error": "De server was niet bereikbaar. Controleer je verbinding en probeer het dan opnieuw.",
     "retry": "Opnieuw proberen",
     "reload": "Herladen",
-    "cancel": "Annuleren"
+    "cancel": "Annuleren",
+    "clear": "Wissen"
   },
   "dl": {
     "error": {
       "failed_abort": "Download mislukt, wordt afgebroken"
-    },
-    "warn": {
-      "failed_retry": "Download mislukt, opnieuw proberen... ({attempt}/{max})"
     }
   },
   "nav": {
     "home": "Home",
     "songlist": "Songlijst",
-    "skins": "Skins",
-    "docs": "Docs",
     "tools": "Tools",
     "secrets": "Geheimen",
     "information": "Informatie",
     "links": "Links",
-    "themes": "OpTk Hub-thema's",
+    "themes": "Opties",
     "tooltip": {
       "home": "Beheer OpenTaiko en de OpenTaiko Hub.",
       "songlist": "Werk je OpenTaiko-nummers bij en download de nieuwste.",
-      "skins": "Download de nieuwste OpenTaiko-skins en bijbehorende assets.",
-      "docs": "Blader door de documentatie van de geselecteerde OpenTaiko-build.",
       "tools": "Tools die je OpenTaiko-ervaring kunnen verbeteren.",
       "secrets": "???",
       "information": "Voor changelogs, documentatie of probleemoplossing.",
       "links": "Bekijk de socials en websites van OpenTaiko!",
-      "themes": "Verander het thema van de OpenTaiko Hub.",
+      "themes": "Thema en taal van de OpenTaiko Hub.",
       "github": "Bekijk de broncode van de OpenTaiko Hub."
     }
   },
@@ -88,19 +82,20 @@
     },
     "button": {
       "reload": "Herladen",
-      "download": "OpenTaiko downloaden",
-      "download_stable": "Stabiel downloaden",
-      "download_experimental": "Experimenteel downloaden",
+      "check_updates": "Controleren op updates",
       "launch": "OpenTaiko starten",
-      "explorer": "Openen in Verkenner",
       "update": "OpenTaiko bijwerken",
       "redownload": "OpenTaiko opnieuw downloaden",
       "rebuild": "Opnieuw bouwen",
       "retry": "Opnieuw proberen",
-      "install": "Een build installeren..."
+      "install": "Een build installeren...",
+      "change_build": "Versie wijzigen"
     },
     "warn": {
-      "skin_update": "(Na het bijwerken is ook een skin-update nodig)"
+      "newer_release": "OpenTaiko {version} is beschikbaar: installeer het met ‘{button}’.",
+      "skin_update": "(Na het bijwerken is ook een skin-update nodig)",
+      "skin_update_confirm": "Daarna moeten ook je geïnstalleerde skins worden bijgewerkt. OpenTaiko nu bijwerken?",
+      "redownload_confirm": "OpenTaiko {version} opnieuw downloaden en in deze instantie opnieuw installeren?"
     },
     "hint": {
       "first_start": "Download eerst een skin (tabblad \"Skins\") en nummers (tabblad \"Songlijst\") voordat je het spel voor het eerst start!",
@@ -108,7 +103,7 @@
     },
     "experimental": {
       "unavailable": "Er is momenteel geen experimentele build beschikbaar",
-      "requires_dotnet": "Voor het bouwen van experimentele versies is de .NET SDK 8 vereist. Installeer deze via https://dotnet.microsoft.com/download/dotnet/8.0 en probeer het opnieuw.",
+      "requires_dotnet": "Voor het bouwen van experimentele versies is de .NET SDK 8 of nieuwer vereist. Installeer deze en probeer het dan opnieuw.",
       "update_available": "Er is een nieuwe experimentele build beschikbaar!",
       "up_to_date": "Deze experimentele build is up-to-date.",
       "stage": {
@@ -130,6 +125,9 @@
       "fetch_release": "Ophalen van de nieuwste OpenTaiko-release mislukt: {error}",
       "build_failed": "Compileren van OpenTaiko mislukt: {error}. Zie de build-uitvoer hieronder.",
       "download_failed": "Downloaden van OpenTaiko mislukt: {error}",
+      "instance_busy": "Een andere taak schrijft nog naar deze instantie. Wacht tot die klaar is en probeer het dan opnieuw.",
+      "branch_head": "De nieuwste versie van de experimentele branch is niet gevonden",
+      "build_exit": "Het compileren stopte met foutcode {code}",
       "incomplete_build": "De geïnstalleerde build is onvolledig (ontbrekende spelbestanden), installeer opnieuw."
     },
     "success": {
@@ -139,7 +137,10 @@
     },
     "tab": {
       "overview": "Overzicht"
-    }
+    },
+    "first_run_text": "OpenTaiko is nog niet geïnstalleerd.",
+    "first_run_install": "OpenTaiko installeren",
+    "first_run_folder": "Het wordt geïnstalleerd in {folder}"
   },
   "docs": {
     "title": "Documentatie",
@@ -171,7 +172,9 @@
       "deleted": "Save \"{name}\" verwijderd."
     },
     "error": {
+      "timeout": "Het lezen van de save-database duurde te lang.",
       "no_db": "Deze instantie heeft nog geen save-database.",
+      "game_running": "Sluit OpenTaiko voordat je de saves wijzigt: het spel zou de wijziging bij het afsluiten overschrijven.",
       "load": "Kon de save-database niet lezen.",
       "invalid_file": "Geen geldig OpenTaiko-savebestand.",
       "export": "Kon de save niet exporteren: {error}",
@@ -208,54 +211,136 @@
     }
   },
   "songs": {
-    "col": {
-      "name": "Titel",
-      "folder": "Map",
-      "difficulties": "Moeilijkheidsgraden",
-      "charter": "Charter: ",
-      "size": "Grootte",
-      "status": "Status"
+    "box": {
+        "language": "Taal",
+        "genre_help": "Het spel gebruikt dit om inhoud vrij te spelen.",
+        "title": "Mapinstellingen",
+        "official_locked": "Map uit de OpenTaiko-soundtrack, wordt door de Hub gesynchroniseerd.",
+        "name": "Naam in het spel",
+        "genre": "Genre",
+        "description": "Beschrijving (3 regels)",
+        "line": "Regel {n}",
+        "colors": "Kleuren",
+        "box_color": "Box",
+        "back_color": "Achter",
+        "bg_color": "Achtergrond",
+        "fore_color": "Tekst",
+        "appearance": "Uiterlijk",
+        "box_type": "Boxtype",
+        "bg_type": "Achtergrondtype",
+        "box_chara": "Personage",
+        "scene": "Scènevoorinstelling",
+        "translations": "Vertaalde namen",
+        "others": "Overige instellingen ({count})",
+        "others_note": "Deze blijven bij het opslaan ongewijzigd.",
+        "clear": "Wissen",
+        "jacket": "Mapafbeelding",
+        "jacket_hint": "Wordt in het spel op de box getoond. PNG, JPG of WebP.",
+        "jacket_pick": "Afbeelding kiezen...",
+        "jacket_saved": "Opgeslagen als {name}",
+        "jacket_failed": "Kon de afbeelding niet instellen: {error}",
+      "discard_title": "Niet-opgeslagen wijzigingen",
+      "discard_message": "De mapinstellingen hebben niet-opgeslagen wijzigingen. Verwerpen?",
+      "discard": "Verwerpen"
     },
-    "filter": {
-      "song": "Nummer zoeken...",
-      "folder": "Map zoeken..."
+    "folder": {
+        "loading": "De nummers worden geladen.",
+        "name_taken": "\"{name}\" bestaat hier al.",
+        "not_downloaded": "Deze map is nog niet gedownload.",
+        "new_folder": "Nieuwe map",
+        "new_subfolder": "Nieuwe submap",
+        "new_prompt": "Naam van de nieuwe map",
+        "new_placeholder": "Bijvoorbeeld: Mijn charts",
+        "create": "Aanmaken",
+        "created": "\"{name}\" aangemaakt",
+        "create_failed": "Kon de map niet aanmaken: {error}",
+        "delete": "Verwijderen",
+        "delete_confirm": "\"{name}\"{count, plural, =0 {} one { en het nummer erin} other { en de # nummers erin}} verwijderen? Dit kan niet ongedaan worden gemaakt.",
+        "delete_song_confirm": "\"{name}\" verwijderen? Dit kan niet ongedaan worden gemaakt.",
+        "deleted": "\"{name}\" verwijderd",
+        "delete_failed": "Kon niet verwijderen: {error}",
+        "box_missing": "nog geen box.def",
+        "box_loading": "Laden...",
+        "save_box": "Opslaan",
+        "unsaved": "niet-opgeslagen wijzigingen",
+        "box_saved": "box.def opgeslagen",
+        "box_save_failed": "Kon box.def niet opslaan: {error}",
+        "drop_hint": "Sleep chart-.zip-bestanden hierheen om ze aan deze map toe te voegen",
+        "browse_zip": "Bestanden kiezen...",
+        "importing": "Charts toevoegen...",
+        "imported": "{count, plural, one {# nummer} other {# nummers}} toegevoegd",
+        "import_rejected": "Geen chart-archief: {names}",
+        "import_failed": "Kon de charts niet toevoegen: {error}",
+        "drop_needs_folder": "Selecteer eerst een eigen map en zet de bestanden daar neer."
+    },
+    "start": {
+        "title": "Je bibliotheek is leeg",
+        "body": "Download de OpenTaiko-nummers om te beginnen, of zet je eigen charts in de songmap."
+    },
+    "detail": {
+        "help_title": "Kies een nummer om details te zien",
+        "help_installed": "Geïnstalleerd en actueel",
+        "help_available": "Beschikbaar om te downloaden",
+        "help_outdated": "Er is een nieuwere versie",
+        "help_custom": "Je eigen chart",
+        "help_hint": "Open een map om te bladeren, of gebruik Ophalen om alles wat ontbreekt te downloaden.",
+        "get_size": "Downloaden ({size})",
+        "open_song_folder": "Map openen",
+        "set_jacket": "Omslag instellen",
+      "website": "Website"
+    },
+    "course": {
+        "easy": "Makkelijk",
+        "normal": "Normaal",
+        "hard": "Moeilijk",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "Toren",
+        "dan": "Dan"
+    },
+    "scope": {
+        "all": "Alle",
+        "installed": "Geïnstalleerd",
+        "updates": "Updates"
+    },
+    "library": {
+        "title": "Muziekbibliotheek",
+        "summary": "{installed} van {total, plural, one {# nummer} other {# nummers}} geïnstalleerd",
+        "get_everything": "Alle {count} ophalen",
+        "updates_waiting": "{count} bij te werken",
+        "search": "Zoek nummers en mappen..."
     },
     "status": {
-      "scanning": "Scannen...",
+      "installed_short": "Geïnstalleerd",
       "not_downloaded": "Niet gedownload",
       "up_to_date": "Up-to-date",
       "outdated": "Verouderd"
     },
     "button": {
-      "bulk_download": "Bulkdownload",
-      "download": "Downloaden",
-      "redownload": "Opnieuw downloaden",
       "update": "Bijwerken",
       "open_folder": "Muziekmap openen"
     },
-    "view": {
-      "list": "Lijst",
-      "tree": "Boomstructuur"
-    },
     "scan": {
-      "progress": "Nummers scannen... ({count} gevonden)",
-      "done": "{count} nummers in de bibliotheek"
+      "progress": "Nummers scannen... ({count} gevonden)"
     },
     "tree": {
-      "soundtrack": "OpenTaiko-soundtrack",
+      "show_more": "Nog {count} tonen",
+      "get_n": "{count} ophalen",
+      "nothing_here": "Niets hier komt overeen met het huidige filter.",
+      "installed_of": "{installed} / {total} geïnstalleerd",
+      "no_match": "Geen nummers komen overeen met deze zoekopdracht.",
+      "open_folder_tip": "Deze map openen",
       "custom": "Aangepast",
-      "songs_count": "{count} nummers",
-      "empty": "Nog geen nummers gevonden in de bibliotheek.",
-      "spicy": "Pittig",
-      "sweet": "Zoet"
+      "all_updated": "Alles is up-to-date.",
+      "none_installed": "Er zijn nog geen nummers geïnstalleerd."
     },
     "migrate": {
-      "banner": "{count} muziekmap(pen) gevonden in \"{instance}\". Overzetten naar de gedeelde muziekbibliotheek?",
+      "banner": "{count, plural, one {# muziekmap} other {# muziekmappen}} gevonden in \"{instance}\". Overzetten naar de gedeelde muziekbibliotheek?",
       "button": "Nummers overzetten",
       "later": "Later",
       "modal_title": "Nummers overzetten uit \"{instance}\"",
-      "summary_new": "{count} nieuwe muziekmap(pen) worden toegevoegd aan de gedeelde bibliotheek.",
-      "summary_identical": "{count} identieke muziekmap(pen) worden uit deze instantie verwijderd.",
+      "summary_new": "{count, plural, one {# nieuwe muziekmap wordt} other {# nieuwe muziekmappen worden}} toegevoegd aan de gedeelde bibliotheek.",
+      "summary_identical": "{count, plural, one {# identieke muziekmap wordt} other {# identieke muziekmappen worden}} uit deze instantie verwijderd.",
       "nothing": "Deze instantie heeft geen charts om over te zetten.",
       "conflicts_title": "Conflicten ({count})",
       "conflicts_hint": "Deze nummers bestaan al in de gedeelde bibliotheek met andere inhoud. Kies welke versie je wilt behouden.",
@@ -270,26 +355,30 @@
       "error": "Kon de nummers niet overzetten: {error}"
     },
     "metadata": {
-      "updated": "{count} genremap(pen) bijgewerkt (box.def / preimages)"
+      "updated": "{count, plural, one {# genremap} other {# genremappen}} bijgewerkt"
     },
-    "experimental_note": "De geselecteerde instantie is een experimentele build: deze bevat eigen nummers en gebruikt de gedeelde muziekbibliotheek niet.",
     "error": {
+      "audio_missing": "{name} staat niet meer in de map van dit nummer.",
+      "open_folder": "Kon de map niet openen: {error}",
       "scanning": "Kan geen nummers downloaden terwijl lokale mappen worden gescand",
+      "audio_failed": "Kon de audio van dit nummer niet lezen: {error}",
       "scan_failed": "Scannen van de muziekbibliotheek mislukt: {error}"
     },
     "success": {
-      "all_up_to_date": "Alle nummers zijn al up-to-date",
-      "download_complete": "Download voltooid",
-      "download_nb": "Nummer {nb} van {total} gedownload"
+      "download_complete": "Download voltooid"
     },
     "duplicates": {
-      "banner": "{count} lege dubbele map(pen) in \"{instance}\". Verwijderen?",
+      "banner": "{count, plural, one {# lege dubbele map} other {# lege dubbele mappen}} in \"{instance}\". Verwijderen?",
       "button": "Opruimen",
-      "success": "{count} dubbele map(pen) verwijderd.",
+      "success": "{count, plural, one {# dubbele map} other {# dubbele mappen}} verwijderd.",
       "error": "Kon de dubbele mappen niet verwijderen: {error}"
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "{name} bijwerken?",
+      "message": "De geïnstalleerde versie van {name} wordt verwijderd voordat de nieuwe wordt gedownload, zodat er geen oude bestanden achterblijven. Wijzigingen die je in de map hebt gemaakt, gaan verloren."
+    },
     "tab": {
       "skins": "Skins",
       "characters": "Personages",
@@ -317,12 +406,12 @@
     },
     "error": {
       "scanning": "Kan geen {type} downloaden terwijl lokale mappen worden gescand",
-      "zip_not_found": "Het skinpakket kon niet op de server worden gevonden. Probeer het over 5 minuten opnieuw. Als het probleem aanhoudt, neem dan contact op met het OpenTaiko-team."
+      "zip_not_found": "Het skinpakket kon niet op de server worden gevonden. Probeer het over 5 minuten opnieuw. Als het probleem aanhoudt, neem dan contact op met het OpenTaiko-team.",
+      "instance_busy": "OpenTaiko wordt in deze instantie geïnstalleerd. Wacht tot dat klaar is en probeer het dan opnieuw."
     },
     "success": {
       "all_up_to_date": "Alle {type} zijn al up-to-date",
-      "download_complete": "Download voltooid",
-      "download_nb": "{nb} van {total} {type} gedownload"
+      "download_complete": "Download voltooid"
     }
   },
   "asset_cell": {
@@ -356,7 +445,9 @@
       "perfect": "Perfect",
       "full_combo": "Full Combo",
       "clear": "Clear"
-    }
+    },
+    "modal_title": "Hall of Fame: {title} ({course} #{rank})",
+    "crown": "Hall of Fame"
   },
   "version_chip": {
     "incompatible": "Niet compatibel met de huidige OpenTaiko-versie",
@@ -364,13 +455,13 @@
   },
   "player": {
     "play": "afspelen",
-    "pause": "pauzeren"
+    "pause": "pauzeren",
+    "position": "Positie"
   },
   "info": {
     "tab": {
       "changelog_game": "Changelogs (Spel)",
       "changelog_hub": "Changelogs (Hub)",
-      "documentation": "Documentatie",
       "troubleshooting": "Probleemoplossing",
       "credits": "Credits"
     },
@@ -491,7 +582,6 @@
   },
   "themes": {
     "title": "Kies een thema.",
-    "title_debug": "Kies een thema. (DEBUGMODUS AAN)",
     "optgroup": {
       "optk": "OpenTaiko Hub-thema's:",
       "skeleton": "Skeleton-presetthema's:"
@@ -521,24 +611,10 @@
       "dark": "Donker",
       "light": "Licht",
       "current": "Huidige modus: {mode}"
-    },
-    "debug": {
-      "disable_btn": "Debugmodus uitschakelen"
-    },
-    "error": {
-      "theme_json": "Het bestand theme.json (of de instellingenmap) bestaat niet of is beschadigd!<br>Installeer de OpenTaiko Hub opnieuw om dit op te lossen.",
-      "thememode_json": "Het bestand thememode.json (of de instellingenmap) bestaat niet of is beschadigd!<br>Installeer de OpenTaiko Hub opnieuw om dit op te lossen."
-    },
-    "warn": {
-      "same_theme": "Het geselecteerde thema is hetzelfde als het huidige thema.",
-      "same_theme_debug": "DEBUG: Het geselecteerde thema is hetzelfde als het huidige thema."
-    },
-    "success": {
-      "debug_disabled": "<b>De debugmodus is uitgeschakeld.</b><br><p class=\"smalltext\">(Let op: je moet de waarde \"debugMode\" aanpassen om de debugmodus volledig uit te schakelen!)</p>"
     }
   },
   "lang": {
-    "label": "Language",
+    "label": "Taal",
     "en": "English",
     "ja": "日本語",
     "zh_Hans": "中文 (简体)",
@@ -549,5 +625,48 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "Bezig",
+    "close_title": "Nog bezig",
+    "close_message": "Er loopt nog een download of build. Als je de Hub sluit, stopt die.",
+    "close": "Sluiten",
+    "keep": "Open laten",
+    "cancelling": "Annuleren…",
+    "installing_into": "Installeren in {name}",
+    "install_cancelled": "Installatie geannuleerd",
+    "dotnet_page": ".NET 8 downloaden",
+    "instance_busy": "Er loopt een installatie in deze instantie",
+    "closing": "Wordt gesloten zodra de huidige stap klaar is…"
+  },
+  "toast": {
+    "copy": "Details kopiëren",
+    "copied": "Gekopieerd",
+    "open_logs": "Logmap openen"
+  },
+  "errors": {
+    "rate_limited": "GitHub beperkt de verzoeken van je verbinding. Probeer het later opnieuw.",
+    "not_found": "Het bestand ontbreekt op de server.",
+    "offline": "Kan de server niet bereiken. Controleer je internetverbinding.",
+    "disk_full": "De schijf is vol.",
+    "access_denied": "Toegang tot een bestand geweigerd. Als het spel draait, sluit het en probeer het opnieuw.",
+    "no_build_for_system": "Deze versie heeft geen download voor {system}.",
+    "songs_link_failed": "Kan de nummerbibliotheek niet koppelen aan {name}, dus het spel toont de nummers niet."
+  },
+  "bulk": {
+    "finishing": "De mappen van de gedownloade nummers worden afgerond…",
+    "status": "Downloaden {done} / {total} · nog {size}",
+    "done": "{count} van {total} gedownload",
+    "failed": "{count} van {total} gedownload. Mislukt: {failed}",
+    "cancelled": "Geannuleerd. {count} van {total} gedownload"
+  },
+  "files": {
+    "images": "Afbeeldingen",
+    "chart_archives": "Chart-archieven",
+    "optk_save": "OpenTaiko-opslag"
+  },
+  "relocate": {
+    "moved": "OpenTaiko Hub bewaart zijn nummers en games nu in {folder}. {count, plural, one {# map is} other {# mappen zijn}} daarheen verplaatst.",
+    "failed": "Een deel van de gegevens van de Hub kon niet naar {folder} worden verplaatst, waardoor nummers of games kunnen ontbreken. Kopieer de details om te zien wat nog verplaatst moet worden."
   }
 }

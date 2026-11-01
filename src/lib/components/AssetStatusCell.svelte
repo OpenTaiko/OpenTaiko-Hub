@@ -41,7 +41,7 @@
             {#if local === null}
                 <button type="button" onclick={() => DownloadMethod(AssetInfo, null, AssetType)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('asset_cell.button.download')}</button>
             {:else if local.assetVersion !== catalogVersion}
-                <button type="button" onclick={() => DownloadMethod(AssetInfo, local, AssetType)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('asset_cell.button.update')}</button>
+                <button type="button" onclick={() => DownloadMethod(AssetInfo, local, AssetType)} class="button-green button-main"><i class="fa-solid fa-rotate"></i> {$_('asset_cell.button.update')}</button>
             {:else}
                 <button type="button" onclick={() => DownloadMethod(AssetInfo, local, AssetType)} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('asset_cell.button.redownload')}</button>
             {/if}

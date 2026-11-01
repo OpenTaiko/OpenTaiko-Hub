@@ -1,20 +1,17 @@
 {
-    "identifier": "migrated",
-    "description": "permissions that were migrated from v1",
+    "identifier": "http",
+    "description": "Requests from the page, limited to the hosts the Hub reads from. Downloads go through download.rs, which has its own list.",
     "local": true,
     "windows": ["main"],
     "permissions": [
       {
         "identifier": "http:default",
         "allow": [
-          {
-            "url": "https://**/"
-          },
-          {
-            "url": "http://**/"
-          }
+          { "url": "https://api.github.com/*" },
+          { "url": "https://raw.githubusercontent.com/*" },
+          { "url": "https://opentaiko.github.io/*" },
+          { "url": "https://opentaiko.neocities.org/*" }
         ]
-      },
-      "http:default"
+      }
     ]
   }

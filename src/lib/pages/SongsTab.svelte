@@ -1,50 +1,64 @@
 <script lang="ts">
+    import { ipc } from '$lib/ipc';
+    import Modal from '$lib/components/Modal.svelte';
+    import { ConfirmDiscardEdits } from '$lib/stores/editing';
+    import { LoadHallOfFame, ChartScores, HOF_DIFFICULTY_INDEX, type HoFRanks } from '$lib/services/hof';
+    import { LoadSongArtists } from '$lib/services/artists';
+    import { FetchSoundtrackCatalog, FetchSoundtrackIndex, IndexedFile, SongInstallEntries, SongGenrePaths, type SoundtrackIndex } from '$lib/services/soundtrack';
     // Dependencies
-    import { onMount } from 'svelte';
+    import { onMount, onDestroy } from 'svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
-    import { openPath } from '@tauri-apps/plugin-opener';
-    import { fetch } from "@tauri-apps/plugin-http";
-    import { download } from "@tauri-apps/plugin-upload";
+    import { mkdir, exists, readFile } from '@tauri-apps/plugin-fs';
+    import { OpenFolder, IsPlainRelPath } from '$lib/utils/path';
+    import { SafeUrl } from '$lib/utils/sanitize';
+    import { SOUNDTRACK_REPO, rawUrl } from '$lib/repos';
+    import { confirm } from '@tauri-apps/plugin-dialog';
+    import { getCurrentWebview } from '@tauri-apps/api/webview';
+    import { installFiles } from '$lib/utils/download';
+    import { startJob, isCancelled, type Job } from '$lib/stores/activity';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { path } from '@tauri-apps/api';
-    import { invoke, Channel } from '@tauri-apps/api/core';
+    import { Channel } from '@tauri-apps/api/core';
     import { getContext } from 'svelte';
     import type { Database } from 'sql.js';
     import type {
-        ArtistLinks,
         CourseName,
         DuplicateCandidate,
-        DuplicateFolder,
         HoFScore,
         LocalSong,
         MigrationCandidate,
         ScanProgressEvent,
-        ScanResult,
         ScannedGenre,
         ScannedSong,
         SongArtists,
         SoundtrackEntry,
         ToastContext
     } from '$lib/types';
-    const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
+    const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
-    import { getSQL } from '$lib/utils/sqljs';
 
     import { _, locale } from 'svelte-i18n';
     import { get } from 'svelte/store';
     import { localizedTitle, titleSearchTerms } from '$lib/utils/titles';
 
-    import { GetGlobalSongsPath, GetTmpPath } from "../utils/path";
+    import { GetGlobalSongsPath } from "../utils/path";
     import { instances } from "../stores/instances";
 
     // Song management
-    import AudioPlayer from '$lib/components/AudioPlayer.svelte';
-    import SongDifficultyChip from '$lib/components/SongDifficultyChip.svelte';
-    import SongTree from '$lib/components/SongTree.svelte';
     import SongMigrationModal from '$lib/components/SongMigrationModal.svelte';
+    import NamePromptModal from '$lib/components/songs/NamePromptModal.svelte';
+
+    // The song library browser
+    import LibraryHeader from '$lib/components/songs/LibraryHeader.svelte';
+    import CollectionBar from '$lib/components/songs/CollectionBar.svelte';
+    import SongRow from '$lib/components/songs/SongRow.svelte';
+    import SongRowHeader from '$lib/components/songs/SongRowHeader.svelte';
+    import SongDetail from '$lib/components/songs/SongDetail.svelte';
+    import FolderDetail from '$lib/components/songs/FolderDetail.svelte';
+    import { buildLibraryTree, viewOf, pendingUnder, formatSize } from '$lib/utils/library';
+    import type { LibraryEntry, LibraryFolder, Scope } from '$lib/utils/library';
 
     // Soundtrack
-    const soundtrackInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/soundtrack_info.json';
     // The big collections are $state.raw: they are always replaced as a whole (never
     // mutated in place), so wrapping thousands of entries in deep proxies would only add
     // a signal per key and per row read.
@@ -55,21 +69,50 @@
     let scannedGenres = $state.raw<Record<string, ScannedGenre>>({});         // relPath → genre folder
     let scanStats = $state({ dirs: 0, found: 0 });
     let scanning = $state(false);
-    let viewMode = $state<'list' | 'tree'>('list');
-    let searchSong = $state("");
-    let searchGenre = $state("");
-    let songPreviousSort = "none";
+    // Library browser state
+    let scope = $state<Scope>('all');
+    let librarySearch = $state('');
+    /** Only one top-level collection is open at a time, which is what stops the tab
+     *  rendering hundreds of rows the moment it opens. */
+    let openCollection = $state<string | null>(null);
+    let selectedKey = $state<string | null>(null);
+    /** A collection is selected instead of a song: the panel shows its box.def. */
+    let selectedFolder = $state<string | null>(null);
+    let boxText = $state<string | null>(null);
+    let boxFileExists = $state(false);
+    let savingBox = $state(false);
+    let importing = $state(false);
+    let dropActive = $state(false);
+    /** Object URL for the selected folder's default.* image, revoked when it changes. */
+    let folderJacket = $state<string | null>(null);
+    const dropListeners: (() => void)[] = [];
+    let globalSongsPath = $state<string | null>(null);
     let songDLProgress = $state<Record<string, number>>({});
-    let songCountProgress = 0;
-    let songCountProgressBar = $state<number | null>(null);
     let bulkBusy = $state(false);          // a bulk download is running
+    // What the library header shows while a bulk download runs, and how to stop it
+    let bulkStatus = $state<{ done: number; total: number; mbLeft: number; finishing?: boolean } | null>(null);
+    let bulkJob: Job | null = null;
+    // Read by the Cancel button, which says it is cancelling until the run stops
+    let bulkCancelRequested = $state(false);
     let activeSingleDownloads = $state(0);  // single-song downloads currently in flight (they run concurrently)
     let songBusy = $derived(activeSingleDownloads > 0);
 
-    // Git blob SHAs of the soundtrack repository (path → sha), fetched once per session
-    // and used to detect outdated box.def / default.png files
-    let remoteShaMap: Map<string, string> | null = null;
-    let remoteShaMapFetch: Promise<Map<string, string> | null> | null = null;   // in-flight fetch, shared by downloads that start together
+    // The soundtrack repository's files at one commit (path → git blob SHA), used to keep
+    // unchanged files, to check downloads, and to detect outdated box.def / default.png
+    let remoteIndex: SoundtrackIndex | null = null;
+    let remoteIndexFetch: Promise<SoundtrackIndex | null> | null = null;   // in-flight fetch, shared by downloads that start together
+    // Read again once this old, so a Hub left open picks up songs updated since. Each time
+    // costs one request against GitHub's hourly limit (two when the songs changed): GitHub
+    // counts a "not modified" answer too.
+    let remoteIndexReadAt = 0;
+    const INDEX_MAX_AGE_MS = 10 * 60 * 1000;
+    // Kept through a refused refresh up to this age
+    const INDEX_MAX_STALE_MS = 30 * 60 * 1000;
+    // After a failed fetch (usually GitHub's hourly API limit), downloads go ahead with
+    // the index they have, or without one, until this time instead of asking again for
+    // every song
+    let remoteIndexRetryAt = 0;
+    const INDEX_COOLDOWN_MS = 10 * 60 * 1000;
 
     // Songs found inside attached instances that can be moved to the shared library
     let migrationCandidates = $state<MigrationCandidate[]>([]);
@@ -86,14 +129,418 @@
     // row on every render (the list re-renders on each scan batch)
     let searchTerms = $derived(new Map<string, string[]>(soundtrackInfo.map((s) => [s.uniqueId, titleSearchTerms(s)])));
 
+    // One tree of installed + downloadable charts. Counts come from here and never move
+    // with the scope or the search, so "12 of 47" always means the same thing.
+    let library = $derived(buildLibraryTree({
+        scanned: allScannedSongs,
+        genres: scannedGenres,
+        catalog: soundtrackInfo,
+        catalogById,
+        installed: currentSongs,
+        labelFor: (entry, fallback) => (entry ? localizedTitle(entry, $locale) : null) ?? fallback,
+        subtitleFor: (entry) => entry.chartSubtitle ?? null
+    }));
+
+    let view = $derived(viewOf(library, scope, librarySearch,
+        (entry: LibraryEntry) => (entry.catalog ? searchTerms.get(entry.catalog.uniqueId) ?? [] : [])));
+
+    // Songs at the top of the library, outside any collection, a page at a time as a
+    // collection shows them: a library of loose charts used to build every row at once.
+    // A new search or scope starts from the first page again.
+    const ROOT_PAGE = 60;
+    let rootShown = $state(ROOT_PAGE);
+    $effect(() => {
+        void scope;
+        void librarySearch;
+        rootShown = ROOT_PAGE;
+    });
+    let rootEntries = $derived((view?.entries ?? []).slice(0, rootShown));
+    let rootHidden = $derived(Math.max(0, (view?.entries.length ?? 0) - rootShown));
+
+    let topCollections = $derived(view ? [...view.children.values()].sort((a, b) => a.name.localeCompare(b.name)) : []);
+    let libraryEmpty = $derived(!scanning && library.installedCount === 0 && library.totalCount > 0);
+
+    let selectedEntry = $derived.by((): LibraryEntry | null => {
+        if (!selectedKey) return null;
+        const find = (node: LibraryFolder): LibraryEntry | null => {
+            for (const entry of node.entries) if (entry.key === selectedKey) return entry;
+            for (const child of node.children.values()) {
+                const hit = find(child);
+                if (hit) return hit;
+            }
+            return null;
+        };
+        return find(library);
+    });
+
+    const SOUNDTRACK_RAW = rawUrl(SOUNDTRACK_REPO);
+
+    // Genre art comes from the soundtrack repo, so a collection looks the same whether or
+    // not it is installed. This is the same file EnsureGenreMetadata already downloads.
+    const GenreArtUrl = (relPath: string): string | null =>
+        relPath ? `${SOUNDTRACK_RAW}/${relPath.split('/').map(encodeURIComponent).join('/')}/default.png` : null;
+
+    const JacketUrl = (entry: SoundtrackEntry): string | null =>
+        entry.chartJacketFilePath ? `${SOUNDTRACK_RAW}/${entry.chartJacketFilePath}` : null;
+
+    const OpenHoF = (entry: SoundtrackEntry, course: CourseName) => openHoFModal(entry, course);
+
+    // An installed chart's jacket and preview come off the disk. Streaming them from the
+    // soundtrack repository instead would put every browse of the library on the network
+    // and on GitHub's bandwidth, and would leave a custom chart — which the repository
+    // has never heard of — with no art and no audio at all.
+    let songJacket = $state<string | null>(null);
+    let songAudio = $state<string | null>(null);
+    // The audio file found for the selected chart, read only once it is played
+    let songAudioName = $state<string | null>(null);
+    // The read under way, shared by every click while it runs: a quick second click read
+    // the whole file again and left the first copy unreleased
+    let songAudioLoad: Promise<string | null> | null = null;
+    let mediaFor = $state<string | null>(null);
+
+    const ReleaseSongMedia = () => {
+        if (songJacket) URL.revokeObjectURL(songJacket);
+        if (songAudio) URL.revokeObjectURL(songAudio);
+        songJacket = null;
+        songAudio = null;
+        songAudioName = null;
+        songAudioLoad = null;
+    };
+
+    const blobFor = async (base: string, relPath: string, name: string): Promise<string | null> => {
+        const full = await path.join(base, relPath, ...name.split('/'));
+        if (!(await exists(full))) return null;
+        const bytes = await readFile(full);
+        return URL.createObjectURL(new Blob([bytes as BlobPart]));
+    };
+
+    const LoadSongMedia = async (entry: LibraryEntry) => {
+        const forPath = entry.relPath;
+        ReleaseSongMedia();
+        mediaFor = forPath;
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const media = await ipc.readSongMedia(base, forPath);
+            // The jacket is shown at once; the audio, often several megabytes, waits
+            // until it is played (LoadSongAudio)
+            const jacket = media.preimage ? await blobFor(base, forPath, media.preimage) : null;
+            // The selection may have moved on while this was in flight.
+            if (mediaFor !== forPath) {
+                if (jacket) URL.revokeObjectURL(jacket);
+                return;
+            }
+            songJacket = jacket;
+            songAudioName = media.audio;
+        } catch (error) {
+            console.error('Could not read the chart media:', error);
+        }
+    };
+
+    const LoadSongAudio = (): Promise<string | null> => {
+        if (songAudio) return Promise.resolve(songAudio);
+        songAudioLoad ??= ReadSongAudio();
+        return songAudioLoad;
+    };
+
+    const ReadSongAudio = async (): Promise<string | null> => {
+        const forPath = mediaFor;
+        const name = songAudioName;
+        if (!forPath || !name) return null;
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const audio = await blobFor(base, forPath, name);
+            if (mediaFor !== forPath) {
+                if (audio) URL.revokeObjectURL(audio);
+                return null;
+            }
+            // Deleted since the scan: said, and looked for again on the next click
+            if (!audio) {
+                songAudioLoad = null;
+                TriggerError(get(_)('songs.error.audio_missing', { values: { name } }), { details: `${name} is no longer in ${forPath}` });
+                return null;
+            }
+            songAudio = audio;
+            return audio;
+        } catch (error) {
+            // Play used to do nothing at all
+            if (mediaFor === forPath) {
+                songAudioLoad = null;
+                TriggerError(get(_)('songs.error.audio_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+            }
+            return null;
+        }
+    };
+
+    $effect(() => {
+        const entry = selectedEntry;
+        if (!entry?.installed) {
+            if (mediaFor !== null) {
+                ReleaseSongMedia();
+                mediaFor = null;
+            }
+            return;
+        }
+        if (entry.relPath === mediaFor) return;
+        LoadSongMedia(entry);
+    });
+
+    const PickSongPreimage = async (entry: LibraryEntry) => {
+        try {
+            const [picked] = await ipc.pickFiles('image', get(_)('files.images'));
+            if (!picked) return;
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const name = await ipc.setSongPreimage(base, entry.relPath, picked);
+            TriggerSuccess(get(_)('songs.box.jacket_saved', { values: { name } }));
+            mediaFor = null;   // force the effect to reload it
+            await LoadSongMedia(entry);
+        } catch (error) {
+            TriggerError(get(_)('songs.box.jacket_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+        }
+    };
+
+    let selectedFolderNode = $derived.by((): LibraryFolder | null => {
+        if (selectedFolder === null) return null;
+        const find = (node: LibraryFolder): LibraryFolder | null => {
+            if (node.relPath === selectedFolder) return node;
+            for (const child of node.children.values()) {
+                const hit = find(child);
+                if (hit) return hit;
+            }
+            return null;
+        };
+        return find(library);
+    });
+
+    let selectedIsOfficial = $derived(selectedFolderNode?.official ?? false);
+
+    onDestroy(() => {
+        for (const stop of dropListeners) stop();
+        if (folderJacket) URL.revokeObjectURL(folderJacket);
+        ReleaseSongMedia();
+    });
+
+    // Selecting something else replaces the folder settings form, so unsaved edits there
+    // are confirmed first instead of being dropped
+    const SelectEntry = async (entry: LibraryEntry) => {
+        if (selectedKey === entry.key) return;
+        if (!(await ConfirmDiscardEdits())) return;
+        selectedKey = entry.key;
+        selectedFolder = null;
+    };
+
+    const SelectFolder = async (folder: LibraryFolder) => {
+        if (selectedFolder === folder.relPath) return;
+        if (!(await ConfirmDiscardEdits())) return;
+        selectedFolder = folder.relPath;
+        selectedKey = null;
+        boxText = null;
+        boxFileExists = false;
+        LoadFolderJacket(folder.relPath);
+        if (!folder.onDisk) return;
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const info = await ipc.readBoxDef(base, folder.relPath);
+            // The selection may have moved on while this was in flight.
+            if (selectedFolder !== folder.relPath) return;
+            boxFileExists = info.fileExists;
+            boxText = info.text;
+        } catch (error) {
+            console.error('Could not read box.def:', error);
+            boxText = '';
+        }
+    };
+
+    const JACKET_NAMES = ['default.png', 'default.jpg', 'default.webp'];
+
+    // The image is read through the fs plugin and shown as a blob: the asset protocol is
+    // not enabled for this app, so a local file cannot be src'd directly.
+    const LoadFolderJacket = async (relPath: string) => {
+        if (folderJacket) {
+            URL.revokeObjectURL(folderJacket);
+            folderJacket = null;
+        }
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            for (const name of JACKET_NAMES) {
+                const full = await path.join(base, relPath, name);
+                if (!(await exists(full))) continue;
+                const bytes = await readFile(full);
+                // The selection may have moved on while this was in flight.
+                if (selectedFolder !== relPath) return;
+                folderJacket = URL.createObjectURL(new Blob([bytes as BlobPart]));
+                return;
+            }
+        } catch (error) {
+            console.error('Could not read the folder image:', error);
+        }
+    };
+
+    const PickJacket = async (relPath: string) => {
+        try {
+            const [picked] = await ipc.pickFiles('image', get(_)('files.images'));
+            if (!picked) return;
+            const base = await GetGlobalSongsPath();
+            const name = await ipc.setFolderJacket(base, relPath, picked);
+            TriggerSuccess(get(_)('songs.box.jacket_saved', { values: { name } }));
+            // The panel reloads the image itself; no chart changed, so no rescan.
+            await LoadFolderJacket(relPath);
+        } catch (error) {
+            TriggerError(get(_)('songs.box.jacket_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+        }
+    };
+
+    const SaveBoxDef = async (text: string) => {
+        if (!selectedFolderNode) return;
+        savingBox = true;
+        try {
+            const base = await GetGlobalSongsPath();
+            await ipc.writeBoxDef(base, selectedFolderNode.relPath, text);
+            boxText = text;
+            boxFileExists = true;
+            TriggerSuccess(get(_)('songs.folder.box_saved'));
+            // Only the folder's own title can have moved, so it is updated in place
+            // rather than re-scanning every chart in the library.
+            const title = /^#TITLE:(.*)$/m.exec(text)?.[1]?.trim() || null;
+            const known = scannedGenres[selectedFolderNode.relPath];
+            if (known) {
+                scannedGenres = {
+                    ...scannedGenres,
+                    [selectedFolderNode.relPath]: { ...known, title }
+                };
+            }
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.box_save_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+        } finally {
+            savingBox = false;
+        }
+    };
+
+    /** Names already used at this level, plus every name the soundtrack owns. */
+    const takenUnder = (parentRel: string): Set<string> => {
+        const find = (node: LibraryFolder): LibraryFolder | null => {
+            if (node.relPath === parentRel) return node;
+            for (const child of node.children.values()) {
+                const hit = find(child);
+                if (hit) return hit;
+            }
+            return null;
+        };
+        const parent = parentRel ? find(library) : library;
+        const names = new Set<string>();
+        for (const child of parent?.children.values() ?? []) {
+            names.add(child.rawName.toLowerCase());
+            names.add(child.label.toLowerCase());
+        }
+        return names;
+    };
+
+    /** Which folder the new-folder prompt would create into; null while it is closed. */
+    let newFolderParent = $state<string | null>(null);
+
+    const NewFolder = (parentRel: string) => { newFolderParent = parentRel; };
+
+    const CreateFolder = async (parentRel: string, wanted: string) => {
+        newFolderParent = null;
+        try {
+            const base = globalSongsPath ?? await GetGlobalSongsPath();
+            const created = await ipc.createGenreFolder(base, parentRel, wanted);
+            TriggerSuccess(get(_)('songs.folder.created', { values: { name: wanted } }));
+            // A new empty folder adds no charts, so the scan has nothing to re-find:
+            // registering it directly avoids emptying and rebuilding the whole library.
+            scannedGenres = {
+                ...scannedGenres,
+                [created]: { relPath: created, title: wanted, boxDefSha1: null, preimageSha1: null }
+            };
+            // The tree has not rebuilt yet, so the node is named rather than looked up.
+            SelectFolder({ relPath: created, onDisk: true } as LibraryFolder);
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.create_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+        }
+    };
+
+    const DeleteFolder = async (folder: LibraryFolder) => {
+        const ok = await confirm(
+            get(_)('songs.folder.delete_confirm', { values: { name: folder.label, count: folder.installedCount } })
+        );
+        if (!ok) return;
+        try {
+            const base = await GetGlobalSongsPath();
+            await ipc.deleteLibraryEntry(base, folder.relPath);
+            TriggerSuccess(get(_)('songs.folder.deleted', { values: { name: folder.label } }));
+            selectedFolder = null;
+            DropUnder(folder.relPath);
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.delete_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+        }
+    };
+
+    const DeleteSong = async (entry: LibraryEntry) => {
+        const ok = await confirm(get(_)('songs.folder.delete_song_confirm', { values: { name: entry.label } }));
+        if (!ok) return;
+        try {
+            const base = await GetGlobalSongsPath();
+            await ipc.deleteLibraryEntry(base, entry.relPath);
+            TriggerSuccess(get(_)('songs.folder.deleted', { values: { name: entry.label } }));
+            selectedKey = null;
+            DropUnder(entry.relPath);
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.delete_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+        }
+    };
+
+    /**
+     * Forgets everything that lived under a path that was just deleted. Exact, and
+     * instant, where a rescan would re-walk the whole library to learn the same thing.
+     */
+    const DropUnder = (relPath: string) => {
+        const under = (p: string) => p === relPath || p.startsWith(relPath + '/');
+        allScannedSongs = allScannedSongs.filter((song) => !under(song.relPath));
+        currentSongs = Object.fromEntries(
+            Object.entries(currentSongs).filter(([, song]) => !under(song.chartRelativePath))
+        );
+        scannedGenres = Object.fromEntries(
+            Object.entries(scannedGenres).filter(([path]) => !under(path))
+        );
+    };
+
+    /** Extracts dropped or picked archives into `relPath`. */
+    const ImportArchives = async (relPath: string, archives: string[]) => {
+        if (archives.length === 0 || importing) return;
+        importing = true;
+        const job = startJob('songs');
+        try {
+            const base = await GetGlobalSongsPath();
+            const report = await ipc.importChartArchives(base, relPath, archives);
+            if (report.charts.length > 0) {
+                TriggerSuccess(get(_)('songs.folder.imported', { values: { count: report.charts.length } }));
+                crawlSongs();
+            }
+            if (report.rejected.length > 0) {
+                TriggerError(get(_)('songs.folder.import_rejected', { values: { names: report.rejected.join(', ') } }));
+            }
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.import_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+        } finally {
+            importing = false;
+            job.end();
+        }
+    };
+
+    const PickArchives = async (relPath: string) => {
+        let picked: string[];
+        try {
+            picked = await ipc.pickFiles('chart_archive', get(_)('files.chart_archives'), true);
+        } catch (error) {
+            TriggerError(get(_)('songs.folder.import_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+            return;
+        }
+        await ImportArchives(relPath, picked);
+    };
+
     // Hall of Fame
-    const hofDbUrl = 'https://opentaiko.github.io/hof.db3';
-    const hofDifficultyMap: Record<number, CourseName>    = { 0: "Easy", 1: "Normal", 2: "Hard", 3: "Oni", 4: "Edit" };
-    const hofDifficultyRevMap: Partial<Record<CourseName, number>> = { "Easy": 0, "Normal": 1, "Hard": 2, "Oni": 3, "Edit": 4 };
     const hofDiffShortMap: Partial<Record<CourseName, string>>     = { "Easy": "EZ", "Normal": "NM", "Hard": "HD", "Oni": "EX", "Edit": "EXEX" };
     let hofDb: Database | null = null;
-    // uniqueId → { difficultyString → globalRank }
-    let hofMap = $state.raw<Record<string, Partial<Record<CourseName, number>>>>({});
+    let hofMap = $state.raw<HoFRanks>({});
 
     // Modal state
     let hofModalOpen = $state(false);
@@ -102,64 +549,12 @@
     let hofModalScores = $state<HoFScore[]>([]);
     let hofModalMaxListPoints = $state(0);
 
-    // Max list points decay per rank, matching the website: 0.95 up to rank 20, then
-    // 0.96 up to rank 50, then 0.98, so the drop flattens out for later ranks. The
-    // tiers chain from one another (no reset), which keeps the curve continuous.
-    const ComputeMaxListPoints = (rank: number): number => {
-        const r = Math.max(1, rank);
-        const steps95 = Math.min(r, 20) - 1;
-        const steps96 = Math.min(Math.max(r - 20, 0), 30);
-        const steps98 = Math.max(r - 50, 0);
-        return Math.trunc(1000 * Math.pow(0.95, steps95) * Math.pow(0.96, steps96) * Math.pow(0.98, steps98));
-    };
-
-    const ScoreToListPointsRatio = (score: Pick<HoFScore, 'goodCount' | 'okCount' | 'badCount' | 'status'>): number => {
-        const total = score.goodCount + score.okCount + score.badCount;
-        if (total === 0) return 0;
-        const accuracy = (score.goodCount + score.okCount * 0.5) / total;
-        const badRatio = score.badCount / total;
-        let ratio = Math.pow(accuracy, 6) * Math.pow(1 - badRatio, 18);
-        switch (score.status) {
-            case "Perfect":    break;
-            case "Full Combo": ratio *= 0.9; break;
-            case "Clear":      ratio *= 0.7; break;
-            default:           ratio = 0;    break;
-        }
-        return ratio;
-    };
-
     const updateHoFInfo = async () => {
         try {
-            const SQL = await getSQL();
-
-            const response = await fetch(hofDbUrl);
-            const buffer = await response.arrayBuffer();
+            const { db, ranks } = await LoadHallOfFame();
             hofDb?.close();
-            hofDb = new SQL.Database(new Uint8Array(buffer));
-
-            // Global rank: all entries sorted by internalDifficultyIndex DESC regardless of difficulty
-            const result = hofDb.exec(
-                'SELECT uniqueId, difficulty, internalDifficultyIndex FROM entries ORDER BY internalDifficultyIndex DESC'
-            );
-
-            if (result.length > 0) {
-                const ranks: Record<string, Partial<Record<CourseName, number>>> = {};
-                let globalRank = 0;
-                for (const [uniqueId, difficulty] of result[0].values) {
-                    globalRank++;
-                    const diffStr = hofDifficultyMap[Number(difficulty)];
-                    if (diffStr && typeof uniqueId === 'string') {
-                        (ranks[uniqueId] ??= {})[diffStr] = globalRank;
-                    }
-                }
-                hofMap = ranks;
-            }
-
-            // Patch soundtrackInfo with chartHoFRanks derived from the DB
-            soundtrackInfo = soundtrackInfo.map(s => ({
-                ...s,
-                chartHoFRanks: hofMap[s.uniqueId] ?? {}
-            }));
+            hofDb = db;
+            hofMap = ranks;
         } catch (e) {
             console.error('Failed to load HoF data:', e);
         }
@@ -167,79 +562,39 @@
 
     const openHoFModal = (songInfo: SoundtrackEntry, difficulty: CourseName) => {
         if (!hofDb) return;
-        const rank = hofMap[songInfo.uniqueId]?.[difficulty];
-        const diffInt = hofDifficultyRevMap[difficulty];
-        if (rank === undefined || diffInt === undefined) return;
-        const result = hofDb.exec(
-            `SELECT player, status, score, grade, goodCount, okCount, badCount, videoLink, imageLink
-             FROM scores WHERE entryId = ? AND difficulty = ?`,
-            [songInfo.uniqueId, diffInt]
-        );
-
-        const maxListPoints = ComputeMaxListPoints(rank);
-        hofModalMaxListPoints = maxListPoints;
-
-        hofModalScores = result.length > 0
-            ? result[0].values
-                .map((row): Omit<HoFScore, 'rank'> => {
-                    const s = {
-                        player: String(row[0] ?? ''), status: String(row[1] ?? ''), score: Number(row[2] ?? 0), grade: String(row[3] ?? ''),
-                        goodCount: Number(row[4] ?? 0), okCount: Number(row[5] ?? 0), badCount: Number(row[6] ?? 0),
-                        videoLink: row[7] == null ? null : String(row[7]), imageLink: row[8] == null ? null : String(row[8])
-                    };
-                    return { ...s, listPoints: Math.round(maxListPoints * ScoreToListPointsRatio(s)) };
-                })
-                .sort((a, b) => b.listPoints - a.listPoints || b.score - a.score)
-                .map((s, i): HoFScore => ({ ...s, rank: i + 1 }))
-            : [];
-
+        const chart = ChartScores(hofDb, hofMap, songInfo.uniqueId, difficulty);
+        if (!chart) return;
+        hofModalMaxListPoints = chart.maxListPoints;
+        hofModalScores = chart.scores;
         hofModalSongInfo = songInfo;
         hofModalDifficulty = difficulty;
         hofModalOpen = true;
     };
 
-    const filter1 = (sInfo: SoundtrackEntry[]): SoundtrackEntry[] => {
-        const uids = ["losTPEtAlSwANDERRBHLiXoUNdsetSUnaN"];
-        return sInfo.filter(obj => !uids.includes(obj.uniqueId));
-    }
-
-    const filter2 = (sInfo: SoundtrackEntry[]): SoundtrackEntry[] => {
-        return sInfo;
-    }
-
     const updateSoundtrackInfo = async () => {
         catalogFetchFailed = false;
         try {
-            const response = await fetch(soundtrackInfoUrl);
-        if (response.ok) {
-            const text = await response.text();
-            soundtrackInfo = JSON.parse(text) as SoundtrackEntry[];
-
-            if (navigator.language === "zh-CN") {
-                soundtrackInfo = filter1(soundtrackInfo);
-            }
-            else {
-                soundtrackInfo = filter2(soundtrackInfo);
-            }
-        } else {
-            // Keep an ARRAY: template #each and .filter/.sort calls expect one
-            soundtrackInfo = [];
-            catalogFetchFailed = true;
-        }
+            soundtrackInfo = await FetchSoundtrackCatalog();
         } catch (error) {
+            console.error('Failed to fetch the soundtrack catalog:', error);
+            // Keep an ARRAY: template #each and .filter/.sort calls expect one
             soundtrackInfo = [];
             catalogFetchFailed = true;
         }
     }
     
+    const LIVE_SCAN_FLUSH_MS = 300;
+
     // Scans the shared Songs library natively (one IPC call, live progress batches)
     const crawlSongs = async () => {
         scanning = true;
         scanStats = { dirs: 0, found: 0 };
         let liveSongs: Record<string, LocalSong> = {};
         let liveAll: ScannedSong[] = [];
-        currentSongs = {};
-        allScannedSongs = [];
+        // A rescan of a library that is already on screen keeps showing it until the
+        // final result replaces it: clearing first empties every bar and refills it row
+        // by row, which reads as the whole library reloading after any small change.
+        const showLive = allScannedSongs.length === 0;
 
         const registerSong = (map: Record<string, LocalSong>, list: ScannedSong[], song: ScannedSong) => {
             list.push(song);
@@ -254,16 +609,17 @@
         try {
             const baseDirPath = await GetGlobalSongsPath();
 
-            // Batches are merged and pushed to the UI at most once per animation frame:
-            // every update re-evaluates the status of each listed song, so applying them
-            // as they arrive would hog the UI thread for the duration of the scan.
+            // Batches are merged and pushed to the UI every LIVE_SCAN_FLUSH_MS: every
+            // update rebuilds the library tree and re-evaluates each listed song, so
+            // applying them at every animation frame kept the UI thread busy for the
+            // whole scan.
             let latestStats = { dirs: 0, found: 0 };
             let dirty = false;
-            let flushFrame: number | null = null;
+            let flushFrame: ReturnType<typeof setTimeout> | null = null;
             const flush = () => {
                 flushFrame = null;
                 scanStats = latestStats;
-                if (dirty) {
+                if (dirty && showLive) {
                     dirty = false;
                     // Raw state compares by reference: hand out fresh containers
                     currentSongs = { ...liveSongs };
@@ -278,11 +634,13 @@
                     for (const song of message.batch) registerSong(liveSongs, liveAll, song);
                     dirty = true;
                 }
-                flushFrame ??= requestAnimationFrame(flush);
+                flushFrame ??= setTimeout(flush, LIVE_SCAN_FLUSH_MS);
             };
 
-            const result = await invoke<ScanResult>('scan_songs', { baseDir: baseDirPath, onEvent: channel });
-            if (flushFrame !== null) cancelAnimationFrame(flushFrame);
+            // The songs come in the result anyway: they are streamed as well only when
+            // shown as they are found, on a first scan, rather than sent twice every time
+            const result = await ipc.scanSongs(baseDirPath, channel, showLive);
+            if (flushFrame !== null) clearTimeout(flushFrame);
 
             // The command result is authoritative; events were only for live display
             const finalSongs: Record<string, LocalSong> = {};
@@ -294,7 +652,7 @@
             scanStats = { dirs: latestStats.dirs, found: finalAll.length };
         } catch (error) {
             console.error('Song scan failed:', error);
-            TriggerError(get(_)('songs.error.scan_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.error.scan_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
         scanning = false;
         CheckMigrations();
@@ -311,12 +669,13 @@
                 // Asked of the backend, which resolves symlinks. A string compare
                 // cannot see that an instance's Songs folder is a link to the shared
                 // library, and would keep offering a migration the backend refuses.
-                if (await invoke<boolean>('paths_are_same_dir', { a: instSongs, b: globalSongs })) continue;
+                if (await ipc.pathsAreSameDir(instSongs, globalSongs)) continue;
                 try {
-                    const probe = new Channel<ScanProgressEvent>();
-                    const result = await invoke<ScanResult>('scan_songs', { baseDir: instSongs, onEvent: probe });
-                    if (result.baseExists && result.songs.length > 0) {
-                        candidates.push({ instance: inst, count: result.songs.length, srcPath: instSongs });
+                    // Counted, not scanned: every chart of every instance used to be read
+                    // and hashed at each start, only for this number
+                    const count = await ipc.countSongs(instSongs);
+                    if (count > 0) {
+                        candidates.push({ instance: inst, count, srcPath: instSongs });
                     }
                 } catch (error) {
                     console.error(`Migration check failed for ${inst.name}:`, error);
@@ -337,10 +696,7 @@
             for (const inst of get(instances)) {
                 const instSongs = await path.join(inst.path, 'Songs');
                 try {
-                    const folders = await invoke<DuplicateFolder[]>('find_duplicate_song_folders', {
-                        instanceSongs: instSongs,
-                        globalSongs
-                    });
+                    const folders = await ipc.findDuplicateSongFolders(instSongs, globalSongs);
                     if (folders.length > 0) {
                         found.push({ instance: inst, srcPath: instSongs, globalSongs, folders });
                     }
@@ -358,15 +714,11 @@
         if (duplicateBusy) return;
         duplicateBusy = true;
         try {
-            const removed = await invoke<number>('remove_duplicate_song_folders', {
-                instanceSongs: candidate.srcPath,
-                globalSongs: candidate.globalSongs,
-                relPaths: candidate.folders.map((f) => f.relPath)
-            });
+            const removed = await ipc.removeDuplicateSongFolders(candidate.srcPath, candidate.globalSongs, candidate.folders.map((f) => f.relPath));
             TriggerSuccess(get(_)('songs.duplicates.success', { values: { count: removed } }));
             duplicateCandidates = duplicateCandidates.filter((c) => c !== candidate);
         } catch (error) {
-            TriggerError(get(_)('songs.duplicates.error', { values: { error: String(error) } }));
+            TriggerError(get(_)('songs.duplicates.error', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
         duplicateBusy = false;
     }
@@ -385,226 +737,190 @@
         crawlSongs();
     }
 
+    /** Opens one collection, or one song's folder, inside the shared library. */
+    const OpenGenreFolder = async (relPath: string) => {
+        try {
+            const songsDir = await GetGlobalSongsPath();
+            await OpenFolder(relPath ? await path.join(songsDir, relPath) : songsDir);
+        } catch (error) {
+            TriggerError(get(_)('songs.error.open_folder', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
+        }
+    };
+
+    const BULK_SONG_CONCURRENCY = 3;
+
+    /** Downloads everything a folder is still missing, updates included. */
+    const DownloadFolder = async (folder: LibraryFolder) => {
+        if (scanning) {
+            TriggerWarning(get(_)('songs.error.scanning'));
+            return;
+        }
+        if (bulkBusy || songBusy) return;
+
+        const pending = pendingUnder(folder);
+        if (pending.length === 0) return;
+
+        bulkBusy = true;
+        bulkCancelRequested = false;
+        const job = startJob('songs');
+        bulkJob = job;
+        // Progress lives in the header instead of a toast per song, and the run ends with
+        // a single summary: hundreds of stacked toasts buried the one that mattered
+        let done = 0;
+        let failed = 0;
+        let mbLeft = pending.reduce((sum, song) => sum + (song.chartSize || 0), 0);
+        bulkStatus = { done, total: pending.length, mbLeft };
+        // Genre folders of the downloaded songs, whose box.def and art are refreshed once at
+        // the end rather than after each song
+        const genres = new Set<string>();
+        try {
+            await EnsureRemoteIndex();
+            // A few songs at a time (each downloads several files at once in the
+            // backend): one after the other, a whole library took a request round trip
+            // per file in sequence. Kept small so GitHub does not start refusing requests.
+            let next = 0;
+            const worker = async () => {
+                while (next < pending.length && !bulkCancelRequested) {
+                    const index = next++;
+                    const SInfo = pending[index];
+                    const outcome = await DownloadSong(SInfo, currentSongs[SInfo.uniqueId] ?? null, index + 1, pending.length, job.id);
+                    if (outcome === 'done') {
+                        done++;
+                        for (const genrePath of SongGenrePaths(SInfo)) genres.add(genrePath);
+                    }
+                    else if (outcome === 'failed') failed++;
+                    mbLeft = Math.max(0, mbLeft - (SInfo.chartSize || 0));
+                    bulkStatus = { done, total: pending.length, mbLeft };
+                }
+            };
+            await Promise.all(Array.from({ length: Math.min(BULK_SONG_CONCURRENCY, pending.length) }, worker));
+            FlushInstalled();
+
+            const values = { count: done, total: pending.length, failed };
+            const cancelled = bulkCancelRequested;
+            if (cancelled) TriggerWarning(get(_)('bulk.cancelled', { values }));
+            else if (failed > 0) TriggerError(get(_)('bulk.failed', { values }));
+            else TriggerSuccess(get(_)('bulk.done', { values }));
+
+            // The genre folders of the songs that did arrive get their box.def and art even
+            // after a cancel: the game shows a folder only when it has a box.def, and those
+            // songs were left ungrouped until another full run. After a cancel this runs as
+            // a job of its own, which Cancel stops too: on the bad connection the run was
+            // cancelled for, its retries could keep the tab busy for minutes.
+            let metadataJob = job;
+            if (cancelled) {
+                job.end();
+                metadataJob = startJob('songs');
+                bulkJob = metadataJob;
+                bulkCancelRequested = false;
+                bulkStatus = { done, total: pending.length, mbLeft: 0, finishing: true };
+            }
+            try {
+                const updated = await RefreshAllGenreMetadata(genres, metadataJob.id, !cancelled);
+                if (updated > 0) TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
+            } finally {
+                metadataJob.end();
+            }
+        } finally {
+            job.end();
+            bulkJob = null;
+            bulkStatus = null;
+            bulkBusy = false;
+        }
+    };
+
+    const CancelBulk = () => {
+        bulkCancelRequested = true;
+        bulkJob?.cancel();
+    };
+
     const OpenSongsFolder = async () => {
         try {
             const songsDir = await GetGlobalSongsPath();
             await mkdir(songsDir, { recursive: true });
-            await openPath(songsDir);
+            await OpenFolder(songsDir);
         } catch (error) {
-            TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
+            // OpenFolder reports its own failures; this is the folder creation failing
+            TriggerError(get(_)('songs.error.open_folder', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     }
 
-    // Fetches the soundtrack repository's git tree once so local box.def / default.png
-    // files can be compared against their upstream version by git blob SHA
-    const EnsureRemoteShaMap = async (): Promise<Map<string, string> | null> => {
-        if (remoteShaMap) return remoteShaMap;
+    // Reads the soundtrack repository's index so local files can be compared against
+    // their upstream version by git blob SHA
+    const EnsureRemoteIndex = async (): Promise<SoundtrackIndex | null> => {
+        const now = Date.now();
+        if (remoteIndex && now - remoteIndexReadAt < INDEX_MAX_AGE_MS) return remoteIndex;
+        if (now < remoteIndexRetryAt) return remoteIndex;
         // Downloads started back to back share one request instead of each hitting the
         // GitHub API (rate limited) for the same tree
-        if (!remoteShaMapFetch) {
-            remoteShaMapFetch = (async () => {
+        if (!remoteIndexFetch) {
+            remoteIndexFetch = (async () => {
                 try {
-                    const response = await fetch('https://api.github.com/repos/OpenTaiko/OpenTaiko-Soundtrack/git/trees/main?recursive=1');
-                    if (response.ok) {
-                        const data = (await response.json()) as { tree?: { type: string; path: string; sha: string }[] };
-                        remoteShaMap = new Map(
-                            (data.tree ?? [])
-                                .filter((entry) => entry.type === 'blob')
-                                .map((entry): [string, string] => [entry.path, entry.sha])
-                        );
-                    }
+                    remoteIndex = await FetchSoundtrackIndex(remoteIndex);
+                    remoteIndexReadAt = Date.now();
                 } catch (error) {
+                    // The index already read stays usable for a while: its files are fetched
+                    // from its own commit. Not past INDEX_MAX_STALE_MS: a song changed upstream
+                    // since then installed that old commit's files, reported as a success,
+                    // for as long as GitHub kept refusing. Without one, files come from the
+                    // branch, current but unchecked.
                     console.error('Failed to fetch the soundtrack repository tree:', error);
+                    remoteIndexRetryAt = Date.now() + INDEX_COOLDOWN_MS;
+                    if (remoteIndex && Date.now() - remoteIndexReadAt > INDEX_MAX_STALE_MS) remoteIndex = null;
                 } finally {
-                    remoteShaMapFetch = null;
+                    remoteIndexFetch = null;
                 }
-                return remoteShaMap;
+                return remoteIndex;
             })();
         }
-        return remoteShaMapFetch;
-    }
-
-
-    let GetFilteredSInfo = $derived((SInfo: SoundtrackEntry): boolean => {
-        // Matches any spelling of the song (default and every translation), so a search
-        // works whatever language the title is displayed in
-        const needle = searchSong.toLowerCase();
-        const bInNameFilter = needle === '' || (searchTerms.get(SInfo.uniqueId) ?? []).some((term) => term.includes(needle));
-        const bInGenreFilter = SInfo.tjaGenreFolder.toLowerCase().includes(searchGenre.toLowerCase());
-
-        return bInGenreFilter && bInNameFilter;
-    })
-
-    // Reactive so status cells re-render as scan results stream in
-    let IsSongUpToDate = $derived((SInfo: SoundtrackEntry): boolean => {
-        const localSong = currentSongs[SInfo.uniqueId];
-        return !!localSong && (localSong.chartMD5s ?? []).includes(SInfo.tjaMD5);
-    })
-
-    const GetFilteredAvailableSInfo = (SInfo: SoundtrackEntry): boolean => {
-        return !IsSongUpToDate(SInfo) && GetFilteredSInfo(SInfo);
-    }
-
-    const UndefinedToMinusOne = (val: number | undefined | null): number => {
-        return (val === undefined || val === null) ? -1 : val;
-    }
-
-    const AlterValueTowerDan = (a: SoundtrackEntry, b: SoundtrackEntry, og: number): number => {
-        const aTD = (a.chartDifficulties.Tower !== undefined || a.chartDifficulties.Dan !== undefined);
-        const bTD = (b.chartDifficulties.Tower !== undefined || b.chartDifficulties.Dan !== undefined);
-        if (aTD) return 2147483647;
-        else if (bTD) return -2147483648;
-        return og;
-    }
-
-    const SortSongsByColumn = (column: string) => {
-        const currentLocale = get(locale);
-        const wasClickedPreviously = `${column} asc` === songPreviousSort;
-        const mult = (wasClickedPreviously) ? -1 : 1;
-        songPreviousSort = (wasClickedPreviously) ? `${column} desc` : `${column} asc`;
-
-        switch (column) {
-            default:
-            case ("name"): 
-            {
-                // Sorted by what the user actually sees, in their own locale
-                soundtrackInfo = [...soundtrackInfo].sort((a, b) => mult * localizedTitle(a, currentLocale).localeCompare(localizedTitle(b, currentLocale), currentLocale ?? undefined));
-                break;
-            }
-            case ("genre"): 
-            {
-                soundtrackInfo = [...soundtrackInfo].sort((a, b) => mult * a.tjaGenreFolder.localeCompare(b.tjaGenreFolder));
-                break;
-            }
-            case ("size"):
-            {
-                soundtrackInfo = [...soundtrackInfo].sort((a, b) => mult * (a.chartSize - b.chartSize));
-                break;
-            }
-            case ("ez"):
-            {
-                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Easy) - UndefinedToMinusOne(b.chartDifficulties.Easy))));
-                break;
-            }
-            case ("nm"):
-            {
-                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Normal) - UndefinedToMinusOne(b.chartDifficulties.Normal))));
-                break;
-            }
-            case ("hd"):
-            {
-                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Hard) - UndefinedToMinusOne(b.chartDifficulties.Hard))));
-                break;
-            }
-            case ("ex"):
-            {
-                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Oni) - UndefinedToMinusOne(b.chartDifficulties.Oni))));
-                break;
-            }
-            case ("exex"):
-            {
-                soundtrackInfo = [...soundtrackInfo].sort((a, b) => AlterValueTowerDan(a, b, mult * (UndefinedToMinusOne(a.chartDifficulties.Edit) - UndefinedToMinusOne(b.chartDifficulties.Edit))));
-                break;
-            }
-        }
-    }
-
-    const DownloadDisplayedSongs = async () => {
-        if (scanning === true) {
-            TriggerError(get(_)('songs.error.scanning'));
-            return ;
-        }
-        // Guard the whole run, not just the progress-bar phase: the first steps are
-        // async, so without this a second click would start a parallel bulk download.
-        // Single downloads must have drained too, the loop would otherwise pick up a
-        // song that is still being written.
-        if (bulkBusy || songBusy) return;
-        bulkBusy = true;
-
-        try {
-            const filteredSInfo = soundtrackInfo.filter((SInfo) => GetFilteredAvailableSInfo(SInfo));
-
-            const songCount = filteredSInfo.length;
-
-            // Load the remote file index once so genre metadata can be checked for updates
-            await EnsureRemoteShaMap();
-
-            if (songCount === 0) {
-                const updated = await RefreshAllGenreMetadata();
-                if (updated > 0) {
-                    TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
-                } else {
-                    TriggerSuccess(get(_)('songs.success.all_up_to_date'));
-                }
-                return ;
-            }
-
-            songCountProgress = 0;
-            for (const SInfo of filteredSInfo) {
-                songCountProgressBar = 100 * (songCountProgress / songCount);
-
-                console.log(`Downloading song ${songCountProgress + 1} out of ${songCount}...`);
-                console.log(SInfo);
-
-                let curObj = null;
-                if (currentSongs[SInfo.uniqueId] !== undefined) curObj = currentSongs[SInfo.uniqueId];
-
-                await DownloadSong(SInfo, curObj, songCountProgress + 1, songCount);
-                songCountProgress++;
-            }
-
-            // Refresh outdated box.def / default.png files across the whole library
-            const updated = await RefreshAllGenreMetadata();
-            if (updated > 0) {
-                TriggerSuccess(get(_)('songs.metadata.updated', { values: { count: updated } }));
-            }
-        } finally {
-            songCountProgressBar = null;
-            bulkBusy = false;
-        }
+        return remoteIndexFetch;
     }
 
     // Downloads box.def / default.png for a genre folder when it is missing or its git
-    // blob SHA differs from the soundtrack repository. Without the remote index the
-    // old behavior is kept (box.def always refreshed, preimage only when missing).
+    // blob SHA differs from the soundtrack repository. Without the remote index, box.def
+    // is refreshed once per session and the preimage only when missing; a file the
+    // repository does not have is simply skipped (the backend reports a 404 as absent
+    // instead of the page probing for it first).
     //
     // Calls are serialized: songs download concurrently, and two songs of the same
-    // genre would otherwise copy the same box.def on top of each other. Once the first
+    // genre would otherwise write the same box.def on top of each other. Once the first
     // one has written it, the next sees the updated local SHA and skips the file.
     let genreMetadataLock: Promise<unknown> = Promise.resolve();
-    const EnsureGenreMetadata = (genrePath: string, tmpFolder: string): Promise<boolean> => {
-        const run = genreMetadataLock.then(() => EnsureGenreMetadataUnlocked(genrePath, tmpFolder));
+    const EnsureGenreMetadata = (genrePath: string, job?: string): Promise<boolean> => {
+        const run = genreMetadataLock.then(() => EnsureGenreMetadataUnlocked(genrePath, job));
         genreMetadataLock = run.catch(() => {});
         return run;
     }
 
-    const EnsureGenreMetadataUnlocked = async (genrePath: string, tmpFolder: string): Promise<boolean> => {
+    // Genres whose box.def was already refreshed without the remote index this session
+    const boxDefRefreshedBlind = new Set<string>();
+
+    const EnsureGenreMetadataUnlocked = async (genrePath: string, job?: string): Promise<boolean> => {
         const baseDirPath = await GetGlobalSongsPath();
         const genreFullPath = await path.join(baseDirPath, genrePath);
         let changed = false;
 
         for (const fileName of ['box.def', 'default.png']) {
-            const destPath = await path.join(genreFullPath, fileName);
             const localGenre = scannedGenres[genrePath];
             const localSha = fileName === 'box.def' ? localGenre?.boxDefSha1 : localGenre?.preimageSha1;
-            const remoteSha = remoteShaMap?.get(`${genrePath}/${fileName}`);
+            const { url: _url, gitSha: remoteSha, size: remoteSize } = IndexedFile(`${genrePath}/${fileName}`, remoteIndex);
 
             let needsDownload: boolean;
-            if (remoteShaMap) {
+            if (remoteIndex) {
                 needsDownload = !!remoteSha && localSha !== remoteSha;
+            } else if (fileName === 'box.def') {
+                needsDownload = !boxDefRefreshedBlind.has(genrePath);
+                boxDefRefreshedBlind.add(genrePath);
             } else {
-                needsDownload = fileName === 'box.def' ? true : !(await exists(destPath));
+                needsDownload = !(await exists(await path.join(genreFullPath, fileName)));
             }
             if (!needsDownload) continue;
 
-            const _url = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${genrePath}/${fileName}`;
-            const dlPath = await path.join(tmpFolder, fileName);
-            const resourceExists = remoteShaMap ? true : await fetch(_url).then(res => res.ok).catch(() => false);
-            if (!resourceExists) continue;
-
             try {
-                await download(_url, dlPath);
-                await copyFile(dlPath, destPath);
+                // Checked against the index like a song's files, when it lists them
+                const entry = { url: _url, relPath: fileName, optional: !remoteSha, gitSha: remoteSha, size: remoteSize };
+                const report = await installFiles(genreFullPath, [entry], undefined, job);
+                if (report.downloaded.length === 0) continue;
                 changed = true;
                 if (remoteSha) {
                     scannedGenres = {
@@ -622,24 +938,50 @@
         return changed;
     }
 
-    const RefreshAllGenreMetadata = async () => {
-        if (!remoteShaMap) return 0;
-        const tmpFolder = await GetTmpPath(crypto.randomUUID());
-        await mkdir(tmpFolder, { recursive: true });
+    // The genres of the songs a bulk run downloaded, which the last scan may not know yet,
+    // and with `everyGenre` and the repository index every genre the scan found (after a
+    // cancel, only the downloaded songs' genres). Stops once cancelled.
+    const RefreshAllGenreMetadata = async (downloaded: Set<string>, job: string, everyGenre: boolean) => {
+        const genres = everyGenre ? new Set([...(remoteIndex ? Object.keys(scannedGenres) : []), ...downloaded]) : downloaded;
         let updated = 0;
-        for (const genrePath of Object.keys(scannedGenres)) {
-            if (await EnsureGenreMetadata(genrePath, tmpFolder)) updated++;
+        for (const genrePath of genres) {
+            if (bulkCancelRequested) break;
+            if (await EnsureGenreMetadata(genrePath, job)) updated++;
         }
-        try { await remove(tmpFolder, { recursive: true }); } catch {}
         return updated;
     }
 
-    const DownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, songNb?: number, songTotal?: number) => {
+    // Songs a bulk run finished, folded into the library a few times a second: each
+    // change to currentSongs rebuilds the whole library tree, which a bulk run used to do
+    // after every song, several times a second for hundreds of songs
+    const INSTALLED_FLUSH_MS = 250;
+    let installedPending: Record<string, LocalSong> = {};
+    let installedTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const FlushInstalled = () => {
+        if (installedTimer !== null) clearTimeout(installedTimer);
+        installedTimer = null;
+        if (Object.keys(installedPending).length === 0) return;
+        currentSongs = { ...currentSongs, ...installedPending };
+        installedPending = {};
+    };
+
+    const RecordInstalled = (uniqueId: string, song: LocalSong, batched: boolean) => {
+        installedPending[uniqueId] = song;
+        if (!batched) FlushInstalled();
+        else installedTimer ??= setTimeout(FlushInstalled, INSTALLED_FLUSH_MS);
+    };
+
+    type DownloadOutcome = 'done' | 'failed' | 'cancelled' | 'skipped';
+
+    // songNb is set when a bulk run drives this: the run reports one summary at the end,
+    // so the song itself stays quiet and only returns how it went.
+    const DownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, songNb?: number, songTotal?: number, job?: string): Promise<DownloadOutcome> => {
         // Never write into the library while it is still being scanned, the scan's
         // final result would otherwise clobber this download's bookkeeping.
         if (scanning) {
-            TriggerError(get(_)('songs.error.scanning'));
-            return;
+            TriggerWarning(get(_)('songs.error.scanning'));
+            return 'skipped';
         }
         // songNb is set when the bulk loop drives this, which owns the busy flag itself
         const standalone = songNb === undefined;
@@ -647,166 +989,112 @@
             // Single songs run in parallel. Only refuse while a bulk run owns every
             // displayed row, or when this exact song is already in flight (it would
             // write into the same folder twice).
-            if (bulkBusy || songDLProgress[songObj.uniqueId] !== undefined) return;
+            if (bulkBusy || songDLProgress[songObj.uniqueId] !== undefined) return 'skipped';
             activeSingleDownloads++;
         }
+        // A song of its own is a job too: the Songs tile shows it is running, and
+        // closing the window asks first instead of cutting it off
+        const ownJob = standalone ? startJob('songs') : null;
         // Claim the row right away (nothing awaited above) so a second click on the
         // same song cannot slip through before the download shows its progress bar
         songDLProgress[songObj.uniqueId] = 0;
         try {
-            await RunDownloadSong(songObj, currentObj, songNb, songTotal);
+            return await RunDownloadSong(songObj, currentObj, songNb !== undefined, ownJob?.id ?? job);
         } finally {
             // Also releases the row when the download throws, otherwise the button
             // would stay replaced by a stuck progress bar
             delete songDLProgress[songObj.uniqueId];
             if (standalone) activeSingleDownloads--;
+            ownJob?.end();
         }
     }
 
-    const RunDownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, songNb?: number, songTotal?: number) => {
-        await EnsureRemoteShaMap();
+    const RunDownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, quiet: boolean, job?: string): Promise<DownloadOutcome> => {
+        await EnsureRemoteIndex();
+
+        // Catalog paths decide where files are written, so a malformed one is refused
+        // before anything is downloaded
+        if (![songObj.tjaFolderPath, ...songObj.tjaFilesPath].every(IsPlainRelPath)) {
+            console.error(`Refusing catalog paths of ${songObj.uniqueId}:`, songObj.tjaFolderPath, songObj.tjaFilesPath);
+            if (!quiet) TriggerError(get(_)('dl.error.failed_abort'));
+            return 'failed';
+        }
 
         const baseDirPath = await GetGlobalSongsPath();
         const localRelPath = ((currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath).replace(/\\/g, '/');
         const tjaFullPath = await path.join(baseDirPath, localRelPath);
 
-        let fold_exists = await exists(tjaFullPath);
-        if (!fold_exists)
-            await mkdir(tjaFullPath, {recursive: true});
+        // Files go straight into the song folder: the backend downloads them side by
+        // side and only replaces anything once every file has arrived, so there is no
+        // temporary copy to write and then copy again. A file whose git blob SHA matches
+        // the repository is kept, so updating a chart does not download its audio again.
+        const entries = SongInstallEntries(songObj, remoteIndex);
 
-        const chartDownloadFolder = await GetTmpPath(crypto.randomUUID());
-
-        fold_exists = await exists(chartDownloadFolder);
-        if (!fold_exists)
-            await mkdir(chartDownloadFolder, {recursive: true});
-
+        let totbyts = 0;
         try {
-            let fileNames: string[] = [];
-
-            let totbyts = 0;
-            for (const filePath of songObj.tjaFilesPath) {
-                // forbid non-children paths
-                let localFilePath = (filePath.startsWith(songObj.tjaFolderPath + '\\') || filePath.startsWith(songObj.tjaFolderPath + '/')) ?
-                    filePath.slice(songObj.tjaFolderPath.length + 1)
-                    : filePath.split("\\").pop() ?? filePath;
-
-                const tjaFileUrl = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/${filePath}`;
-                const dlPath = await path.join(chartDownloadFolder, localFilePath.replace(/\\/g, '/'));
-
-                // ensure subdirectory exists
-                const dlPathFold = await path.dirname(dlPath);
-                if (!await exists(dlPathFold))
-                    await mkdir(dlPathFold, {recursive: true});
-
-                const success = await backoffDownload(
-                    tjaFileUrl,
-                    dlPath,
-                    (pr) => {
-                        totbyts += pr.progress;
-                        songDLProgress[songObj.uniqueId] = 100 * (totbyts / (songObj.chartSize * 1024 * 1024));
-                        //console.log(songDLProgress);
-                    }
-                );
-
-                // The caller's finally releases the row
-                if (!success) return ;
-
-                fileNames.push(localFilePath);
-            };
-
-            songDLProgress[songObj.uniqueId] = 0;
-            await Promise.all(fileNames.map(async (fn, idx) => {
-                const strPath = await path.join(chartDownloadFolder, fn.replace(/\\/g, '/'));
-                const destPath = await path.join(tjaFullPath, fn.replace(/\\/g, '/'));
-
-                // ensure subdirectory exists
-                const destPathDir = await path.dirname(destPath);
-                if (!await exists(destPathDir))
-                    await mkdir(destPathDir, {recursive: true});
-
-                await copyFile(strPath, destPath);
-                songDLProgress[songObj.uniqueId] = (idx + 1) * (100 / fileNames.length);
-                //console.log(songDLProgress);
-            }));
-
-            // Download / refresh box.def and default.png of every ancestor genre folder
-            const genrePaths = songObj.tjaFolderPath.split('\\').slice(0, -1).map((_, i, arr) => arr.slice(0, i + 1).join('/'));
-
-            for (const genrePath of genrePaths) {
-                const genreFullPath = await path.join(baseDirPath, genrePath);
-                if (!await exists(genreFullPath))
-                    await mkdir(genreFullPath, {recursive: true});
-                await EnsureGenreMetadata(genrePath, chartDownloadFolder);
-            }
-        } finally {
-            // Clean after pooping, including when the download gave up halfway
-            try { await remove(chartDownloadFolder, { recursive: true }); } catch {}
+            await installFiles(tjaFullPath, entries, (pr) => {
+                totbyts += pr.progress;
+                songDLProgress[songObj.uniqueId] = 100 * (totbyts / (songObj.chartSize * 1024 * 1024));
+            }, job);
+        } catch (error) {
+            // The caller's finally releases the row
+            if (isCancelled(error)) return 'cancelled';
+            console.error(`Download of ${songObj.uniqueId} failed:`, error);
+            if (!quiet) TriggerError(`${get(_)('dl.error.failed_abort')}<br>${DescribeError(error)}`, { details: ErrorText(error) });
+            return 'failed';
         }
 
-        if (songNb === undefined)
-            TriggerSuccess(get(_)('songs.success.download_complete'));
-        else
-            TriggerSuccess(get(_)('songs.success.download_nb', { values: { nb: songNb, total: songTotal } }));
-
-        //crawlSongs();
-        currentSongs = {
-            ...currentSongs,
-            [songObj.uniqueId]: {
-                chartMD5s: [songObj.tjaMD5],
-                // Keep the actual install location when the song was relocated by the user
-                chartRelativePath: (currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath
+        // Download / refresh box.def and default.png of every ancestor genre folder. A bulk
+        // run does this once at the end: here, one slow box.def held up every song after it
+        if (!quiet) {
+            for (const genrePath of SongGenrePaths(songObj)) {
+                await EnsureGenreMetadata(genrePath, job);
             }
-        };
+        }
+
+        if (!quiet) TriggerSuccess(get(_)('songs.success.download_complete'));
+
+        RecordInstalled(songObj.uniqueId, {
+            chartMD5s: [songObj.tjaMD5],
+            // Keep the actual install location when the song was relocated by the user
+            chartRelativePath: (currentObj !== null) ? currentObj.chartRelativePath : songObj.tjaFolderPath
+        }, quiet);
+        return 'done';
     }
 
     // Artists info
-    const artistsDbUrl = 'https://opentaiko.github.io/artists_info.db3';
     let songArtistsMap = $state.raw<Record<string, SongArtists>>({}); // songUid → artists and links
-    let expandedSongUid = $state<string | null>(null);
 
     const updateArtistInfo = async () => {
-        let db: Database | null = null;
         try {
-            const SQL = await getSQL();
-            const response = await fetch(artistsDbUrl);
-            const buffer = await response.arrayBuffer();
-            db = new SQL.Database(new Uint8Array(buffer));
-
-            const artistsResult = db.exec('SELECT entryId, artist, youtube, soundcloud, spotify, bandcamp, bilibili, other FROM artists');
-            const link = (value: unknown): string | null => (value == null ? null : String(value));
-            const artistsById: Record<string, ArtistLinks> = {};
-            if (artistsResult.length > 0) {
-                for (const [entryId, artist, youtube, soundcloud, spotify, bandcamp, bilibili, other] of artistsResult[0].values) {
-                    artistsById[String(entryId)] = {
-                        artist: String(artist ?? ''),
-                        youtube: link(youtube), soundcloud: link(soundcloud), spotify: link(spotify),
-                        bandcamp: link(bandcamp), bilibili: link(bilibili), other: link(other)
-                    };
-                }
-            }
-
-            const songsResult = db.exec('SELECT songUid, artists, link FROM songs');
-            if (songsResult.length > 0) {
-                const bySong: Record<string, SongArtists> = {};
-                for (const [songUid, artistsJson, songLink] of songsResult[0].values) {
-                    const artistIds = JSON.parse(String(artistsJson || '[]')) as (string | number)[];
-                    const artists = artistIds.map((id) => artistsById[String(id)]).filter((a): a is ArtistLinks => !!a);
-                    bySong[String(songUid)] = { artists, link: link(songLink) };
-                }
-                songArtistsMap = bySong;
-            }
+            songArtistsMap = await LoadSongArtists();
         } catch (e) {
             console.error('Failed to load artist info:', e);
-        } finally {
-            db?.close();
         }
     };
 
-    const toggleExpand = (uid: string) => {
-        expandedSongUid = expandedSongUid === uid ? null : uid;
-    };
-
     onMount(async () => {
+        GetGlobalSongsPath().then((dir) => globalSongsPath = dir).catch(() => {});
+
+        const stopDrop = await getCurrentWebview().onDragDropEvent(async (event) => {
+            // Archives land in the collection that is currently selected, which is the
+            // only unambiguous target: the panel showing the drop zone is its panel.
+            const target = selectedFolderNode;
+            const usable = target !== null && target.onDisk && target.canAddCharts;
+            if (event.payload.type === 'over') {
+                dropActive = usable;
+            } else if (event.payload.type === 'drop') {
+                dropActive = false;
+                if (!usable || !target) {
+                    TriggerWarning(get(_)('songs.folder.drop_needs_folder'));
+                    return;
+                }
+                await ImportArchives(target.relPath, event.payload.paths);
+            } else {
+                dropActive = false;
+            }
+        });
+        dropListeners.push(stopDrop);
         crawlSongs();         // native scan: no longer depends on the catalog fetch
         await updateSoundtrackInfo();
         updateHoFInfo();      // fire-and-forget: patches soundtrackInfo when DB is ready
@@ -819,7 +1107,7 @@
 <aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
 	<i class="fa-solid fa-triangle-exclamation text-red-500"></i>
 	<span class="flex-1"><b>{$_('common.fetch_error')}</b></span>
-	<button type="button" class="button-red button-main" onclick={updateSoundtrackInfo}>
+	<button type="button" class="button-blue button-main" onclick={updateSoundtrackInfo}>
 		<i class="fa-solid fa-rotate"></i> {$_('common.retry')}
 	</button>
 </aside>
@@ -855,194 +1143,169 @@
 </aside>
 {/each}
 
-<div class="card bg-surface-100-800 p-3 mb-2 flex items-center gap-3 flex-wrap">
-	{#if scanning}
-		<div class="flex-1 flex items-center gap-3 min-w-[16rem]">
-			<ProgressBar />
-			<span class="whitespace-nowrap text-sm">{$_('songs.scan.progress', { values: { count: scanStats.found } })}</span>
-		</div>
+<LibraryHeader
+	LibraryPath={globalSongsPath}
+	Installed={library.installedCount}
+	Total={library.totalCount}
+	PendingMb={library.pendingMb}
+	Outdated={library.outdatedCount}
+	Scanning={scanning}
+	Found={scanStats.found}
+	Busy={bulkBusy || songBusy}
+	Bulk={bulkStatus}
+	Cancelling={bulkCancelRequested}
+	OnCancelBulk={CancelBulk}
+	CurrentScope={scope}
+	Search={librarySearch}
+	OnScope={(s) => scope = s}
+	OnSearch={(v) => librarySearch = v}
+	OnReload={crawlSongs}
+	OnOpenLibrary={OpenSongsFolder}
+	OnGetAll={() => DownloadFolder(library)}
+/>
+
+<div class="library-body">
+	<div class="collections">
+		{#if libraryEmpty}
+			<!-- First run: one sentence and one action, not a wall of ghosts. -->
+			<div class="card start">
+				<h3>{$_('songs.start.title')}</h3>
+				<p>{$_('songs.start.body')}</p>
+				<div class="start-actions">
+					<button type="button" class="button-green button-main" disabled={bulkBusy || songBusy || scanning} onclick={() => DownloadFolder(library)}>
+						<i class="fa-solid fa-download"></i>
+						{$_('songs.library.get_everything', { values: { count: library.totalCount } })}
+						<span class="dim">{formatSize(library.pendingMb)}</span>
+					</button>
+					<button type="button" class="button-blue button-main" onclick={OpenSongsFolder}>
+						<i class="fa-solid fa-folder-open"></i> {$_('songs.button.open_folder')}
+					</button>
+					<button type="button" class="button-blue button-main" onclick={() => NewFolder('')}>
+						<i class="fa-solid fa-folder-plus"></i> {$_('songs.folder.new_folder')}
+					</button>
+				</div>
+			</div>
+		{:else if view === null}
+			<!-- Says why the list is empty: a search that found nothing reads differently
+			     from a library with nothing to update -->
+			<p class="nomatch">
+				{#if librarySearch.trim()}
+					{$_('songs.tree.no_match')}
+				{:else if scope === 'updates'}
+					<i class="fa-solid fa-check"></i> {$_('songs.tree.all_updated')}
+				{:else if scope === 'installed'}
+					{$_('songs.tree.none_installed')}
+				{:else}
+					{$_('songs.tree.nothing_here')}
+				{/if}
+			</p>
+		{:else}
+			{#each topCollections as node (node.relPath)}
+				<CollectionBar
+					Node={node}
+					Depth={0}
+					Open={openCollection === node.relPath}
+					SelectedKey={selectedKey}
+					SelectedFolder={selectedFolder}
+					Downloading={songDLProgress}
+					Disabled={bulkBusy || scanning}
+					BulkDisabled={bulkBusy || songBusy || scanning}
+					ArtUrl={GenreArtUrl}
+					OnToggle={(p) => openCollection = openCollection === p ? null : p}
+					OnSelect={SelectEntry}
+					OnSelectFolder={SelectFolder}
+					OnGet={(entry) => DownloadSong(entry, currentSongs[entry.uniqueId] ?? null)}
+					OnGetFolder={DownloadFolder}
+					OnOpenFolder={OpenGenreFolder}
+				/>
+			{/each}
+
+			<button type="button" class="addfolder" onclick={() => NewFolder('')}>
+				<i class="fa-solid fa-plus"></i> {$_('songs.folder.new_folder')}
+			</button>
+
+			{#if view.entries.length > 0}<SongRowHeader />{/if}
+			{#each rootEntries as entry (entry.key)}
+				<SongRow
+					Entry={entry}
+					Selected={selectedKey === entry.key}
+					Progress={entry.catalog ? songDLProgress[entry.catalog.uniqueId] : undefined}
+					Disabled={bulkBusy || scanning}
+					OnSelect={SelectEntry}
+					OnGet={(e) => DownloadSong(e, currentSongs[e.uniqueId] ?? null)}
+				/>
+			{/each}
+			{#if rootHidden > 0}
+				<button type="button" class="more" onclick={() => rootShown += ROOT_PAGE * 4}>
+					{$_('songs.tree.show_more', { values: { count: rootHidden } })}
+				</button>
+			{/if}
+		{/if}
+	</div>
+
+	{#if selectedFolderNode}
+		<FolderDetail
+			Node={selectedFolderNode}
+			BoxText={boxText}
+			BoxFileExists={boxFileExists}
+			Saving={savingBox}
+			Busy={bulkBusy || songBusy || scanning}
+			DropActive={dropActive}
+			Importing={importing}
+			Official={selectedIsOfficial}
+			Scanning={scanning}
+			OnSaveBox={SaveBoxDef}
+			OnOpenFolder={OpenGenreFolder}
+			OnGetFolder={DownloadFolder}
+			OnNewFolder={NewFolder}
+			OnDelete={DeleteFolder}
+			OnPickArchives={PickArchives}
+			OnPickJacket={PickJacket}
+			JacketUrl={folderJacket}
+		/>
 	{:else}
-		<span class="text-sm">{$_('songs.scan.done', { values: { count: allScannedSongs.length } })}</span>
-		<button type="button" class="button-blue button-main" onclick={crawlSongs}><i class="fa-solid fa-rotate"></i> {$_('common.reload')}</button>
-		<button type="button" class="button-blue button-main" onclick={OpenSongsFolder}><i class="fa-solid fa-folder-open"></i> {$_('songs.button.open_folder')}</button>
-		<span class="flex-1"></span>
+	<SongDetail
+		Entry={selectedEntry}
+		Artists={selectedEntry?.catalog ? songArtistsMap[selectedEntry.catalog.uniqueId] ?? null : null}
+		HoFRanks={selectedEntry?.catalog ? hofMap[selectedEntry.catalog.uniqueId] ?? {} : {}}
+		Progress={selectedEntry?.catalog ? songDLProgress[selectedEntry.catalog.uniqueId] : undefined}
+		Disabled={bulkBusy || scanning}
+		JacketUrl={JacketUrl}
+		LocalJacket={songJacket}
+		LocalAudio={songAudio}
+		LoadAudio={songAudioName ? LoadSongAudio : undefined}
+		OnPickPreimage={PickSongPreimage}
+		OnGet={(entry) => DownloadSong(entry, currentSongs[entry.uniqueId] ?? null)}
+		OnOpenFolder={OpenGenreFolder}
+		OnHoF={OpenHoF}
+		OnDelete={DeleteSong}
+	/>
 	{/if}
-	<button type="button" class="button-{viewMode === 'list' ? 'gray' : 'blue'} button-main" onclick={() => viewMode = 'list'}>
-		<i class="fa-solid fa-list"></i> {$_('songs.view.list')}
-	</button>
-	<button type="button" class="button-{viewMode === 'tree' ? 'gray' : 'blue'} button-main" onclick={() => viewMode = 'tree'}>
-		<i class="fa-solid fa-folder-tree"></i> {$_('songs.view.tree')}
-	</button>
 </div>
 
-{#if viewMode === 'tree'}
-<SongTree Songs={allScannedSongs} Genres={scannedGenres} CatalogById={catalogById} />
-{:else}
-<div class="table-wrap">
-	<table class="table table-hover">
-		<thead>
-			<tr>
-				<th><button onclick={() => SortSongsByColumn("name")}>{$_('songs.col.name')}</button></th>
-				<th><button onclick={() => SortSongsByColumn("genre")}>{$_('songs.col.folder')}</button></th>
-				<th colspan="5" class="w-1/5">{$_('songs.col.difficulties')}</th>
-				<th><button onclick={() => SortSongsByColumn("size")}>{$_('songs.col.size')}</button></th>
-				<th class="w-1/6">{$_('songs.col.status')}</th>
-			</tr>
-			<tr>
-				<th><input class="w-full rounded-md px-3 py-2 bg-white text-blue-950" placeholder={$_('songs.filter.song')} bind:value={searchSong}></th>
-				<th><input class="w-full rounded-md px-3 py-2 bg-white text-blue-950" placeholder={$_('songs.filter.folder')} bind:value={searchGenre}></th>
-				<th><button onclick={() => SortSongsByColumn("ez")}>EZ</button></th>
-				<th><button onclick={() => SortSongsByColumn("nm")}>NM</button></th>
-				<th><button onclick={() => SortSongsByColumn("hd")}>HD</button></th>
-				<th><button onclick={() => SortSongsByColumn("ex")}>EX</button></th>
-				<th><button onclick={() => SortSongsByColumn("exex")}>EXEX</button></th>
-				<th></th>
-				<th>
-					{#if songCountProgressBar !== null}
-					<ProgressBar value={songCountProgressBar} max={100} />
-					{:else}
-					<button type="button" disabled={bulkBusy || songBusy} onclick={DownloadDisplayedSongs} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.bulk_download')}</button>
-					{/if}
-				</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each soundtrackInfo as songInfo}
-			{#if GetFilteredSInfo(songInfo)}
-			<tr class:row-expanded={expandedSongUid === songInfo.uniqueId}>
-				<td>
-					<div class="flex items-center gap-2">
-						<button class="expand-btn" onclick={() => toggleExpand(songInfo.uniqueId)} aria-label="expand">
-							<i class="fa-solid fa-chevron-{expandedSongUid === songInfo.uniqueId ? 'down' : 'right'}"></i>
-						</button>
-						<div class="flex-1"><AudioPlayer {songInfo} /></div>
-					</div>
-				</td>
-				<td>{songInfo.tjaGenreFolder}</td>
-				{#if songInfo.chartDifficulties.Dan !== undefined}
-				<td colspan="5">
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Dan"/>
-				</td>
-				{:else if songInfo.chartDifficulties.Tower !== undefined}
-				<td colspan="5">
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Tower"/>
-				</td>
-				{:else}
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Easy" OnCrownClick={openHoFModal}/>
-				</td>
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Normal" OnCrownClick={openHoFModal}/>
-				</td>
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Hard" OnCrownClick={openHoFModal}/>
-				</td>
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Oni" OnCrownClick={openHoFModal}/>
-				</td>
-				<td>
-					<SongDifficultyChip SongInfo={songInfo} Difficulty="Edit" OnCrownClick={openHoFModal}/>
-				</td>
-				{/if}
-				<td>{songInfo.chartSize}Mb</td>
-				<!-- songDLProgress[songObj.uniqueId] -->
-				{#if scanning === true && currentSongs[songInfo.uniqueId] === undefined}
-				<td>
-					<p>{$_('songs.status.scanning')}</p>
-				</td>
-				{:else if currentSongs[songInfo.uniqueId] === undefined}
-				<td>
-					<p>{$_('songs.status.not_downloaded')}</p>
-					<br />
-					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy} onclick={() => DownloadSong(songInfo, null)} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.download')}</button>
-					{:else}
-					<ProgressBar value={songDLProgress[songInfo.uniqueId]} max={100} />
-					{/if}
-				</td>
-				{:else if IsSongUpToDate(songInfo)}
-				<td>
-					<p>{$_('songs.status.up_to_date')}</p>
-                    <br />
-                    {#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy} onclick={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-gray button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.redownload')}</button>
-					{:else}
-					<ProgressBar value={songDLProgress[songInfo.uniqueId]} max={100} />
-					{/if}
-				</td>
-				{:else}
-				<td>
-					<p>{$_('songs.status.outdated')}</p>
-					<br />
-					{#if songDLProgress[songInfo.uniqueId] === undefined}
-					<button type="button" disabled={bulkBusy} onclick={() => DownloadSong(songInfo, currentSongs[songInfo.uniqueId])} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('songs.button.update')}</button>
-					{:else}
-					<ProgressBar value={songDLProgress[songInfo.uniqueId]} max={100} />
-					{/if}
-				</td>
-				{/if}
-			</tr>
-			{#if expandedSongUid === songInfo.uniqueId}
-				{@const artistData = songArtistsMap[songInfo.uniqueId]}
-			<tr class="expanded-detail-row">
-				<td colspan="9">
-					<div class="song-detail-box">
-						<!-- Jacket -->
-						<div class="song-jacket">
-							{#if songInfo.chartJacketFilePath}
-								<img
-									src="https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Soundtrack/main/{songInfo.chartJacketFilePath}"
-									alt="jacket"
-								/>
-							{:else}
-								<div class="no-jacket"><span>No jacket</span></div>
-							{/if}
-						</div>
-						<!-- Artist info -->
-						<div class="song-artist-info">
-							{#if artistData && artistData.artists.length > 0}
-								{#each artistData.artists as artist}
-									<div class="artist-entry">
-										<span class="artist-name">{artist.artist}</span>
-										<div class="artist-links">
-											{#if artist.youtube}   <a href={artist.youtube}   target="_blank" class="artist-link link-youtube">  <i class="fa-brands fa-youtube"></i>    YouTube</a>   {/if}
-											{#if artist.soundcloud}<a href={artist.soundcloud} target="_blank" class="artist-link link-soundcloud"><i class="fa-brands fa-soundcloud"></i> SoundCloud</a>{/if}
-											{#if artist.spotify}   <a href={artist.spotify}   target="_blank" class="artist-link link-spotify">  <i class="fa-brands fa-spotify"></i>    Spotify</a>   {/if}
-											{#if artist.bandcamp}  <a href={artist.bandcamp}  target="_blank" class="artist-link link-bandcamp"> <i class="fa-brands fa-bandcamp"></i>   Bandcamp</a>  {/if}
-											{#if artist.bilibili}  <a href={artist.bilibili}  target="_blank" class="artist-link link-bilibili"> <i class="fa-solid fa-tv"></i>          Bilibili</a>  {/if}
-											{#if artist.other}     <a href={artist.other}     target="_blank" class="artist-link link-other">    <i class="fa-solid fa-link"></i>        Website</a>   {/if}
-										</div>
-									</div>
-								{/each}
-								{#if artistData.link}
-									<a href={artistData.link} target="_blank" class="artist-link link-other mt-1"><i class="fa-solid fa-music"></i> Song link</a>
-								{/if}
-							{:else}
-								<span class="opacity-50 italic">No artist information available.</span>
-							{/if}
-						</div>
-					</div>
-				</td>
-			</tr>
-			{/if}
-			{/if}
-			{/each}
-		</tbody>
-	</table>
-</div>
+{#if newFolderParent !== null}
+    {@const parent = newFolderParent}
+    <NamePromptModal
+        Title={$_('songs.folder.new_folder')}
+        Label={$_('songs.folder.new_prompt')}
+        Placeholder={$_('songs.folder.new_placeholder')}
+        Confirm={$_('songs.folder.create')}
+        Taken={takenUnder(parent)}
+        OnConfirm={(name) => CreateFolder(parent, name)}
+        OnCancel={() => newFolderParent = null}
+    />
 {/if}
 
 {#if hofModalOpen && hofModalSongInfo && hofModalDifficulty}
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={() => hofModalOpen = false}>
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
+{@const hofTitle = $_('hof.modal_title', { values: { title: localizedTitle(hofModalSongInfo, $locale), course: hofDiffShortMap[hofModalDifficulty] ?? '', rank: hofMap[hofModalSongInfo.uniqueId]?.[hofModalDifficulty] ?? '' } })}
+<Modal Label={hofTitle} OnClose={() => hofModalOpen = false}>
+    <div class="p-6 space-y-4 hof-modal">
         <div class="flex justify-between items-center">
-            <h2 class="h3">Hall of Fame — {localizedTitle(hofModalSongInfo, $locale)} ({hofDiffShortMap[hofModalDifficulty]} #{hofMap[hofModalSongInfo.uniqueId]?.[hofModalDifficulty]})</h2>
-            <button class="btn-icon btn-icon-sm preset-filled" onclick={() => hofModalOpen = false} aria-label={$_('hof.close')}>✕</button>
+            <h2 class="h3">{hofTitle}</h2>
+            <button type="button" class="btn-icon btn-icon-sm preset-tonal" onclick={() => hofModalOpen = false} aria-label={$_('hof.close')} title={$_('hof.close')}><i class="fa-solid fa-xmark"></i></button>
         </div>
         <div class="flex flex-col gap-1">
-            <a href="https://opentaiko.github.io/songinfo/{hofModalSongInfo.uniqueId}?d={hofDifficultyRevMap[hofModalDifficulty]}" target="_blank" class="text-blue-600 underline">
+            <a href="https://opentaiko.github.io/songinfo/{hofModalSongInfo.uniqueId}?d={HOF_DIFFICULTY_INDEX[hofModalDifficulty]}" target="_blank" class="underline">
                 {$_('hof.website_link')} <i class="fa-solid fa-arrow-up-right-from-square"></i>
             </a>
             <span class="text-sm opacity-70">{$_('hof.max_list_points')}: <b>{hofModalMaxListPoints}</b></span>
@@ -1062,7 +1325,7 @@
                         <th>{$_('hof.col.good')}</th>
                         <th>{$_('hof.col.ok')}</th>
                         <th>{$_('hof.col.bad')}</th>
-                        <th>LP</th>
+                        <th>{$_('hof.col.list_points')}</th>
                         <th>{$_('hof.col.video')}</th>
                     </tr>
                 </thead>
@@ -1073,16 +1336,16 @@
                     <tr>
                         <td>{s.rank}</td>
                         <td>{s.player ?? '—'}</td>
-                        <td>{s.score?.toLocaleString()}</td>
+                        <td>{s.score?.toLocaleString($locale ?? undefined)}</td>
                         <td class="grade grade-{gradeClass}">{gradeDisplay}</td>
                         <td class="status status-{s.status?.replace(' ', '-')}">{s.status === 'Perfect' ? $_('hof.status.perfect') : s.status === 'Full Combo' ? $_('hof.status.full_combo') : s.status === 'Clear' ? $_('hof.status.clear') : (s.status ?? '—')}</td>
                         <td>{s.goodCount}</td>
                         <td>{s.okCount}</td>
                         <td>{s.badCount}</td>
-                        <td>{s.listPoints?.toLocaleString()}</td>
+                        <td>{s.listPoints?.toLocaleString($locale ?? undefined)}</td>
                         <td>
-                            {#if s.videoLink}
-                                <a href={s.videoLink} target="_blank" class="text-blue-600 underline">{$_('hof.video_link')} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
+                            {#if SafeUrl(s.videoLink)}
+                                <a href={SafeUrl(s.videoLink)} target="_blank" rel="noreferrer" class="underline">{$_('hof.video_link')} <i class="fa-solid fa-arrow-up-right-from-square"></i></a>
                             {:else}—{/if}
                         </td>
                     </tr>
@@ -1092,7 +1355,7 @@
         </div>
         {/if}
     </div>
-</div>
+</Modal>
 {/if}
 
 {#if migrationCandidate && migrationGlobalPath}
@@ -1107,29 +1370,69 @@
 {/if}
 
 <style>
-    .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0,0,0,0.6);
+    /* Collections scroll; the detail panel stays put beside them. */
+    .library-body {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 20rem;
+        gap: 0.6rem;
+        align-items: start;
+        margin-top: 0.5rem;
+    }
+    .collections {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+        min-width: 0;
+        padding: 0.5rem;
+        border-radius: var(--radius-container);
+        background-color: light-dark(var(--color-surface-100), var(--color-surface-800));
+        box-shadow: inset 0 0 0 1px light-dark(rgb(23 23 23 / 0.05), rgb(250 250 250 / 0.05));
+    }
+
+    .start {padding: 1.25rem; display: flex; flex-direction: column; gap: 0.6rem; align-items: flex-start;}
+    .start-actions {display: flex; gap: 0.5rem; flex-wrap: wrap;}
+    .dim {opacity: 0.85; font-weight: 400;}
+    .nomatch {opacity: 0.7; padding: 1rem 0.5rem;}
+
+    .addfolder {
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 9999;
+        gap: 0.45rem;
+        width: 100%;
+        font: inherit;
+        font-size: 0.82rem;
+        font-weight: 700;
+        padding: 0.5rem;
+        border-radius: 0.5rem;
+        border: 2px dashed color-mix(in oklab, var(--color-surface-500) 40%, transparent);
+        background: none;
+        color: inherit;
+        opacity: 0.8;
+        cursor: pointer;
     }
-    .modal-card {
-        max-width: 800px;
-        width: 90%;
-        max-height: 80vh;
-        overflow-y: auto;
+    .addfolder:hover {
+        opacity: 1;
+        border-color: var(--color-primary-500);
+        background-color: color-mix(in oklab, var(--color-primary-500) 10%, transparent);
+    }
+
+    /* Below ~1000px the panel would squeeze the list, so it moves under it. */
+    @media (max-width: 1000px) {
+        .library-body {grid-template-columns: minmax(0, 1fr);}
+    }
+
+    .hof-modal {
+        width: min(800px, calc(100vw - 2rem));
     }
 
     /* Grade letter colors */
     .grade { font-weight: bold; }
-    .grade-E { color: #ffffff; }
-    .grade-D { color: #ff4444; }
-    .grade-C { color: #ff9933; }
-    .grade-B { color: #ffdd00; }
-    .grade-A { color: #44cc44; }
+    .grade-E { color: light-dark(#6b7280, #ffffff); }
+    .grade-D { color: light-dark(#b91c1c, #ff4444); }
+    .grade-C { color: light-dark(#c2410c, #ff9933); }
+    .grade-B { color: light-dark(#a16207, #ffdd00); }
+    .grade-A { color: light-dark(#15803d, #44cc44); }
     .grade-S {
         background: linear-gradient(90deg, #56ccf2, #2f80ed, #56ccf2);
         background-size: 200% auto;
@@ -1140,7 +1443,7 @@
     }
     .grade-omega {
         font-family: 'Segoe UI', Arial, sans-serif;
-        background: linear-gradient(90deg, #1a237e, #3949ab, #5c6bc0, #3949ab, #1a237e);
+        background: linear-gradient(90deg, light-dark(#1a237e, #8c9eff), light-dark(#3949ab, #b3bcff), light-dark(#5c6bc0, #dfe3ff), light-dark(#3949ab, #b3bcff), light-dark(#1a237e, #8c9eff));
         background-size: 200% auto;
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
@@ -1182,91 +1485,26 @@
     }
 
     /* Expand button */
-    .expand-btn {
-        flex-shrink: 0;
-        width: 1.6rem;
-        height: 1.6rem;
-        border-radius: 0.3rem;
-        opacity: 0.6;
-        transition: opacity 0.15s;
-    }
-    .expand-btn:hover { opacity: 1; }
 
     /* Expanded detail row */
-    .expanded-detail-row td { padding: 0 !important; }
 
-    .song-detail-box {
-        display: flex;
-        flex-direction: row;
-        gap: 1rem;
-        padding: 0.75rem 1rem;
-        border-top: 1px solid rgba(128,128,128,0.2);
-    }
 
     /* Jacket */
-    .song-jacket {
-        flex-shrink: 0;
-        width: 96px;
-        height: 96px;
-        border-radius: 0.4rem;
-        overflow: hidden;
-        border: 1px solid rgba(128,128,128,0.3);
-    }
-    .song-jacket img {
-        width: 100%;
-        height: 100%;
-        object-fit: cover;
-    }
-    .no-jacket {
-        width: 100%;
-        height: 100%;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: rgba(128,128,128,0.15);
-        font-size: 0.7rem;
-        opacity: 0.5;
-        font-style: italic;
-    }
 
     /* Artist info */
-    .song-artist-info {
-        display: flex;
-        flex-direction: column;
-        gap: 0.4rem;
-        justify-content: center;
-    }
-    .artist-entry {
-        display: flex;
-        flex-direction: column;
-        gap: 0.2rem;
-    }
-    .artist-name {
-        font-weight: 600;
-        font-size: 0.95rem;
-    }
-    .artist-links {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 0.3rem;
-    }
-    .artist-link {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.3rem;
-        padding: 0.15rem 0.5rem;
-        border-radius: 0.3rem;
+    /* As a collection's "show more" (CollectionBar) */
+    .more {
+        align-self: flex-start;
+        margin: 0.25rem 0 0 0;
+        font: inherit;
         font-size: 0.78rem;
-        font-weight: 500;
-        color: #fff;
-        text-decoration: none;
-        transition: opacity 0.15s;
+        font-weight: 700;
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.375rem;
+        border: 1px solid color-mix(in oklab, var(--color-surface-500) 35%, transparent);
+        background: none;
+        color: inherit;
+        cursor: pointer;
     }
-    .artist-link:hover { opacity: 0.8; }
-    .link-youtube   { background: #ff0000; }
-    .link-soundcloud{ background: #ff5500; }
-    .link-spotify   { background: #1db954; }
-    .link-bandcamp  { background: #1da0c3; }
-    .link-bilibili  { background: #00a1d6; }
-    .link-other     { background: #555; }
+    .more:hover {background-color: color-mix(in oklab, var(--color-primary-500) 12%, transparent);}
 </style>

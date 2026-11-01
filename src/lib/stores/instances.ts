@@ -2,14 +2,17 @@
 // See `Instance` in $lib/types for the record shape; channel === null means no build
 // has been installed into the folder yet.
 import { writable, derived, get } from 'svelte/store';
-import { readTextFile, writeTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
+import { readTextFile, mkdir, exists } from '@tauri-apps/plugin-fs';
 import { join, basename } from '@tauri-apps/api/path';
-import { invoke } from '@tauri-apps/api/core';
-import { GetPreferencesPath, GetRootPath, GetGlobalSongsPath, GetLegacyInstancePath } from '../utils/path';
+import { ipc } from '$lib/ipc';
+import { GetPreferencesPath, GetGlobalSongsPath, GetLegacyInstancePath } from '../utils/path';
 import { isVersionInSeries } from '../utils/versions';
+import { toaster } from '$lib/utils/toaster';
+import { IsSongsPathUnstorable } from '$lib/utils/errors';
+import { _ } from 'svelte-i18n';
 import type { Instance, InstanceRegistry } from '$lib/types';
 
-const REGISTRY_FILE = 'instances.json';
+const REGISTRY_FILE = 'instances.json' as const;
 
 // Only the 0.6.0.x series keeps its Favorite / Recent / Search boxes as box.def folders
 // inside the instance's own Songs folder, so only those instances need that folder in
@@ -37,15 +40,23 @@ const normalizePath = (p: string | null | undefined): string => {
     return isWindowsPath ? normalized.toLowerCase() : normalized;
 };
 
-const persist = async (): Promise<void> => {
-    const prefsDir = await GetPreferencesPath();
-    await mkdir(prefsDir, { recursive: true });
-    const data: InstanceRegistry = {
-        version: 1,
-        activeId: get(activeInstanceId),
-        instances: get(instances)
-    };
-    await writeTextFile(await registryPath(), JSON.stringify(data, null, 2));
+// Written by the backend, which replaces the file in one step: a crash mid-write used to
+// leave a truncated list that the next start took for no list at all. Saves run one
+// after the other, each with the list as it is when its turn comes: a first install saves
+// twice in a row, and the older list could land last.
+let persisting: Promise<void> = Promise.resolve();
+
+const persist = (): Promise<void> => {
+    const write = persisting.catch(() => {}).then(() => {
+        const data: InstanceRegistry = {
+            version: 1,
+            activeId: get(activeInstanceId),
+            instances: get(instances)
+        };
+        return ipc.writeSettingsFile(REGISTRY_FILE, JSON.stringify(data, null, 2));
+    });
+    persisting = write;
+    return write;
 };
 
 export interface ResolveInstancesInput {
@@ -100,14 +111,26 @@ export const loadInstances = async (): Promise<void> => {
     let storedList: unknown = [];
     let storedActiveId: string | null = null;
     let registryFound = false;
+    const readRegistry = async (file: string): Promise<Partial<InstanceRegistry>> =>
+        JSON.parse(await readTextFile(file)) as Partial<InstanceRegistry>;
+    let data: Partial<InstanceRegistry> | null = null;
     try {
-        const content = await readTextFile(await registryPath());
-        const data = JSON.parse(content) as Partial<InstanceRegistry>;
-        storedList = Array.isArray(data.instances) ? data.instances : [];
-        storedActiveId = data.activeId ?? null;
+        data = await readRegistry(await registryPath());
         registryFound = true;
     } catch {
-        // No registry yet: first run of 0.2, or a fresh install
+        // No registry yet (first run of 0.2, or a fresh install), or one that cannot be
+        // read: the backend keeps the previous list beside it, which beats starting over
+        // with no instances. Saved again below, which repairs the main file.
+        try {
+            data = await readRegistry(`${await registryPath()}.bak`);
+            console.warn('The instance list could not be read; using its previous copy');
+        } catch {
+            data = null;
+        }
+    }
+    if (data) {
+        storedList = Array.isArray(data.instances) ? data.instances : [];
+        storedActiveId = data.activeId ?? null;
     }
 
     let legacyPath: string | null = null;
@@ -155,14 +178,24 @@ export const updateInstance = async (id: string, patch: Partial<Instance>): Prom
     return get(instances).find((inst) => inst.id === id) ?? null;
 };
 
+// "OpenTaiko", then "OpenTaiko (2)", "OpenTaiko (3)"... for an instance created without
+// a name. The folder keeps its unique name; this is only what the user reads.
+export const DefaultInstanceName = (taken: string[]): string => {
+    const names = new Set(taken.map((name) => name.trim().toLowerCase()));
+    if (!names.has('opentaiko')) return 'OpenTaiko';
+    let n = 2;
+    while (names.has(`opentaiko (${n})`)) n++;
+    return `OpenTaiko (${n})`;
+};
+
 export const createInstance = async (name: string | null | undefined): Promise<Instance> => {
-    const root = await GetRootPath();
     const folderName = `OpenTaiko-${crypto.randomUUID()}`;
-    const path = await join(root, folderName);
-    await mkdir(path, { recursive: true });
+    // Created by the backend, which also gives the Hub access to it: the Hub root itself
+    // is not open to the page
+    const path = await ipc.createInstanceDir(folderName);
     const instance: Instance = {
         id: crypto.randomUUID(),
-        name: name?.trim() || folderName,
+        name: name?.trim() || DefaultInstanceName(get(instances).map((inst) => inst.name)),
         path,
         channel: null,
         experimental: null,
@@ -204,12 +237,25 @@ export const detachInstance = async (id: string): Promise<void> => {
     await persist();
 };
 
-export const refreshInstanceVersion = async (id: string): Promise<string | null> => {
+// Reads of one instance's version that overlap share one read: at startup the page, the
+// song library link and the Home tab each asked for the same instance's at once, three
+// reads of the game binary. A read asked for after the last one ended reads again.
+const versionReads = new Map<string, Promise<string | null>>();
+
+export const refreshInstanceVersion = (id: string): Promise<string | null> => {
+    const running = versionReads.get(id);
+    if (running) return running;
+    const read = readInstanceVersion(id).finally(() => versionReads.delete(id));
+    versionReads.set(id, read);
+    return read;
+};
+
+const readInstanceVersion = async (id: string): Promise<string | null> => {
     const instance = get(instances).find((inst) => inst.id === id);
     if (!instance) return null;
     let version: string | null = null;
     try {
-        version = await invoke<string | null>('get_game_version', { instanceDir: instance.path });
+        version = await ipc.getGameVersion(instance.path);
     } catch (error) {
         console.error('get_game_version failed:', error);
     }
@@ -247,12 +293,18 @@ export const linkGlobalSongs = async (instance: Instance | null | undefined): Pr
 
         const globalSongs = await GetGlobalSongsPath();
         await mkdir(globalSongs, { recursive: true });
-        await invoke('ensure_config_tjapath', {
-            instanceDir: instance.path,
-            globalSongsPath: globalSongs,
-            includeLocal
-        });
+        await ipc.ensureConfigTjapath(instance.path, includeLocal);
     } catch (error) {
         console.error('Failed to link the global Songs folder:', error);
+        // The one cause the user can act on, and that otherwise only shows as a game
+        // without songs. A missing instance folder fails here too, on every start, and
+        // is left to the log.
+        if (IsSongsPathUnstorable(error)) {
+            toaster.error({
+                description: get(_)('errors.songs_link_failed', { values: { name: instance.name } }),
+                duration: Infinity,
+                meta: { details: String(error) }
+            });
+        }
     }
 };

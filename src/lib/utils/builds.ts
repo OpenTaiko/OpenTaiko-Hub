@@ -1,10 +1,11 @@
 // Shared access to OpenTaiko build sources (GitHub releases and experimental builds).
-import { fetch } from '@tauri-apps/plugin-http';
+// Every API read goes through the backend's cache: an unchanged answer costs nothing
+// against GitHub's hourly limit for unauthenticated requests.
+import { fetchCachedJson } from './download';
 import { isVersionBelow } from './versions';
+import { ValidRelease, ValidReleaseList } from './validate';
+import { GAME_REPO, apiUrl } from '$lib/repos';
 import type { BuildOption, GitHubRelease } from '$lib/types';
-
-export const repoOwner = '0AuBSQ';//'OpenTaiko';
-export const repoName = 'OpenTaiko';//OpenTaiko-Dev-Mirror';
 
 interface IndevBuild {
     branch: string;
@@ -24,12 +25,14 @@ const INDEV_BUILDS: IndevBuild[] = [
 export const INDEV_BRANCH = INDEV_BUILDS[0].branch;
 export const INDEV_LABEL = INDEV_BUILDS[0].label;
 
+/** The version a branch build is recorded as until the built game's own can be read. */
+export const IndevVersion = (branch: string): string | null => {
+    const build = INDEV_BUILDS.find((b) => b.branch === branch);
+    return build ? `${build.version}.0` : null;
+};
+
 export const fetchLatestRelease = async (): Promise<GitHubRelease> => {
-    const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/latest`);
-    if (!response.ok) {
-        throw new Error(`HTTP error status: ${response.status}`);
-    }
-    return (await response.json()) as GitHubRelease;
+    return ValidRelease(await fetchCachedJson<unknown>(`${apiUrl(GAME_REPO)}/releases/latest`));
 };
 
 // Experimental build sources: prereleases, plus any branch build whose target version
@@ -45,13 +48,10 @@ export const fetchExperimentalOptions = async (latestTag: string | null): Promis
         }
     }
     try {
-        const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases?per_page=15`);
-        if (response.ok) {
-            const releases = (await response.json()) as GitHubRelease[];
-            const prerelease = releases.find((release) => release.prerelease && !release.draft);
-            if (prerelease) {
-                options.push({ kind: 'prerelease', tag: prerelease.tag_name, label: prerelease.tag_name });
-            }
+        const releases = ValidReleaseList(await fetchCachedJson<unknown>(`${apiUrl(GAME_REPO)}/releases?per_page=15`));
+        const prerelease = releases.find((release) => release.prerelease && !release.draft);
+        if (prerelease) {
+            options.push({ kind: 'prerelease', tag: prerelease.tag_name, label: prerelease.tag_name });
         }
     } catch (error) {
         console.error('Failed to list prereleases:', error);
@@ -60,18 +60,12 @@ export const fetchExperimentalOptions = async (latestTag: string | null): Promis
 };
 
 export const fetchReleaseByTag = async (tag: string): Promise<GitHubRelease> => {
-    const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/releases/tags/${encodeURIComponent(tag)}`);
-    if (!response.ok) {
-        throw new Error(`HTTP error status: ${response.status}`);
-    }
-    return (await response.json()) as GitHubRelease;
+    return ValidRelease(await fetchCachedJson<unknown>(`${apiUrl(GAME_REPO)}/releases/tags/${encodeURIComponent(tag)}`));
 };
 
+// The head of now, never an old copy: a build of an old commit would be recorded as the
+// current one, and the update check would then say it is up to date
 export const fetchBranchHeadSha = async (branch: string): Promise<string | null> => {
-    const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/branches/${branch}`);
-    if (!response.ok) {
-        throw new Error(`HTTP error status: ${response.status}`);
-    }
-    const data = (await response.json()) as { commit?: { sha?: string } };
+    const data = await fetchCachedJson<{ commit?: { sha?: string } }>(`${apiUrl(GAME_REPO)}/branches/${branch}`, true);
     return data.commit?.sha ?? null;
 };

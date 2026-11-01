@@ -71,7 +71,8 @@ fn walk(dir: &Path, base: &Path, target: &str, out: &mut Vec<AssetVersion>) {
 }
 
 #[tauri::command]
-pub async fn scan_asset_versions(base_dir: String, target_file: String) -> Result<Vec<AssetVersion>, String> {
+pub async fn scan_asset_versions(app: tauri::AppHandle, base_dir: String, target_file: String) -> Result<Vec<AssetVersion>, String> {
+    crate::guard::checked(&app, &base_dir)?;
     tokio::task::spawn_blocking(move || {
         let base = PathBuf::from(&base_dir);
         let mut out = Vec::new();

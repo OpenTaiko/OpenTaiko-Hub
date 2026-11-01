@@ -1,4 +1,5 @@
 <script lang="ts">
+    import { ipc } from '$lib/ipc';
     // Dependencies
     import { onMount } from 'svelte';
     import { Tabs, Accordion } from '@skeletonlabs/skeleton-svelte';
@@ -6,8 +7,9 @@
     import { marked } from 'marked';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
-    import { invoke } from '@tauri-apps/api/core';
-    import { openPath } from '@tauri-apps/plugin-opener';
+    import { OpenFolder } from '$lib/utils/path';
+    import { SafeHtml } from '$lib/utils/sanitize';
+    import { GAME_REPO, HUB_REPO, pageUrl, rawUrl } from '$lib/repos';
 
     let currentInfo = $state(0);
 
@@ -17,7 +19,7 @@
     let logDir = $state<string | null>(null);
     onMount(async () => {
         try {
-            logDir = await invoke<string | null>('log_directory');
+            logDir = await ipc.logDirectory();
         } catch {
             logDir = null;
         }
@@ -26,18 +28,18 @@
     const OpenLogFolder = async () => {
         if (!logDir) return;
         try {
-            await openPath(logDir);
+            await OpenFolder(logDir);
         } catch (error) {
             console.error('Failed to open the log folder:', error);
         }
     };
 
     // Information
-    const changelogUrl = 'https://raw.githubusercontent.com/0auBSQ/OpenTaiko/main/CHANGELOG.md';
+    const changelogUrl = rawUrl(GAME_REPO, 'CHANGELOG.md');
     let changelogContent = $state('');
-    const hubChangelogUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Hub/main/CHANGELOG.md';
+    const hubChangelogUrl = rawUrl(HUB_REPO, 'CHANGELOG.md');
     let hubChangelogContent = $state('');
-    const creditsUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Hub/main/CREDITS.md';
+    const creditsUrl = rawUrl(HUB_REPO, 'CREDITS.md');
     let creditsContent = $state('');
 
     // External links open in the system browser and pick up the app's link styling
@@ -45,7 +47,7 @@
     const renderLink = renderer.link.bind(renderer);
     renderer.link = function (token) {
         const link = renderLink(token);
-        return link.replace("<a", "<a target='_blank' class='text-blue-600 underline'");
+        return link.replace("<a", "<a target='_blank' class='underline'");
     };
     marked.setOptions({
         renderer: renderer,
@@ -165,9 +167,9 @@
         <hr class="my-3">
 
         {#if currentInfo === 0}
-            {@html changelogContent}
+            {@html SafeHtml(changelogContent)}
         {:else if currentInfo === 1}
-            {@html hubChangelogContent}
+            {@html SafeHtml(hubChangelogContent)}
         {/if}
     </div>
 {/if}
@@ -180,9 +182,9 @@
     <div class="content">
         <h1>{$_('info.troubleshoot.title')}</h1>
         <p>{$_('info.troubleshoot.intro')}</p>
-        <a href="https://discord.gg/5xfpGuwASU" target='_blank' class='text-blue-600 underline'>{$_('info.troubleshoot.discord')}</a>
+        <a href="https://discord.gg/5xfpGuwASU" target='_blank' class='underline'>{$_('info.troubleshoot.discord')}</a>
         <br />
-        <a href="https://github.com/0auBSQ/OpenTaiko/issues" target='_blank' class='text-blue-600 underline'>{$_('info.troubleshoot.github')}</a>
+        <a href={pageUrl(GAME_REPO, 'issues')} target='_blank' class='underline'>{$_('info.troubleshoot.github')}</a>
         <p>{$_('info.troubleshoot.note')}</p>
 
         {#if logDir}
@@ -207,7 +209,7 @@
 <!-- Credits -->
 {#if currentInfo === 4}
     <div class="content">
-        {@html creditsContent}
+        {@html SafeHtml(creditsContent)}
     </div>
 {/if}
 

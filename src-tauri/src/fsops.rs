@@ -56,11 +56,52 @@ fn merge_move(src: &Path, dest: &Path) -> Result<(), String> {
 
 /// Moves the CONTENT of `src` into `dest` (merging into existing folders, replacing
 /// existing files), then removes the emptied `src`.
+///
+/// Only what the Hub extracted or built in its own temporary folders is moved: any folder
+/// the page could reach used to be, so files imported anywhere could be moved beside the
+/// game, or into a build. Into a build folder, only the source archive just extracted
+/// goes, and its file list is kept for `publish_game` to check the folder against.
 #[tauri::command]
-pub async fn merge_move_dir(src: String, dest: String) -> Result<(), String> {
-    tokio::task::spawn_blocking(move || merge_move_dir_sync(&src, &dest))
-        .await
-        .map_err(|e| format!("Task failed: {e}"))?
+pub async fn merge_move_dir(app: tauri::AppHandle, src: String, dest: String) -> Result<(), String> {
+    // Both ends are written to: the source is emptied and removed
+    let src_path = crate::guard::checked(&app, &src)?;
+    let dest_path = crate::guard::checked(&app, &dest)?;
+    if !crate::guard::inside_hub_tmp(&src_path) {
+        return Err(format!("Refusing to move {}: not a folder the Hub prepared", src));
+    }
+    let into_build = crate::guard::inside_hub_tmp(&dest_path);
+    if into_build && !crate::download::take_extracted(&src_path) {
+        return Err(format!("Refusing to move {} into {}: not the source the Hub extracted", src, dest));
+    }
+    // Cut off by a closing window, an install would leave the instance half old, half new
+    let _moving = crate::jobs::in_flight(&app);
+    tokio::task::spawn_blocking(move || {
+        if into_build {
+            crate::procs::remember_source(&dest_path, files_under(&src_path));
+        }
+        merge_move_dir_sync(&src, &dest)
+    })
+    .await
+    .map_err(|e| format!("Task failed: {e}"))?
+}
+
+/// Every file under `dir`, relative to it. Links are not followed.
+pub(crate) fn files_under(dir: &Path) -> std::collections::HashSet<std::path::PathBuf> {
+    let mut files = std::collections::HashSet::new();
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(folder) = pending.pop() {
+        let Ok(entries) = std::fs::read_dir(&folder) else { continue };
+        for entry in entries.flatten() {
+            let Ok(kind) = entry.file_type() else { continue };
+            let path = entry.path();
+            if kind.is_dir() {
+                pending.push(path);
+            } else if let Ok(relative) = path.strip_prefix(dir) {
+                files.insert(relative.to_path_buf());
+            }
+        }
+    }
+    files
 }
 
 /// A song folder is a directory that directly contains at least one .tja file.
@@ -107,6 +148,11 @@ pub fn merge_move_dir_sync(src: &str, dest: &str) -> Result<(), String> {
     if !src_path.is_dir() {
         return Err(format!("Source folder not found: {}", src));
     }
+    // A destination inside the source would be walked into as it is filled, until the
+    // stack overflowed and took the whole Hub down
+    if crate::guard::resolve_existing(&dest_path).starts_with(crate::guard::resolve_existing(&src_path)) {
+        return Err(format!("Refusing to move {} into itself", src));
+    }
     std::fs::create_dir_all(&dest_path)
         .map_err(|e| format!("Failed to create {}: {}", dest_path.display(), e))?;
     for entry in std::fs::read_dir(&src_path)
@@ -145,5 +191,18 @@ mod tests {
         assert_eq!(fs::read_to_string(dest.join("sub/b.txt")).unwrap(), "new-b");
         assert_eq!(fs::read_to_string(dest.join("sub/keep.txt")).unwrap(), "keep");
         assert!(!src.exists(), "source should be gone after the move");
+    }
+
+    #[test]
+    fn a_folder_is_never_moved_into_itself() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("src");
+        write(&src.join("a.txt"), "a");
+        for dest in [src.clone(), src.join("sub"), src.join("sub").join("deeper")] {
+            assert!(merge_move_dir_sync(src.to_str().unwrap(), dest.to_str().unwrap()).is_err());
+        }
+        assert_eq!(fs::read_to_string(src.join("a.txt")).unwrap(), "a");
+        // A sibling that merely starts with the same letters is fine
+        merge_move_dir_sync(src.to_str().unwrap(), tmp.path().join("src2").to_str().unwrap()).unwrap();
     }
 }

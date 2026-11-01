@@ -1,9 +1,12 @@
 <script lang="ts">
-    import { getContext } from 'svelte';
+    import { getContext, tick } from 'svelte';
+    import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
-    import { open } from '@tauri-apps/plugin-dialog';
-    import { openPath } from '@tauri-apps/plugin-opener';
+    import { ipc } from '$lib/ipc';
+    import { OpenFolder as OpenFolderPath } from '$lib/utils/path';
+    import Modal from '$lib/components/Modal.svelte';
+    import { busyInstanceIds } from '$lib/stores/activity';
 
     import {
         instances,
@@ -41,19 +44,25 @@
 
     const DoAttach = async () => {
         try {
-            const dir = await open({ directory: true, multiple: false, title: get(_)('instances.attach') });
+            // The backend shows the dialog and records the folder as an instance; the page
+            // naming a folder itself would let it open any folder to itself
+            const dir = await ipc.attachInstanceDir(get(_)('instances.attach'));
             if (!dir) return;
             const instance = await attachInstance(dir);
             await refreshInstanceVersion(instance.id);
             await linkGlobalSongs(get(instances).find((i) => i.id === instance.id));
             TriggerSuccess(get(_)('instances.success.attached', { values: { name: instance.name } }));
         } catch (error) {
-            TriggerError(get(_)('instances.error.attach_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('instances.error.attach_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
     // Creating an instance asks which build to install (Stable / Experimental);
     // the download starts automatically on the Home tab once the instance is created.
+    // This dialog closes after the picker has, so focus goes back through the picker to
+    // this dialog's button and then to the Manage button: closed first, focus was left on
+    // the page itself.
+    let created = false;
     const DoCreate = async (build: BuildOption) => {
         try {
             const instance = await createInstance(newInstanceName);
@@ -63,34 +72,28 @@
                 pendingInstall: build
             });
             TriggerSuccess(get(_)('instances.success.created', { values: { name: instance.name } }));
-            OnClose();
+            created = true;
         } catch (error) {
-            TriggerError(get(_)('instances.error.create_failed', { values: { error: String(error) } }));
+            TriggerError(get(_)('instances.error.create_failed', { values: { error: DescribeError(error) } }), { details: ErrorText(error) });
         }
     };
 
     const DoDetach = async (inst: Instance) => {
+        // An install still writing into the folder would lose track of its instance
+        if (get(busyInstanceIds).has(inst.id)) return;
         await detachInstance(inst.id);
         TriggerSuccess(get(_)('instances.success.detached', { values: { name: inst.name } }));
     };
 
-    const OpenFolder = async (inst: Instance) => {
-        try {
-            await openPath(inst.path);
-        } catch (error) {
-            TriggerError(get(_)('home.error.launch', { values: { error: String(error) } }));
-        }
-    };
+    const OpenFolder = (inst: Instance) => OpenFolderPath(inst.path);
 </script>
 
 {#if Show}
-<!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-<div class="modal-backdrop" onclick={OnClose}>
-    <!-- svelte-ignore a11y_click_events_have_key_events, a11y_no_static_element_interactions -->
-    <div class="card p-6 space-y-4 modal-card" onclick={(e) => e.stopPropagation()}>
+<Modal Label={$_('instances.title')} OnClose={OnClose}>
+    <div class="p-6 space-y-4 modal-body">
         <div class="flex justify-between items-center">
             <h2 class="h3">{$_('instances.title')}</h2>
-            <button class="button-red button-main" onclick={OnClose}>{$_('hof.close')}</button>
+            <button type="button" class="btn-icon btn-icon-sm preset-tonal" onclick={OnClose} aria-label={$_('hof.close')} title={$_('hof.close')}><i class="fa-solid fa-xmark"></i></button>
         </div>
 
         {#if $instances.length === 0}
@@ -123,10 +126,10 @@
                         <td>{$instanceVersions[inst.id] ?? '—'}</td>
                         <td class="path-cell" title={inst.path}>{inst.path}</td>
                         <td class="whitespace-nowrap">
-                            <button class="button-blue button-main" title={$_('instances.open_folder')} onclick={() => OpenFolder(inst)}>
+                            <button class="button-blue button-main" title={$_('instances.open_folder')} aria-label={$_('instances.open_folder')} onclick={() => OpenFolder(inst)}>
                                 <i class="fa-solid fa-folder-open"></i>
                             </button>
-                            <button class="button-red button-main" title={$_('instances.detach')} onclick={() => DoDetach(inst)}>
+                            <button type="button" class="button-gray button-main disabled:opacity-50" title={$busyInstanceIds.has(inst.id) ? $_('jobs.instance_busy') : $_('instances.detach')} aria-label={$_('instances.detach')} disabled={$busyInstanceIds.has(inst.id)} onclick={() => DoDetach(inst)}>
                                 <i class="fa-solid fa-link-slash"></i>
                             </button>
                         </td>
@@ -147,8 +150,9 @@
             </button>
             <span class="opacity-50">|</span>
             <input
-                class="rounded-md px-3 py-2 bg-white text-blue-950"
+                class="name-field"
                 placeholder={$_('instances.create_name_placeholder')}
+                aria-label={$_('instances.create_name_placeholder')}
                 bind:value={newInstanceName}
             />
             <button class="button-green button-main" onclick={() => showBuildPicker = true}>
@@ -156,27 +160,32 @@
             </button>
         </div>
     </div>
-</div>
+</Modal>
 {/if}
 
-<BuildPickerModal Show={showBuildPicker} OnClose={() => showBuildPicker = false} OnPick={DoCreate} />
+<BuildPickerModal Show={showBuildPicker} OnClose={async () => {
+    showBuildPicker = false;
+    if (!created) return;
+    created = false;
+    // The picker's own focus goes back first
+    await tick();
+    OnClose();
+}} OnPick={DoCreate} />
 
 <style>
-    .modal-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.6);
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        z-index: 9999;
+    .modal-body {
+        width: min(1000px, calc(100vw - 2rem));
     }
-    .modal-card {
-        max-width: 1000px;
-        width: 95%;
-        max-height: 85vh;
-        overflow-y: auto;
+    /* Theme colours rather than a fixed white field, which glared on dark themes */
+    .name-field {
+        font: inherit;
+        padding: 0.4rem 0.75rem;
+        border-radius: 0.375rem;
+        border: 1px solid color-mix(in oklab, var(--color-surface-500) 40%, transparent);
+        background-color: light-dark(var(--color-surface-50), var(--color-surface-900));
+        color: light-dark(var(--color-surface-950), var(--color-surface-50));
     }
+    .name-field:focus {outline: none; border-color: var(--color-primary-500);}
     .path-cell {
         max-width: 280px;
         overflow: hidden;

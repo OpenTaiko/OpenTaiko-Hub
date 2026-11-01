@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use crate::fsops::{collect_song_dirs, copy_dir_recursive};
+use crate::library::resolve_entry_inside;
 use crate::scan::{decode_text, extract_title, parse_unique_id};
 use md5::{Digest, Md5};
 
@@ -48,11 +49,24 @@ pub struct MigrationPlan {
     pub conflict_count: usize,
 }
 
+/// What happens to one song of the instance. An unknown value is refused when the
+/// request is read rather than falling through to one of these.
+#[derive(Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum MigrationAction {
+    /// A new song: move it into the shared library.
+    Move,
+    /// Keep the library's copy and delete the instance's.
+    KeepGlobal,
+    /// Replace the library's copy with the instance's.
+    UseInstance,
+}
+
 #[derive(Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct MigrationDecision {
     pub src_rel_path: String,
-    pub action: String, // "move" | "keep_global" | "use_instance"
+    pub action: MigrationAction,
     pub dest_rel_path: Option<String>,
 }
 
@@ -184,14 +198,20 @@ fn build_plan(src: &Path, dest: &Path) -> MigrationPlan {
 /// Lets the frontend ask the same question the guards ask, instead of comparing
 /// lowercased strings, which cannot see through a symlink.
 #[tauri::command]
-pub async fn paths_are_same_dir(a: String, b: String) -> bool {
+pub async fn paths_are_same_dir(app: tauri::AppHandle, a: String, b: String) -> bool {
+    // Answering for folders outside the scope would tell the page which exist
+    if crate::guard::checked(&app, &a).is_err() || crate::guard::checked(&app, &b).is_err() {
+        return false;
+    }
     tokio::task::spawn_blocking(move || is_same_dir(&PathBuf::from(&a), &PathBuf::from(&b)))
         .await
         .unwrap_or(false)
 }
 
 #[tauri::command]
-pub async fn plan_migration(src_songs: String, dest_songs: String) -> Result<MigrationPlan, String> {
+pub async fn plan_migration(app: tauri::AppHandle, src_songs: String, dest_songs: String) -> Result<MigrationPlan, String> {
+    crate::guard::songs_dir(&app, &src_songs)?;
+    crate::guard::songs_dir(&app, &dest_songs)?;
     tokio::task::spawn_blocking(move || build_plan(&PathBuf::from(&src_songs), &PathBuf::from(&dest_songs)))
         .await
         .map_err(|e| format!("Task failed: {e}"))
@@ -240,30 +260,32 @@ fn apply_plan(src: &Path, dest: &Path, decisions: &[MigrationDecision]) -> Resul
     let mut moved_rels: Vec<PathBuf> = Vec::new();
 
     for decision in decisions {
-        let src_dir = src.join(&decision.src_rel_path);
+        // Relative paths come from the page: each must stay inside its Songs folder, since
+        // the folders they name get deleted or replaced
+        let src_dir = resolve_entry_inside(src, &decision.src_rel_path)?;
+        let dest_dir = resolve_entry_inside(dest, &decision.src_rel_path)?;
         if !src_dir.is_dir() {
             continue;
         }
-        match decision.action.as_str() {
-            "keep_global" => {
+        match decision.action {
+            MigrationAction::KeepGlobal => {
                 remove_path(&src_dir)?;
                 summary.discarded += 1;
             }
-            "use_instance" => {
+            MigrationAction::UseInstance => {
                 // Drop the conflicting global song, which may sit at a different rel path
                 if let Some(dest_rel) = &decision.dest_rel_path {
-                    let global = dest.join(dest_rel);
-                    if global != dest.join(&decision.src_rel_path) {
+                    let global = resolve_entry_inside(dest, dest_rel)?;
+                    if global != dest_dir {
                         remove_path(&global)?;
                     }
                 }
-                move_dir(&src_dir, &dest.join(&decision.src_rel_path))?;
+                move_dir(&src_dir, &dest_dir)?;
                 summary.replaced += 1;
                 moved_rels.push(PathBuf::from(&decision.src_rel_path));
             }
-            _ => {
-                // "move" (new song) and any unknown action: place it in the shared library
-                move_dir(&src_dir, &dest.join(&decision.src_rel_path))?;
+            MigrationAction::Move => {
+                move_dir(&src_dir, &dest_dir)?;
                 summary.moved += 1;
                 moved_rels.push(PathBuf::from(&decision.src_rel_path));
             }
@@ -308,7 +330,6 @@ fn apply_plan(src: &Path, dest: &Path, decisions: &[MigrationDecision]) -> Resul
     Ok(summary)
 }
 
-/// True when the folder holds at least one .tja anywhere beneath it.
 /// True when both paths name the same folder on disk, following symlinks.
 ///
 /// A raw `==` is not enough: an instance whose Songs folder is a symlink (or a bind
@@ -327,6 +348,7 @@ pub(crate) fn is_same_dir(a: &Path, b: &Path) -> bool {
 /// handful of levels deep.
 const MAX_CHART_SCAN_DEPTH: usize = 24;
 
+/// True when the folder holds at least one .tja anywhere beneath it.
 pub(crate) fn contains_tja(dir: &Path) -> bool {
     contains_tja_within(dir, MAX_CHART_SCAN_DEPTH)
 }
@@ -389,7 +411,12 @@ fn is_recursively_empty(dir: &Path) -> bool {
 /// experimental build would otherwise install its own copies of songs alongside the
 /// shared library. Returns the number of song folders removed.
 #[tauri::command]
-pub async fn strip_song_content(songs_dir: String) -> Result<usize, String> {
+pub async fn strip_song_content(app: tauri::AppHandle, songs_dir: String) -> Result<usize, String> {
+    crate::guard::checked(&app, &songs_dir)?;
+    strip_song_content_in(songs_dir).await
+}
+
+async fn strip_song_content_in(songs_dir: String) -> Result<usize, String> {
     tokio::task::spawn_blocking(move || {
         let base = PathBuf::from(&songs_dir);
         if !base.is_dir() {
@@ -469,9 +496,16 @@ fn count_files(dir: &Path) -> usize {
 /// folders) untouched.
 #[tauri::command]
 pub async fn find_duplicate_song_folders(
+    app: tauri::AppHandle,
     instance_songs: String,
     global_songs: String,
 ) -> Result<Vec<DuplicateFolder>, String> {
+    crate::guard::songs_dir(&app, &instance_songs)?;
+    crate::guard::songs_dir(&app, &global_songs)?;
+    find_duplicates_in(instance_songs, global_songs).await
+}
+
+async fn find_duplicates_in(instance_songs: String, global_songs: String) -> Result<Vec<DuplicateFolder>, String> {
     tokio::task::spawn_blocking(move || {
         let src = PathBuf::from(&instance_songs);
         let dest = PathBuf::from(&global_songs);
@@ -512,6 +546,17 @@ pub async fn find_duplicate_song_folders(
 /// stale UI list can never delete real songs.
 #[tauri::command]
 pub async fn remove_duplicate_song_folders(
+    app: tauri::AppHandle,
+    instance_songs: String,
+    global_songs: String,
+    rel_paths: Vec<String>,
+) -> Result<usize, String> {
+    crate::guard::songs_dir(&app, &instance_songs)?;
+    crate::guard::songs_dir(&app, &global_songs)?;
+    remove_duplicates_in(instance_songs, global_songs, rel_paths).await
+}
+
+async fn remove_duplicates_in(
     instance_songs: String,
     global_songs: String,
     rel_paths: Vec<String>,
@@ -524,8 +569,13 @@ pub async fn remove_duplicate_song_folders(
         }
         let mut removed = 0;
         for rel in rel_paths {
-            // Plain child names only: never traverse out of the Songs folder
-            if rel.is_empty() || rel.contains('/') || rel.contains('\\') || rel.contains("..") {
+            // Plain child names only: never traverse out of the Songs folder, and never "."
+            // (the Songs folder itself, which is chart-less after stripping)
+            let mut parts = Path::new(&rel).components();
+            if !matches!((parts.next(), parts.next()), (Some(std::path::Component::Normal(_)), None))
+                || rel.contains('/')
+                || rel.contains('\\')
+            {
                 continue;
             }
             let path = src.join(&rel);
@@ -548,10 +598,14 @@ pub async fn remove_duplicate_song_folders(
 
 #[tauri::command]
 pub async fn apply_migration(
+    app: tauri::AppHandle,
     src_songs: String,
     dest_songs: String,
     decisions: Vec<MigrationDecision>,
 ) -> Result<MigrateSummary, String> {
+    crate::guard::songs_dir(&app, &src_songs)?;
+    crate::guard::songs_dir(&app, &dest_songs)?;
+    let _moving = crate::jobs::in_flight(&app);
     tokio::task::spawn_blocking(move || {
         apply_plan(&PathBuf::from(&src_songs), &PathBuf::from(&dest_songs), &decisions)
     })
@@ -582,6 +636,26 @@ mod tests {
     }
 
     #[test]
+    fn a_decision_cannot_reach_outside_the_songs_folders() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("Instance/Songs");
+        let dest = tmp.path().join("Songs");
+        write(&src.join("01 Pop/Song/oni.tja"), "TITLE:A\n");
+        write(&tmp.path().join("Precious/keep.txt"), "x");
+        fs::create_dir_all(&dest).unwrap();
+
+        for (src_rel, dest_rel) in [("../../Precious", None), ("01 Pop/Song", Some("../Precious"))] {
+            let decisions = vec![MigrationDecision {
+                src_rel_path: src_rel.into(),
+                action: MigrationAction::UseInstance,
+                dest_rel_path: dest_rel.map(String::from),
+            }];
+            assert!(apply_plan(&src, &dest, &decisions).is_err());
+        }
+        assert!(tmp.path().join("Precious/keep.txt").exists());
+    }
+
+    #[test]
     fn migrating_a_folder_onto_itself_is_refused_rather_than_deleting_it() {
         let tmp = tempfile::tempdir().unwrap();
         let songs = tmp.path().join("Songs");
@@ -595,7 +669,7 @@ mod tests {
         // ...and applying one anyway must refuse instead of deleting the library.
         let decisions = vec![MigrationDecision {
             src_rel_path: "01 Pop/Song".into(),
-            action: "keep_global".into(),
+            action: MigrationAction::KeepGlobal,
             dest_rel_path: Some("01 Pop/Song".into()),
         }];
         let result = apply_plan(&songs, &songs, &decisions);
@@ -655,7 +729,7 @@ mod tests {
 
         let decisions = vec![MigrationDecision {
             src_rel_path: "01 Pop/Song".into(),
-            action: "keep_global".into(),
+            action: MigrationAction::KeepGlobal,
             dest_rel_path: Some("01 Pop/Song".into()),
         }];
         assert!(apply_plan(&instance, &library, &decisions).is_err());
@@ -737,9 +811,9 @@ mod tests {
         write(&dest.join("05 Old/Diff/uniqueID.json"), "{\"id\":\"d\"}");
 
         let decisions = vec![
-            MigrationDecision { src_rel_path: "01 Pop/New".into(), action: "move".into(), dest_rel_path: None },
-            MigrationDecision { src_rel_path: "01 Pop/Same".into(), action: "keep_global".into(), dest_rel_path: Some("01 Pop/Same".into()) },
-            MigrationDecision { src_rel_path: "01 Pop/Diff".into(), action: "use_instance".into(), dest_rel_path: Some("05 Old/Diff".into()) },
+            MigrationDecision { src_rel_path: "01 Pop/New".into(), action: MigrationAction::Move, dest_rel_path: None },
+            MigrationDecision { src_rel_path: "01 Pop/Same".into(), action: MigrationAction::KeepGlobal, dest_rel_path: Some("01 Pop/Same".into()) },
+            MigrationDecision { src_rel_path: "01 Pop/Diff".into(), action: MigrationAction::UseInstance, dest_rel_path: Some("05 Old/Diff".into()) },
         ];
         let summary = apply_plan(&src, &dest, &decisions).unwrap();
 
@@ -776,7 +850,7 @@ mod tests {
         // Only migrate one of the two songs
         let decisions = vec![MigrationDecision {
             src_rel_path: "01 Pop/Moved".into(),
-            action: "move".into(),
+            action: MigrationAction::Move,
             dest_rel_path: None,
         }];
         apply_plan(&src, &dest, &decisions).unwrap();
@@ -806,7 +880,7 @@ mod tests {
 
         let removed = tokio::runtime::Runtime::new()
             .unwrap()
-            .block_on(strip_song_content(songs.to_str().unwrap().into()))
+            .block_on(strip_song_content_in(songs.to_str().unwrap().into()))
             .unwrap();
         assert_eq!(removed, 2, "both song folders should be removed");
 
@@ -843,7 +917,7 @@ mod tests {
         // Migrating moves the song, never the whole Songs folder
         let decisions = vec![MigrationDecision {
             src_rel_path: "01 Pop/Song A".into(),
-            action: "move".into(),
+            action: MigrationAction::Move,
             dest_rel_path: None,
         }];
         apply_plan(&src, &dest, &decisions).unwrap();
@@ -858,7 +932,7 @@ mod tests {
         let missing = tmp.path().join("publish/Songs");
         let removed = tokio::runtime::Runtime::new()
             .unwrap()
-            .block_on(strip_song_content(missing.to_str().unwrap().into()))
+            .block_on(strip_song_content_in(missing.to_str().unwrap().into()))
             .unwrap();
         assert_eq!(removed, 0);
     }
@@ -887,7 +961,7 @@ mod tests {
         let dest_s = dest.to_str().unwrap();
         let found = tokio::runtime::Runtime::new()
             .unwrap()
-            .block_on(find_duplicate_song_folders(src_s.into(), dest_s.into()))
+            .block_on(find_duplicates_in(src_s.into(), dest_s.into()))
             .unwrap();
         let names: Vec<&str> = found.iter().map(|f| f.rel_path.as_str()).collect();
         assert_eq!(names, vec!["01 Chapter I", "S1 Dan-i Dojo"]);
@@ -895,7 +969,7 @@ mod tests {
         // Removal takes only those, and re-verifies before deleting
         let removed = tokio::runtime::Runtime::new()
             .unwrap()
-            .block_on(remove_duplicate_song_folders(
+            .block_on(remove_duplicates_in(
                 src_s.into(),
                 dest_s.into(),
                 vec![
@@ -913,5 +987,42 @@ mod tests {
         assert!(src.join("X1 Favorite/box.def").is_file(), "game boxes must be kept");
         assert!(src.join("L3 Downloaded Songs/box.def").is_file());
         assert!(src.join("L2 Custom Charts/Mine/mine.tja").is_file());
+    }
+
+    #[test]
+    fn the_songs_folder_itself_is_never_a_duplicate() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("inst/Songs");
+        let dest = tmp.path().join("global/Songs");
+        // A stripped instance library holds no chart, and the shared one does
+        write(&src.join("X1 Favorite/box.def"), "#TITLE:Fav");
+        write(&dest.join("Pop/Song/song.tja"), "TITLE:S\n");
+
+        let removed = tokio::runtime::Runtime::new()
+            .unwrap()
+            .block_on(remove_duplicates_in(
+                src.to_str().unwrap().into(),
+                dest.to_str().unwrap().into(),
+                vec![".".into(), "".into()],
+            ))
+            .unwrap();
+        assert_eq!(removed, 0);
+        assert!(src.join("X1 Favorite/box.def").is_file());
+    }
+
+    #[test]
+    fn a_migration_never_names_a_whole_songs_folder() {
+        let tmp = tempfile::tempdir().unwrap();
+        let src = tmp.path().join("inst/Songs");
+        let dest = tmp.path().join("global/Songs");
+        write(&src.join("Mine/mine.tja"), "TITLE:Mine\n");
+        write(&dest.join("Pop/Song/song.tja"), "TITLE:S\n");
+        let decision = MigrationDecision {
+            src_rel_path: "Mine".into(),
+            action: MigrationAction::UseInstance,
+            dest_rel_path: Some(".".into()),
+        };
+        assert!(apply_plan(&src, &dest, &[decision]).is_err());
+        assert!(dest.join("Pop/Song/song.tja").is_file(), "the shared library must survive");
     }
 }

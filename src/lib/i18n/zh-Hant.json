@@ -1,38 +1,32 @@
 {
   "common": {
-    "fetch_error": "擷取錯誤",
+    "fetch_error": "無法連線到伺服器。請檢查網路連線後再試。",
     "retry": "重試",
     "reload": "重新整理",
-    "cancel": "取消"
+    "cancel": "取消",
+    "clear": "清除"
   },
   "dl": {
     "error": {
       "failed_abort": "下載失敗，取消中"
-    },
-    "warn": {
-      "failed_retry": "下載失敗，重試中……（{attempt}/{max} 次）"
     }
   },
   "nav": {
     "home": "首頁",
     "songlist": "歌曲",
-    "skins": "主題",
-    "docs": "文件",
     "tools": "工具",
     "secrets": "祕密",
     "information": "資訊",
     "links": "鏈結",
-    "themes": "Hub 主題",
+    "themes": "設定",
     "tooltip": {
       "home": "管理 OpenTaiko 與 OpenTaiko Hub。",
       "songlist": "更新並下載最新的 OpenTaiko 歌曲。",
-      "skins": "取得最新的 OpenTaiko 主題與素材。",
-      "docs": "瀏覽所選 OpenTaiko 版本內附的說明文件。",
       "tools": "可加強 OpenTaiko 體驗的工具。",
       "secrets": "???",
       "information": "查看更新紀錄、說明文件、疑難排解。",
       "links": "查看 OpenTaiko 的社群與官方網站！",
-      "themes": "更改 OpenTaiko Hub 的主題。",
+      "themes": "變更 OpenTaiko Hub 的主題和語言。",
       "github": "查看 OpenTaiko Hub 原始碼。"
     }
   },
@@ -88,19 +82,20 @@
     },
     "button": {
       "reload": "重新整理",
-      "download": "下載 OpenTaiko",
-      "download_stable": "下載穩定版",
-      "download_experimental": "下載實驗版",
+      "check_updates": "檢查更新",
       "launch": "啟動 OpenTaiko",
-      "explorer": "開啟所在資料夾",
       "update": "更新 OpenTaiko",
       "redownload": "重新下載 OpenTaiko",
       "rebuild": "重新建置",
       "retry": "重試",
-      "install": "安裝版本..."
+      "install": "安裝版本...",
+      "change_build": "更換版本"
     },
     "warn": {
-      "skin_update": "（更新後需要在「主題」頁面更新主題）"
+      "newer_release": "OpenTaiko {version} 已發布：請透過「{button}」安裝。",
+      "skin_update": "（更新後需要在「主題」頁面更新主題）",
+      "skin_update_confirm": "此更新之後，已安裝的主題也需要更新。現在更新 OpenTaiko 嗎？",
+      "redownload_confirm": "重新下載 OpenTaiko {version} 並在此實例中重新安裝嗎？"
     },
     "hint": {
       "first_start": "在首次啟動遊戲前，請確定已在「主題」頁面下載任一主題，且已在「歌曲」頁面下載任何歌曲！",
@@ -108,7 +103,7 @@
     },
     "experimental": {
       "unavailable": "目前沒有可用的實驗版",
-      "requires_dotnet": "建置實驗版需要 .NET SDK 8。請從 https://dotnet.microsoft.com/download/dotnet/8.0 安裝後再重試。",
+      "requires_dotnet": "建置實驗版需要 .NET SDK 8 或更新版本。請安裝後再試。",
       "update_available": "有新的實驗版可用！",
       "up_to_date": "此實驗版已是最新版。",
       "stage": {
@@ -130,6 +125,9 @@
       "fetch_release": "擷取最新 OpenTaiko 版本失敗：{error}",
       "build_failed": "OpenTaiko 建置失敗：{error}。請查看下方的建置輸出。",
       "download_failed": "下載 OpenTaiko 失敗：{error}",
+      "instance_busy": "另一項工作仍在寫入此實例。請等待完成後再試。",
+      "branch_head": "未能找到實驗分支的最新版本",
+      "build_exit": "建置已停止，錯誤代碼 {code}",
       "incomplete_build": "已安裝的版本不完整（缺少遊戲檔案），請重新安裝。"
     },
     "success": {
@@ -139,7 +137,10 @@
     },
     "tab": {
       "overview": "概覽"
-    }
+    },
+    "first_run_text": "尚未安裝 OpenTaiko。",
+    "first_run_install": "安裝 OpenTaiko",
+    "first_run_folder": "將安裝到 {folder}"
   },
   "docs": {
     "title": "說明文件",
@@ -171,7 +172,9 @@
       "deleted": "已刪除存檔「{name}」。"
     },
     "error": {
+      "timeout": "讀取存檔資料庫耗時過長。",
       "no_db": "此實例尚無存檔資料庫。",
+      "game_running": "變更存檔前請先關閉 OpenTaiko：遊戲結束時會覆寫這些變更。",
       "load": "無法讀取存檔資料庫。",
       "invalid_file": "不是有效的 OpenTaiko 存檔檔案。",
       "export": "匯出存檔失敗：{error}",
@@ -208,46 +211,128 @@
     }
   },
   "songs": {
-    "col": {
-      "name": "歌曲名稱",
-      "folder": "分類資料夾",
-      "difficulties": "難度",
-      "charter": "譜面作者：",
-      "size": "大小",
-      "status": "狀態"
+    "box": {
+        "language": "語言",
+        "genre_help": "遊戲用它來解鎖內容。",
+        "title": "資料夾設定",
+        "official_locked": "OpenTaiko 原聲帶資料夾，由 Hub 保持同步。",
+        "name": "遊戲中顯示的名稱",
+        "genre": "流派",
+        "description": "說明（3 行）",
+        "line": "第 {n} 行",
+        "colors": "顏色",
+        "box_color": "盒子",
+        "back_color": "背面",
+        "bg_color": "背景",
+        "fore_color": "文字",
+        "appearance": "外觀",
+        "box_type": "盒子類型",
+        "bg_type": "背景類型",
+        "box_chara": "角色",
+        "scene": "場景預設",
+        "translations": "翻譯名稱",
+        "others": "其他設定（{count}）",
+        "others_note": "儲存時會原樣保留這些設定。",
+        "clear": "清除",
+        "jacket": "資料夾圖片",
+        "jacket_hint": "在遊戲中顯示於盒子上。支援 PNG、JPG 或 WebP。",
+        "jacket_pick": "選擇圖片...",
+        "jacket_saved": "已儲存為 {name}",
+        "jacket_failed": "無法設定圖片：{error}",
+      "discard_title": "未儲存的變更",
+      "discard_message": "資料夾設定有未儲存的變更。要捨棄嗎？",
+      "discard": "捨棄"
     },
-    "filter": {
-      "song": "搜尋歌曲……",
-      "folder": "搜尋資料夾……"
+    "folder": {
+        "loading": "正在載入歌曲。",
+        "name_taken": "「{name}」已存在。",
+        "not_downloaded": "此資料夾尚未下載。",
+        "new_folder": "新增資料夾",
+        "new_subfolder": "新增子資料夾",
+        "new_prompt": "新資料夾的名稱",
+        "new_placeholder": "例如：我的譜面",
+        "create": "建立",
+        "created": "已建立「{name}」",
+        "create_failed": "無法建立資料夾：{error}",
+        "delete": "刪除",
+        "delete_confirm": "要刪除「{name}」及其中的 {count} 首歌曲嗎？此操作無法復原。",
+        "delete_song_confirm": "要刪除「{name}」嗎？此操作無法復原。",
+        "deleted": "已刪除「{name}」",
+        "delete_failed": "無法刪除：{error}",
+        "box_missing": "尚無 box.def",
+        "box_loading": "載入中...",
+        "save_box": "儲存",
+        "unsaved": "未儲存的變更",
+        "box_saved": "已儲存 box.def",
+        "box_save_failed": "無法儲存 box.def：{error}",
+        "drop_hint": "將譜面 .zip 拖放到此處即可加入該資料夾",
+        "browse_zip": "選擇檔案...",
+        "importing": "正在加入譜面...",
+        "imported": "已加入 {count} 首歌曲",
+        "import_rejected": "不是譜面壓縮檔：{names}",
+        "import_failed": "無法加入譜面：{error}",
+        "drop_needs_folder": "請先選擇你自己的資料夾，然後再拖放檔案。"
+    },
+    "start": {
+        "title": "曲庫為空",
+        "body": "下載 OpenTaiko 歌曲即可開始，或將自製譜面放入歌曲資料夾。"
+    },
+    "detail": {
+        "help_title": "選擇一首歌曲查看詳情",
+        "help_installed": "已安裝且為最新",
+        "help_available": "可下載",
+        "help_outdated": "有更新的版本",
+        "help_custom": "自製譜面",
+        "help_hint": "展開資料夾進行瀏覽，或使用「取得」下載其中缺少的內容。",
+        "get_size": "下載（{size}）",
+        "open_song_folder": "開啟資料夾",
+        "set_jacket": "設定封面",
+      "website": "網站"
+    },
+    "course": {
+        "easy": "簡單",
+        "normal": "普通",
+        "hard": "困難",
+        "oni": "EX",
+        "edit": "EXEX",
+        "tower": "塔",
+        "dan": "段位"
+    },
+    "scope": {
+        "all": "全部",
+        "installed": "已安裝",
+        "updates": "更新"
+    },
+    "library": {
+        "title": "曲庫",
+        "summary": "已安裝 {installed} / {total} 首",
+        "get_everything": "取得全部 {count} 首",
+        "updates_waiting": "{count} 首可更新",
+        "search": "搜尋歌曲和資料夾..."
     },
     "status": {
-      "scanning": "掃描中……",
+      "installed_short": "已安裝",
       "not_downloaded": "未下載",
       "up_to_date": "最新",
       "outdated": "有更新"
     },
     "button": {
-      "bulk_download": "全部下載",
-      "download": "下載",
-      "redownload": "重新下載",
       "update": "更新",
       "open_folder": "開啟歌曲資料夾"
     },
-    "view": {
-      "list": "清單",
-      "tree": "樹狀"
-    },
     "scan": {
-      "progress": "掃描歌曲中……（已找到 {count} 首）",
-      "done": "曲庫中共有 {count} 首歌曲"
+      "progress": "掃描歌曲中……（已找到 {count} 首）"
     },
     "tree": {
-      "soundtrack": "OpenTaiko 音軌",
+      "show_more": "再顯示 {count} 首",
+      "get_n": "取得 {count} 首",
+      "nothing_here": "沒有符合目前篩選條件的內容。",
+      "installed_of": "已安裝 {installed} / {total}",
+      "no_match": "沒有符合搜尋條件的歌曲。",
+      "open_folder_tip": "開啟此資料夾",
       "custom": "自訂",
-      "songs_count": "{count} 首歌曲",
-      "empty": "曲庫中尚未找到任何歌曲。",
-      "spicy": "辣口",
-      "sweet": "甜口"
+      "all_updated": "全部都是最新的。",
+      "none_installed": "尚未安裝任何歌曲。"
     },
     "migrate": {
       "banner": "在「{instance}」中找到 {count} 個歌曲資料夾。是否移動到共享曲庫？",
@@ -270,17 +355,17 @@
       "error": "移動歌曲失敗：{error}"
     },
     "metadata": {
-      "updated": "已更新 {count} 個曲風資料夾（box.def／預覽圖）"
+      "updated": "已更新 {count} 個曲風資料夾"
     },
-    "experimental_note": "所選實例為實驗版：它內含自己的歌曲，不會使用共享曲庫。",
     "error": {
+      "audio_missing": "{name} 已不在這首歌的資料夾中。",
+      "open_folder": "無法開啟資料夾：{error}",
       "scanning": "仍在掃描本機資料夾，因此無法下載歌曲",
+      "audio_failed": "無法讀取這首歌的音訊：{error}",
       "scan_failed": "掃描曲庫失敗：{error}"
     },
     "success": {
-      "all_up_to_date": "所有歌曲皆是最新版",
-      "download_complete": "下載完成",
-      "download_nb": "已下載第 {nb}/{total} 首歌曲"
+      "download_complete": "下載完成"
     },
     "duplicates": {
       "banner": "「{instance}」中有 {count} 個空的重複資料夾。要刪除嗎？",
@@ -290,6 +375,10 @@
     }
   },
   "assets": {
+    "update_skin": {
+      "title": "更新 {name}？",
+      "message": "為避免留下舊檔案，下載新版本前會先刪除已安裝的 {name}。你在其資料夾中所做的變更將會遺失。"
+    },
     "tab": {
       "skins": "主題",
       "characters": "角色",
@@ -317,12 +406,12 @@
     },
     "error": {
       "scanning": "仍在掃描本機資料夾，因此無法下載{type}",
-      "zip_not_found": "在伺服器上找不到主題壓縮包。請在 5 分鐘後重試 1 次。如果問題仍然存在，請聯絡 OpenTaiko 團隊。"
+      "zip_not_found": "在伺服器上找不到主題壓縮包。請在 5 分鐘後重試 1 次。如果問題仍然存在，請聯絡 OpenTaiko 團隊。",
+      "instance_busy": "正在向此實例安裝 OpenTaiko。請等待完成後再試。"
     },
     "success": {
       "all_up_to_date": "所有{type}皆是最新版",
-      "download_complete": "下載完成",
-      "download_nb": "已下載{type} {nb}/{total}"
+      "download_complete": "下載完成"
     }
   },
   "asset_cell": {
@@ -356,7 +445,9 @@
       "perfect": "全良連段",
       "full_combo": "全連段",
       "clear": "過關"
-    }
+    },
+    "modal_title": "名人堂：{title}（{course} #{rank}）",
+    "crown": "名人堂"
   },
   "version_chip": {
     "incompatible": "與目前的 OpenTaiko 版本不相容",
@@ -364,13 +455,13 @@
   },
   "player": {
     "play": "播放",
-    "pause": "暫停"
+    "pause": "暫停",
+    "position": "播放位置"
   },
   "info": {
     "tab": {
       "changelog_game": "更新紀錄（遊戲本體）",
       "changelog_hub": "更新紀錄（Hub）",
-      "documentation": "說明文件",
       "troubleshooting": "疑難排解",
       "credits": "致謝資訊"
     },
@@ -491,7 +582,6 @@
   },
   "themes": {
     "title": "選擇主題。",
-    "title_debug": "選擇主題。（偵錯模式開啟）",
     "optgroup": {
       "optk": "OpenTaiko Hub 主題：",
       "skeleton": "Skeleton 內建主題："
@@ -521,20 +611,6 @@
       "dark": "深色",
       "light": "淺色",
       "current": "目前配色：{mode}"
-    },
-    "debug": {
-      "disable_btn": "停用偵錯模式"
-    },
-    "error": {
-      "theme_json": "找不到 theme.json 檔案（或設定資料夾）或檔案已損壞！<br>請重新安裝 OpenTaiko Hub 以修復此問題。",
-      "thememode_json": "找不到 thememode.json 檔案（或設定資料夾）或檔案已損壞！<br>請重新安裝 OpenTaiko Hub 以修復此問題。"
-    },
-    "warn": {
-      "same_theme": "所選主題已是目前主題。",
-      "same_theme_debug": "偵錯：所選主題已是目前主題。"
-    },
-    "success": {
-      "debug_disabled": "<b>偵錯模式已停用。</b><br><p class=\"smalltext\">（注意：需要更改「debugMode」的值，才能完全停用偵錯模式！）</p>"
     }
   },
   "lang": {
@@ -549,5 +625,48 @@
     "nl": "Nederlands",
     "ko": "한국어",
     "ru": "Русский"
+  },
+  "jobs": {
+    "busy": "進行中",
+    "close_title": "仍在進行",
+    "close_message": "下載或建置仍在進行。關閉 Hub 會使其中斷。",
+    "close": "關閉",
+    "keep": "保持開啟",
+    "cancelling": "正在取消…",
+    "installing_into": "正在安裝到 {name}",
+    "install_cancelled": "安裝已取消",
+    "dotnet_page": "取得 .NET 8",
+    "instance_busy": "此實例正在進行安裝",
+    "closing": "目前步驟完成後即關閉…"
+  },
+  "toast": {
+    "copy": "複製詳細資訊",
+    "copied": "已複製",
+    "open_logs": "開啟記錄資料夾"
+  },
+  "errors": {
+    "rate_limited": "GitHub 正在限制來自你網路的請求。請稍後再試。",
+    "not_found": "伺服器上缺少該檔案。",
+    "offline": "無法連線到伺服器。請檢查網路連線。",
+    "disk_full": "磁碟已滿。",
+    "access_denied": "檔案存取遭拒。如果遊戲正在執行，請關閉後再試。",
+    "no_build_for_system": "此版本沒有適用於 {system} 的下載。",
+    "songs_link_failed": "無法將曲庫連結到 {name}，遊戲中將不會顯示這些歌曲。"
+  },
+  "bulk": {
+    "finishing": "正在完善已下載歌曲的資料夾…",
+    "status": "正在下載 {done} / {total} · 剩餘 {size}",
+    "done": "已下載 {count} / {total}",
+    "failed": "已下載 {count} / {total}。失敗：{failed}",
+    "cancelled": "已取消。已下載 {count} / {total}"
+  },
+  "files": {
+    "images": "圖片",
+    "chart_archives": "譜面壓縮檔",
+    "optk_save": "OpenTaiko 存檔"
+  },
+  "relocate": {
+    "moved": "OpenTaiko Hub 現在將歌曲和遊戲保存在 {folder}。已將 {count} 個資料夾移到那裡。",
+    "failed": "Hub 的部分資料未能移到 {folder}，因此可能缺少歌曲或遊戲。複製詳細資訊可查看還需要移動的內容。"
   }
 }

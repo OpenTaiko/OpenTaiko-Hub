@@ -6,6 +6,7 @@
     // any kind are made — the file is read and rendered as is.
     import { exists, readTextFile, readFile, readDir } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
+    import { untrack } from 'svelte';
     import { _ } from 'svelte-i18n';
 
     import { activeInstance } from "../stores/instances";
@@ -16,7 +17,6 @@
     let notFound = $state(false);
     let loading = $state(false);
     let refreshToken = 0;
-    let renderedFor: string | null = null;   // bookkeeping only, never rendered
 
     // The built page is served to the iframe through a Blob URL rather than srcdoc. A
     // srcdoc document borrows the Hub's own URL as its base, so when the docs' router
@@ -175,11 +175,10 @@ ${SCRIPT_CLOSE}`;
     };
     // Only (re)build when the active instance actually changes — building inlines the
     // whole docs site, so avoid redundant rebuilds on unrelated store updates.
+    let instanceId = $derived($activeInstance?.id ?? null);
     $effect(() => {
-        if ($activeInstance && renderedFor !== $activeInstance.id) {
-            renderedFor = $activeInstance.id;
-            Refresh($activeInstance);
-        }
+        if (instanceId === null) return;
+        untrack(() => { if ($activeInstance) Refresh($activeInstance); });
     });
 </script>
 
@@ -191,16 +190,24 @@ ${SCRIPT_CLOSE}`;
         </div>
     </section>
 {:else if docsUrl !== null}
-    <iframe src={docsUrl} title={$_('docs.title')} class="docs-frame"></iframe>
+    <!-- The docs come from the instance folder and run their own scripts. Without the
+         sandbox they would share the Hub's origin and could call the backend through
+         window.parent; with it they get an opaque origin. Popups stay allowed so
+         external links still open. -->
+    <iframe src={docsUrl} title={$_('docs.title')} class="docs-frame"
+        sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe>
 {:else if loading}
     <div class="placeholder animate-pulse w-full h-24"></div>
 {/if}
 
 <style>
     .docs-frame {
+        /* Inline, it sat on a text line and stood a few pixels taller than its box */
+        display: block;
         width: 100%;
         height: 100%;
-        min-height: 75vh;
+        /* Its box is the height left under the Home bars; 75vh was more than that */
+        min-height: 12rem;
         border: none;
         border-radius: 0.5rem;
         background: #fff;

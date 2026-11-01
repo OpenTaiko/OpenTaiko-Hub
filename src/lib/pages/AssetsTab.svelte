@@ -1,42 +1,25 @@
 <script lang="ts">
+    import { ipc } from '$lib/ipc';
+    import { formatSize } from '$lib/utils/format.svelte';
+    import { ValidAssetCatalog } from '$lib/utils/validate';
+    import { SKINS_REPO, pageUrl, rawUrl } from '$lib/repos';
     // Dependencies
     import { onMount } from 'svelte';
     import { Tabs } from '@skeletonlabs/skeleton-svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir, readDir, exists, copyFile, remove } from '@tauri-apps/plugin-fs';
-    import { fetch } from "@tauri-apps/plugin-http";
+    import { mkdir, remove, exists } from '@tauri-apps/plugin-fs';
+    import { confirm } from '@tauri-apps/plugin-dialog';
+    import { InstallZip } from '$lib/services/install';
+    import { download, installFiles, fetchCachedJson, type InstallEntry } from '$lib/utils/download';
+    import { startJob, isCancelled, InstanceInUse, type Job } from '$lib/stores/activity';
+    import { DescribeError, ErrorCause, ErrorText } from '$lib/utils/errors';
     import { path } from '@tauri-apps/api';
-    import { invoke } from '@tauri-apps/api/core';
-    import { listen } from '@tauri-apps/api/event';
-    import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, LocalAsset, ToastContext } from '$lib/types';
+    import type { AssetCatalog, AssetInfo, AssetPrefix as AssetKeyPrefix, AssetType, AssetVersion, CharaInfo, Instance, LocalAsset, ToastContext } from '$lib/types';
 
-    const copyAllFilesRecursive = async (src: string, dst: string): Promise<void> => {
-        let files;
-        try {
-            files = await readDir(src);
-        } catch (error) {
-            console.error(`Error reading directory ${src}:`, error);
-            return;
-        }
-        for (const file of files) {
-            const srcPath = `${src}/${file.name}`;
-            const dstPath = `${dst}/${file.name}`;
-            try {
-                if (file.isDirectory) {
-                    await mkdir(dstPath, { recursive: true });
-                    await copyAllFilesRecursive(srcPath, dstPath);
-                } else {
-                    await copyFile(srcPath, dstPath);
-                }
-            } catch (error) {
-                console.error(`Error copying ${srcPath} → ${dstPath}:`, error);
-            }
-        }
-    }
     import { getContext } from 'svelte';
-    const { TriggerError, TriggerSuccess, backoffDownload } = getContext<ToastContext>('toast');
+    const { TriggerError, TriggerWarning, TriggerSuccess } = getContext<ToastContext>('toast');
 
-    import { GetTmpPath } from "$lib/utils/path";
+    import { IsPlainRelPath } from "$lib/utils/path";
     import { activeInstance, instanceVersions } from "$lib/stores/instances";
     import { _ } from 'svelte-i18n';
     import { get } from 'svelte/store';
@@ -73,7 +56,7 @@
     // Rescan whenever another instance becomes active
     let scannedInstanceId: string | null = null;   // bookkeeping only, never rendered
 
-    const assetsInfoUrl = 'https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/assets_info.json';
+    const assetsInfoUrl = rawUrl(SKINS_REPO, 'assets_info.json');
     let assetsInfo = $state<AssetCatalog>(emptyCatalog());
     let currentAssets = $state<LocalAssets>(emptyByType<LocalAsset>());
     let assetScanning = $state(false);
@@ -88,19 +71,23 @@
         "Characters":null,
         "Puchicharas":null
     });
+    // Running bulk downloads, per asset type, so each can be cancelled
+    const bulkJobs: Partial<Record<AssetType, Job>> = {};
+    // Read by the Cancel button, which says it is cancelling until the run stops
+    const bulkCancelRequested = $state<Partial<Record<AssetType, boolean>>>({});
+    // Set when the catalog could not be loaded: an empty table would otherwise read as
+    // "everything is up to date"
+    let catalogFetchFailed = $state(false);
 
 
     const updateAssetsInfo = async () => {
+        catalogFetchFailed = false;
         try {
-            const response = await fetch(assetsInfoUrl);
-            if (response.ok) {
-                const text = await response.text();
-                assetsInfo = JSON.parse(text) as AssetCatalog;
-            } else {
-                assetsInfo = emptyCatalog();
-            }
+            assetsInfo = ValidAssetCatalog(await fetchCachedJson<unknown>(assetsInfoUrl));
         } catch (error) {
+            console.error('Failed to fetch the asset catalog:', error);
             assetsInfo = emptyCatalog();
+            catalogFetchFailed = true;
         }
     }
 
@@ -130,7 +117,7 @@
         const scanned: Record<string, LocalAsset> = {};
         try {
             const baseDir = await path.join(instancePath, assetBaseDirs[assetType]);
-            const found = await invoke<AssetVersion[]>('scan_asset_versions', { baseDir, targetFile: targetFile[assetType] });
+            const found = await ipc.scanAssetVersions(baseDir, targetFile[assetType]);
             for (const { relPath, version } of found) {
                 scanned[relPath] = { assetFolderName: relPath, assetVersion: version };
             }
@@ -154,9 +141,11 @@
         Number((info as Record<string, unknown>)[`${prefix}Size`] ?? 0);
 
     const DownloadDisplayedAssets = async (assetType: AssetType) => {
+        // Skins are updated one at a time: each update asks before deleting the old version
+        if (assetType === "Skins") return;
         if (assetScanning === true) {
             const translatedType = get(_)(`assets.type.${assetType.toLowerCase()}`);
-            TriggerError(get(_)('assets.error.scanning', { values: { type: translatedType } }));
+            TriggerWarning(get(_)('assets.error.scanning', { values: { type: translatedType } }));
             return ;
         }
 
@@ -169,6 +158,13 @@
             return _notdownloaded || _outdated;
         };
 
+        // Without the catalog nothing is known to be missing, which used to be reported
+        // as everything being up to date
+        if (catalogFetchFailed) {
+            TriggerWarning(get(_)('common.fetch_error'));
+            return;
+        }
+
         const AInfo = assetsInfo[assetType].filter((a) => _filter(a));
 
         const assetCount = AInfo.length;
@@ -179,161 +175,183 @@
             return ;
         }
 
+        const instance = get(activeInstance);
+        if (!instance || !CanWriteInto(instance)) return;
+        const job = startJob('home', instance.id);
+        bulkJobs[assetType] = job;
+        bulkCancelRequested[assetType] = false;
+        // One summary at the end instead of a toast per asset
+        let done = 0;
+        let failed = 0;
         assetCountProgress[assetType] = 0;
-        for (const Aif of AInfo) {
-            const assetRelpath = Field(Aif, assetPrefix, 'Folder');
+        assetCountProgressBar[assetType] = 0;
+        try {
+            for (const Aif of AInfo) {
+                if (bulkCancelRequested[assetType]) break;
+                const assetRelpath = Field(Aif, assetPrefix, 'Folder');
+                const curObj = currentAssets[assetType][assetRelpath] ?? null;
 
-            assetCountProgressBar[assetType] = 100 * (assetCountProgress[assetType] / assetCount);
-
-            console.log(`Downloading ${assetType} ${assetCountProgress[assetType] + 1} out of ${assetCount}...`);
-            console.log(Aif);
-
-            const curObj = currentAssets[assetType][assetRelpath] ?? null;
-
-            await DownloadAsset(Aif, curObj, assetType, assetCountProgress[assetType] + 1, assetCount);
-            assetCountProgress[assetType]++;
+                const outcome = await DownloadAsset(Aif, curObj, assetType, assetCountProgress[assetType] + 1, assetCount, job);
+                if (outcome === 'done') done++;
+                else if (outcome === 'failed') failed++;
+                assetCountProgress[assetType]++;
+                assetCountProgressBar[assetType] = 100 * (assetCountProgress[assetType] / assetCount);
+            }
+            const values = { count: done, total: assetCount, failed };
+            if (bulkCancelRequested[assetType]) TriggerWarning(get(_)('bulk.cancelled', { values }));
+            else if (failed > 0) TriggerError(get(_)('bulk.failed', { values }));
+            else TriggerSuccess(get(_)('bulk.done', { values }));
+        } finally {
+            job.end();
+            delete bulkJobs[assetType];
+            assetCountProgressBar[assetType] = null;
         }
-        assetCountProgressBar[assetType] = null
     }
 
-    const DownloadAsset = async (assetObj: AssetInfo, currentObj: LocalAsset | null, assetType: AssetType, assetNb?: number, assetTotal?: number) => {
-        const instance = get(activeInstance);
-        if (!instance) return;
-        if (instance.channel === 'experimental') {
-            TriggerError(get(_)('assets.experimental.blocked_text'));
-            return;
-        }
-        const res = instance.path;
+    const CancelBulk = (assetType: AssetType) => {
+        bulkCancelRequested[assetType] = true;
+        bulkJobs[assetType]?.cancel();
+    };
 
+    type DownloadOutcome = 'done' | 'failed' | 'cancelled' | 'skipped';
+
+    // A bulk run passes its job and reports a summary itself, so the asset stays quiet.
+    // A single asset gets a job of its own, so it shows as running and can be noticed
+    // before the window is closed on it.
+    // Said once, before a run starts: a bulk run used to say it again for every asset
+    const CanWriteInto = (instance: Instance): boolean => {
+        if (instance.channel === 'experimental') {
+            TriggerWarning(get(_)('assets.experimental.blocked_text'));
+            return false;
+        }
+        // An install replaces the game's files, these included
+        if (InstanceInUse(instance.id, false)) {
+            TriggerWarning(get(_)('assets.error.instance_busy'));
+            return false;
+        }
+        return true;
+    };
+
+    const DownloadAsset = async (assetObj: AssetInfo, currentObj: LocalAsset | null, assetType: AssetType, assetNb?: number, assetTotal?: number, bulkJob?: Job): Promise<DownloadOutcome> => {
+        const instance = get(activeInstance);
+        if (!instance) return 'skipped';
+        if (!bulkJob && !CanWriteInto(instance)) return 'skipped';
+        // A skin update removes the old version first: files the new one no longer has
+        // were left behind and still read by the game
+        const replace = assetType === "Skins" && currentObj !== null
+            && currentObj.assetVersion !== Field(assetObj, 'skin', 'Version');
+        if (replace && !await ConfirmSkinUpdate(assetObj)) return 'skipped';
+        const quiet = bulkJob !== undefined;
+        const job = bulkJob ?? startJob('home', instance.id);
+        try {
+            return await InstallAsset(instance.path, assetObj, assetType, quiet, job, replace);
+        } finally {
+            if (!bulkJob) job.end();
+        }
+    }
+
+    const ConfirmSkinUpdate = (assetObj: AssetInfo): Promise<boolean> => {
+        const t = get(_);
+        const name = Field(assetObj, 'skin', 'Name');
+        return confirm(t('assets.update_skin.message', { values: { name } }), {
+            title: t('assets.update_skin.title', { values: { name } }),
+            kind: 'warning',
+            okLabel: t('asset_cell.button.update'),
+            cancelLabel: t('common.cancel')
+        });
+    };
+
+    /** `replace`: the asset's folder is deleted before the new version is downloaded. */
+    const InstallAsset = async (res: string, assetObj: AssetInfo, assetType: AssetType, quiet: boolean, job: Job, replace = false): Promise<DownloadOutcome> => {
         const baseDir = assetBaseDirs[assetType];
         const assetPrefix = AssetPrefix(assetType);
         const assetRelpath = Field(assetObj, assetPrefix, 'Folder');
         const assetSize = SizeMb(assetObj, assetPrefix);
         const assetVersion = Field(assetObj, assetPrefix, 'Version');
 
+        // Catalog paths decide where files are written, so a malformed one is refused
+        // before anything is downloaded
+        const catalogPaths = assetType === 'Skins' ? [assetRelpath] : [assetRelpath, ...(assetObj as CharaInfo).charaFilesPath];
+        if (!catalogPaths.every(IsPlainRelPath)) {
+            console.error(`Refusing catalog paths of ${assetRelpath}:`, catalogPaths);
+            if (!quiet) TriggerError(get(_)('dl.error.failed_abort'));
+            return 'failed';
+        }
+
         assetDLProgress[assetType][assetRelpath] = 0;
 
         const localPath = `${baseDir}/${assetRelpath}`;
         const assetFullPath = await path.join(res, localPath);
 
-        if (!await exists(assetFullPath))
+        // Any failure below clears the progress row, says so, and records nothing: a
+        // half-installed asset must not show as up to date
+        try {
+            if (replace) {
+                // Never a folder above the skin's own ("System/." would be System itself)
+                if (assetRelpath.split(/[\\/]/).some((part) => part === '' || part === '.')) {
+                    throw new Error(`Refusing to delete ${localPath}`);
+                }
+                if (await exists(assetFullPath)) await remove(assetFullPath, { recursive: true });
+                // Shown as not downloaded should the new version fail to arrive
+                delete currentAssets[assetType][assetRelpath];
+            }
             await mkdir(assetFullPath, { recursive: true });
 
-        const assetDownloadFolder = await GetTmpPath(crypto.randomUUID());
-
-        if (!await exists(assetDownloadFolder))
-            await mkdir(assetDownloadFolder, { recursive: true });
-
-        if (assetType === "Skins") {
-            // Zip name: spaces → dots, parentheses stripped (matches release asset naming)
-            const zipName = assetRelpath.replace(/[()]/g, '').replace(/ /g, '.') + '.zip';
-            const zipUrl = `https://github.com/OpenTaiko/OpenTaiko-Skins/releases/download/system-assets/${zipName}`;
-            const zipPath = await path.join(assetDownloadFolder, 'skin.zip');
-
-            let totbyts = 0;
-            const success = await backoffDownload(
-                zipUrl,
-                zipPath,
-                (pr) => {
-                    totbyts += pr.progress;
-                    assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
-                }
-            );
-
-            if (!success) {
-                // backoffDownload already shows an error toast; show zip-specific guidance on top
-                TriggerError(get(_)('assets.error.zip_not_found'));
-                await remove(assetDownloadFolder, { recursive: true });
-                delete assetDLProgress[assetType][assetRelpath];
-                return;
-            }
-
-            assetDLProgress[assetType][assetRelpath] = 0;
-
-            let extracting = true;
-            const capturedRelpath = assetRelpath;
-            const capturedType = assetType;
-            const unlisten = await listen<number>('extract-progress', (event) => {
-                if (!extracting) return;
-                assetDLProgress[capturedType][capturedRelpath] = event.payload;
-            });
-
-            await invoke('unzip_and_get_first_folder', { zipPath });
-            extracting = false;
-            unlisten();
-
-            // All skin zips are flat (files/folders at zip root), so copy directly
-            // from the extraction folder into the skin destination.
-            await remove(zipPath);
-            await copyAllFilesRecursive(assetDownloadFolder.replace(/\\/g, '/'), assetFullPath);
-
-            await remove(assetDownloadFolder, { recursive: true });
-
-        } else {
-            // Per-file download for Characters and Puchicharas
-            const subDir = "Global";
-            const assetFpath = (assetObj as CharaInfo).charaFilesPath;
-            const baseDirPath = await path.join(res, baseDir);
-
-            let fileNames: string[] = [];
-            let totbyts = 0;
-
-            for (const filePath of assetFpath) {
-                const localFileName = filePath.replace(/^[^\\]+\\/, '');
-                const assetFileUrl = `https://raw.githubusercontent.com/OpenTaiko/OpenTaiko-Skins/main/${subDir}/${filePath}`;
-                const dlPath = await path.join(assetDownloadFolder, localFileName.replace(/\\/g, '/'));
-                const fileFold = await path.join(assetDownloadFolder, (filePath.split('\\').length > 2 ? filePath.replace(/^[^\\]+\\/, '').replace(/\\[^\\]+$/, '') : '').replace(/\\/g, '/'));
-
-                if (!await exists(fileFold))
-                    await mkdir(fileFold, { recursive: true });
-
-                const success = await backoffDownload(
-                    assetFileUrl,
-                    dlPath,
-                    (pr) => {
+            if (assetType === "Skins") {
+                // Zip name: spaces → dots, parentheses stripped (matches release asset naming)
+                const zipName = assetRelpath.replace(/[()]/g, '').replace(/ /g, '.') + '.zip';
+                // Skin packages hold their files at the archive's root
+                let totbyts = 0;
+                await InstallZip(pageUrl(SKINS_REPO, `releases/download/system-assets/${zipName}`), assetFullPath, job.id, {
+                    // The size comes from the catalog: the release server does not always send it
+                    download: (url, dest) => download(url, dest, (pr) => {
                         totbyts += pr.progress;
                         assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
+                    }, undefined, job.id),
+                    onStage: (stage) => {
+                        if (stage === 'extract') assetDLProgress[assetType][assetRelpath] = 0;
+                    },
+                    onProgress: (percent) => {
+                        if (percent !== undefined) assetDLProgress[assetType][assetRelpath] = percent;
                     }
-                );
+                }, { flat: true });
+            } else {
+                // Characters and Puchicharas are separate files, downloaded straight into
+                // place a few at a time. The first folder of each catalog path is the
+                // repository's own (Characters\ / Puchicharas\) and is dropped.
+                const subDir = "Global";
+                const baseDirPath = await path.join(res, baseDir);
+                const entries: InstallEntry[] = (assetObj as CharaInfo).charaFilesPath.map((filePath) => ({
+                    url: rawUrl(SKINS_REPO, `${subDir}/${filePath.replace(/\\/g, '/')}`),
+                    relPath: filePath.replace(/^[^\\]+\\/, '').replace(/\\/g, '/')
+                }));
 
-                if (!success) {
-                    await remove(assetDownloadFolder, { recursive: true });
-                    delete assetDLProgress[assetType][assetRelpath];
-                    return;
-                }
-
-                fileNames.push(localFileName);
+                let totbyts = 0;
+                await installFiles(baseDirPath, entries, (pr) => {
+                    totbyts += pr.progress;
+                    assetDLProgress[assetType][assetRelpath] = 100 * (totbyts / (assetSize * 1024 * 1024));
+                }, job.id);
             }
-
-            assetDLProgress[assetType][assetRelpath] = 0;
-            await Promise.all(fileNames.map(async (fn, idx) => {
-                const strPath = (await path.join(assetDownloadFolder, fn)).replace(/\\/g, '/');
-                const destPath = (await path.join(baseDirPath, fn)).replace(/\\/g, '/');
-                const fileFold = await path.dirname(destPath);
-
-                if (!await exists(fileFold))
-                    await mkdir(fileFold, { recursive: true });
-
-                await copyFile(strPath, destPath);
-                assetDLProgress[assetType][assetRelpath] = (idx + 1) * (100 / fileNames.length);
-            }));
-
-            await remove(assetDownloadFolder, { recursive: true });
+        } catch (error) {
+            if (isCancelled(error)) return 'cancelled';
+            console.error(`Installing ${assetRelpath} failed:`, error);
+            if (!quiet) {
+                // A skin package missing on the server has advice of its own
+                const missing = assetType === 'Skins' && ErrorCause(error) === 'errors.not_found';
+                TriggerError(missing ? get(_)('assets.error.zip_not_found') : `${get(_)('dl.error.failed_abort')}<br>${DescribeError(error)}`, { details: ErrorText(error) });
+            }
+            return 'failed';
+        } finally {
+            delete assetDLProgress[assetType][assetRelpath];
         }
 
-        if (assetNb === undefined)
-            TriggerSuccess(get(_)('assets.success.download_complete'));
-        else {
-            const translatedType = get(_)(`assets.type.${assetType.toLowerCase()}`);
-            TriggerSuccess(get(_)('assets.success.download_nb', { values: { type: translatedType, nb: assetNb, total: assetTotal } }));
-        }
+        if (!quiet) TriggerSuccess(get(_)('assets.success.download_complete'));
 
         currentAssets[assetType][assetRelpath] = {
             assetFolderName: assetRelpath,
             assetVersion: assetVersion
         };
-
-        delete assetDLProgress[assetType][assetRelpath];
+        return 'done';
     }
 
     onMount(async () => {
@@ -379,6 +397,15 @@
 	</Tabs.List>
 </Tabs>
 {/if}
+{#if catalogFetchFailed}
+<aside class="card p-3 mb-2 flex items-center gap-3 flex-wrap">
+	<i class="fa-solid fa-triangle-exclamation text-red-500"></i>
+	<span class="flex-1"><b>{$_('common.fetch_error')}</b></span>
+	<button type="button" class="button-blue button-main" onclick={updateAssetsInfo}>
+		<i class="fa-solid fa-rotate"></i> {$_('common.retry')}
+	</button>
+</aside>
+{/if}
 <div class="table-wrap">
 	<table class="table table-hover">
 		<thead>
@@ -398,8 +425,11 @@
 				<th></th>
 				<th>
 					{#if assetCountProgressBar[AssetTabType(currentAsset)] !== null}
-					<ProgressBar value={assetCountProgressBar[AssetTabType(currentAsset)]} max={100} />
-					{:else}
+					<div class="flex items-center gap-2">
+						<ProgressBar value={assetCountProgressBar[AssetTabType(currentAsset)]} max={100} />
+						<button type="button" onclick={() => CancelBulk(AssetTabType(currentAsset))} class="button-gray button-main" disabled={bulkCancelRequested[AssetTabType(currentAsset)]} title={bulkCancelRequested[AssetTabType(currentAsset)] ? $_('jobs.cancelling') : $_('common.cancel')} aria-label={bulkCancelRequested[AssetTabType(currentAsset)] ? $_('jobs.cancelling') : $_('common.cancel')}><i class="fa-solid {bulkCancelRequested[AssetTabType(currentAsset)] ? 'fa-spinner fa-spin' : 'fa-xmark'}"></i></button>
+					</div>
+					{:else if AssetTabType(currentAsset) !== 'Skins'}
 					<button type="button" onclick={() => DownloadDisplayedAssets(AssetTabType(currentAsset))} class="button-green button-main"><i class="fa-solid fa-download"></i> {$_('assets.button.bulk_download')}</button>
 					{/if}
 				</th>
@@ -410,11 +440,12 @@
 			<tr>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Name')}</td>
 				<td>
-					<VersionNumberChip LatestVersion={Field(info, AssetTabPrefix(currentAsset), 'Version')} CurrentVersion={optk_version} Strictness="Error" />
+					<!-- Characters and puchicharas do not follow the game's versions the way skins do -->
+					<VersionNumberChip LatestVersion={Field(info, AssetTabPrefix(currentAsset), 'Version')} CurrentVersion={optk_version} Strictness={AssetTabType(currentAsset) === 'Skins' ? 'Error' : 'None'} />
 				</td>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Resolution')}</td>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Creator')}</td>
-				<td>{SizeMb(info, AssetTabPrefix(currentAsset))}Mb</td>
+				<td>{formatSize(SizeMb(info, AssetTabPrefix(currentAsset)))}</td>
 				<td>
 					<AssetStatusCell
 						IsScanning={assetScanning}
