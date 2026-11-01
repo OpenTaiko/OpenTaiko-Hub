@@ -3,7 +3,7 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
-## [0.3.0] - 2026-09-22 (Alpha)
+## [0.3.0] - 2026-11-01 (Alpha)
 
 - [Feat] The Songs tab is now a library browser: collections open in place, the songs you have and the songs you have yet to download sit together in the same folders, and picking one fills a panel beside the list
 - [Feat] A header above the library shows how much of the soundtrack you have installed, how many updates are waiting and where your Songs folder is, with one button that downloads everything missing or outdated and its total size
