@@ -1,6 +1,6 @@
 [package]
 name = "OpenTaiko-Hub"
-version = "0.3.0"
+version = "0.3.1"
 description = "Update manager and launcher for OpenTaiko"
 authors = ["OpenTaiko Team"]
 license = "MIT"

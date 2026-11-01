@@ -3,6 +3,10 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.3.1] - 2026-11-02 (Alpha)
+
+- [Fix] Downloaded official songs played their whole audio instead of the 15-second preview
+
 ## [0.3.0] - 2026-11-01 (Alpha)
 
 - [Feat] The Songs tab is now a library browser: collections open in place, the songs you have and the songs you have yet to download sit together in the same folders, and picking one fills a panel beside the list

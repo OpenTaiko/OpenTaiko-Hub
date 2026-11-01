@@ -9,9 +9,8 @@
 		/** The catalog entry, or null for a song of the user's own that the soundtrack
 		 *  does not have: it plays from disk and shows Title and Subtitle instead. */
 		songInfo: SoundtrackEntry | null;
-		/** Local audio for an installed chart. Falls back to the soundtrack repo only
-		 *  when the chart is not on disk, so a downloaded library plays offline and
-		 *  does not hammer the repository. */
+		/** Local audio for an installed chart: what a song of the user's own plays, and
+		 *  what an official song plays when its preview cannot be reached (offline). */
 		Src?: string | null;
 		/** Reads the local audio when it is first played, for an installed chart: read on
 		 *  selection, browsing the library read every song's whole audio file. Src then
@@ -23,11 +22,22 @@
 
 	let { songInfo, Src = null, LoadSrc, Title = '', Subtitle = null }: Props = $props();
 
-	// A chart whose audio is on disk never streams it from the repository meanwhile
-	let source = $derived(
-		Src
-		?? (LoadSrc ? null : songInfo ? rawUrl(SOUNDTRACK_REPO, songInfo.chartAudioFilePath) : null)
-	);
+	// An official song plays its 15-second preview from the soundtrack repository,
+	// installed or not: the installed audio is the whole song. Fetched only once played.
+	let preview = $derived(songInfo ? rawUrl(SOUNDTRACK_REPO, songInfo.chartAudioFilePath) : null);
+	// The preview that could not be loaded, so the song on disk plays instead
+	let previewFailed = $state<string | null>(null);
+	let usePreview = $derived(preview !== null && previewFailed !== preview);
+	let source = $derived(usePreview ? preview : Src);
+
+	const PreviewFailed = async () => {
+		if (!usePreview || (!Src && !LoadSrc)) return;
+		previewFailed = preview;
+		// It failed on a click on Play: the song on disk is played in its place
+		if (!Src && LoadSrc && !(await LoadSrc())) return;
+		await tick();
+		paused = false;
+	};
 
 	// Clicks while the audio is being read are ignored: each one used to toggle once the
 	// read ended, so a double click played and paused at once
@@ -81,6 +91,7 @@
 		bind:duration
 		bind:paused
 		preload="none"
+		onerror={PreviewFailed}
 		onended={() => {
 			time = 0;
 		}}

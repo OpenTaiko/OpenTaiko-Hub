@@ -185,10 +185,12 @@
 
     const OpenHoF = (entry: SoundtrackEntry, course: CourseName) => openHoFModal(entry, course);
 
-    // An installed chart's jacket and preview come off the disk. Streaming them from the
-    // soundtrack repository instead would put every browse of the library on the network
-    // and on GitHub's bandwidth, and would leave a custom chart — which the repository
-    // has never heard of — with no art and no audio at all.
+    // An installed chart's jacket comes off the disk. Streaming it from the soundtrack
+    // repository instead would put every browse of the library on the network and on
+    // GitHub's bandwidth, and would leave a custom chart — which the repository has never
+    // heard of — with no art at all. Its audio is read from disk only to be played: an
+    // official song plays its 15-second preview from the repository, and its own audio
+    // only when that preview cannot be reached.
     let songJacket = $state<string | null>(null);
     let songAudio = $state<string | null>(null);
     // The audio file found for the selected chart, read only once it is played

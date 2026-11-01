@@ -24,7 +24,8 @@
         /** Art and audio read off the disk for an installed chart. */
         LocalJacket?: string | null;
         LocalAudio?: string | null;
-        /** Reads the installed chart's audio on first play (see AudioPlayer). */
+        /** Reads the installed chart's audio on first play: a song of the user's own, or
+         *  an official one whose preview cannot be reached (see AudioPlayer). */
         LoadAudio?: () => Promise<string | null>;
         /** Offered for an installed chart, which can carry its own #PREIMAGE. */
         OnPickPreimage?: (entry: LibraryEntry) => void;
@@ -64,9 +65,10 @@
             : LocalJacket ?? (Entry?.catalog && JacketUrl ? JacketUrl(Entry.catalog) : null)
     );
 
-    // Playable from disk once installed, and from the repository while it is only on
-    // offer. A Dan course is a list of other songs, so it has nothing of its own to play.
-    let playable = $derived(!isDan && Entry && (LocalAudio || LoadAudio || (Entry.catalog && !Entry.installed)));
+    // An official song plays its preview from the repository, a song of the user's own
+    // its audio on disk. A Dan course is a list of other songs, so it has nothing of its
+    // own to play.
+    let playable = $derived(!isDan && Entry && (Entry.catalog || LocalAudio || LoadAudio));
     let courses = $derived(Entry ? ALL_COURSES.filter((c) => Entry.levels[c] !== undefined) : []);
 
     const LINKS: { key: keyof ArtistLinks; icon: string; label: string }[] = [
