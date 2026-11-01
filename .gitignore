@@ -139,3 +139,4 @@ vite.config.*.timestamp-*
 
 # Data of development builds (instances, songs, logs): see src-tauri/src/devdata.rs
 /dev-hub/
+/audit
