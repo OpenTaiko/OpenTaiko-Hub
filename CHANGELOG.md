@@ -3,6 +3,10 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.3.4] - 2026-11-04 (Alpha)
+
+- [Fix] (Speculative) Linux: the AppImage, missing from 0.3.3 is back, with the black window fix of 0.3.3 now applied
+
 ## [0.3.3] - 2026-11-04 (Alpha)
 
 - [Fix] (Speculative) Linux: the AppImage opened on a black window on recent systems, Wayland especially, as its page crashed at startup

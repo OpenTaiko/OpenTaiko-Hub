@@ -185,7 +185,8 @@ jobs:
             if: matrix.platform == 'ubuntu-22.04' # This must match the platform value defined above.
             run: |
               sudo apt-get update
-              sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+              # squashfs-tools: the AppImage is repacked without libwayland after the build
+              sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf squashfs-tools
               # Each `run:` block is its own shell, so an `export` here would die with it
               # and never reach the build step. NO_STRIP keeps linuxdeploy from stripping
               # the AppImage's bundled libraries, which users had to do by hand to make
@@ -225,8 +226,32 @@ jobs:
 
           # Bundled into the AppImage, this system's libwayland was loaded by the user's
           # graphics driver, which needs a newer one (Mesa 26): the page process aborted
-          # ("Could not create default EGL display") and the window stayed black. The Tauri
-          # CLI stopped bundling it in 2.12; this keeps it from coming back unnoticed.
+          # ("Could not create default EGL display") and the window stayed black. Tauri
+          # still bundles it (2.12.4), and offers no way to leave it out, so it is taken
+          # out here: an AppImage is its runtime followed by a SquashFS image, which is
+          # unpacked, cleared of libwayland and packed again with the same compression,
+          # behind the same runtime. Nothing is downloaded for it.
+          - name: take libwayland out of the AppImage
+            if: matrix.platform == 'ubuntu-22.04'
+            run: |
+              for image in src-tauri/target/release/bundle/appimage/*.AppImage; do
+                image=$(realpath "$image")
+                offset=$("$image" --appimage-offset)
+                compression=$(unsquashfs -s -o "$offset" "$image" | sed -n 's/^Compression \([a-z0-9]*\)$/\1/p' | head -n 1)
+                [ -n "$compression" ] || { echo "::error::No SquashFS image found in $(basename "$image")"; exit 1; }
+                work=$(mktemp -d)
+                unsquashfs -q -n -d "$work/root" -o "$offset" "$image"
+                find "$work/root" -name 'libwayland-*.so*' -print -delete
+                head -c "$offset" "$image" > "$work/image"
+                mksquashfs "$work/root" "$work/fs" -comp "$compression" -all-root -noappend -quiet
+                cat "$work/fs" >> "$work/image"
+                chmod +x "$work/image"
+                mv -f "$work/image" "$image"
+                rm -rf "$work"
+              done
+
+          # Unpacked by its own runtime, which proves the repacked image reads, and checked
+          # for libwayland, so it cannot come back unnoticed
           - name: check the AppImage leaves libwayland to the system
             if: matrix.platform == 'ubuntu-22.04'
             run: |
