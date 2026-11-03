@@ -5,7 +5,7 @@
     // "disabled" and fails contrast on the darker themes.
     import { _ } from 'svelte-i18n';
     import { FormatLevel } from '$lib/utils/levels';
-    import { MAIN_COURSES, formatSize } from '$lib/utils/library';
+    import { MAIN_COURSES, VaultSlots, formatSize } from '$lib/utils/library';
     import type { LibraryEntry } from '$lib/utils/library';
     import type { CourseName, SoundtrackEntry } from '$lib/types';
 
@@ -53,6 +53,19 @@
                 title="{towerLevel !== undefined ? $_('songs.course.tower') : $_('songs.course.dan')} {FormatLevel((towerLevel ?? danLevel) as number)}"
                 aria-label="{towerLevel !== undefined ? $_('songs.course.tower') : $_('songs.course.dan')} {FormatLevel((towerLevel ?? danLevel) as number)}"
             >{FormatLevel((towerLevel ?? danLevel) as number)}</span>
+        {:else if Entry.vault}
+            <!-- As the game shows the vault: its one or two charts, under EX and EXEX -->
+            {#each ['easy', 'normal', 'hard'] as spot (spot)}
+                <span class="cell blank" aria-hidden="true"></span>
+            {/each}
+            {#each VaultSlots(Entry.levels) as slot, i (i)}
+                {#if slot}
+                    {@const label = `${$_(`songs.course.${i === 0 ? 'oni' : 'edit'}`)} ${FormatLevel(slot.level)}`}
+                    <span class="cell c-Vault" title={label} aria-label={label}>{FormatLevel(slot.level)}</span>
+                {:else}
+                    <span class="cell blank" aria-hidden="true"></span>
+                {/if}
+            {/each}
         {:else}
             {#each MAIN_COURSES as course (course)}
                 {@const level = Entry.levels[course as CourseName]}
@@ -170,6 +183,9 @@
 
     .c-Tower {background-color: light-dark(#fddfb8, #5c3a0a); color: light-dark(#6b3405, #ffd9a6);}
     .c-Dan   {background-color: light-dark(#ccd5f5, #1b2a63); color: light-dark(#17265e, #ccd5f5);}
+    /* The game's vault level colours (song_select_core layout.json: level_gauge_vault, level_vault) */
+    .c-Vault {background-color: light-dark(#5fc8c8, #1f5050); color: light-dark(#1f5050, #5fc8c8);}
+    .cell.blank {visibility: hidden;}
 
     /* Fixed so a row never reflows as it moves Get -> progress -> Installed. Wide enough
        for the longest label, the German and French "Update", which spilled over the

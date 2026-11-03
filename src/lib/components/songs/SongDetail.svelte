@@ -9,7 +9,7 @@
     import AudioPlayer from '$lib/components/AudioPlayer.svelte';
     import { FormatLevel } from '$lib/utils/levels';
     import { SafeUrl } from '$lib/utils/sanitize';
-    import { ALL_COURSES, formatSize } from '$lib/utils/library';
+    import { ALL_COURSES, VaultSlots, formatSize } from '$lib/utils/library';
     import type { LibraryEntry } from '$lib/utils/library';
     import type { ArtistLinks, CourseName, SongArtists, SoundtrackEntry } from '$lib/types';
 
@@ -69,7 +69,19 @@
     // its audio on disk. A Dan course is a list of other songs, so it has nothing of its
     // own to play.
     let playable = $derived(!isDan && Entry && (Entry.catalog || LocalAudio || LoadAudio));
-    let courses = $derived(Entry ? ALL_COURSES.filter((c) => Entry.levels[c] !== undefined) : []);
+    // Each course with the name it is shown under: a vault chart's charts are shown as the
+    // game shows them, a lone one as EXEX (VaultSlots)
+    let courses = $derived.by((): { course: CourseName; shown: CourseName }[] => {
+        if (!Entry) return [];
+        if (Entry.vault) {
+            const [ex, exex] = VaultSlots(Entry.levels);
+            return [
+                ...(ex ? [{ course: ex.course, shown: 'Oni' as CourseName }] : []),
+                ...(exex ? [{ course: exex.course, shown: 'Edit' as CourseName }] : [])
+            ];
+        }
+        return ALL_COURSES.filter((c) => Entry.levels[c] !== undefined).map((course) => ({ course, shown: course }));
+    });
 
     const LINKS: { key: keyof ArtistLinks; icon: string; label: string }[] = [
         { key: 'youtube', icon: 'fa-brands fa-youtube', label: 'YouTube' },
@@ -172,11 +184,11 @@
 
         {#if courses.length}
             <div class="courses">
-                {#each courses as course (course)}
+                {#each courses as { course, shown } (course)}
                     {@const rank = HoFRanks[course]}
                     <div class="course">
-                        <span class="cname">{$_(`songs.course.${course.toLowerCase()}`)}</span>
-                        <span class="clevel">{FormatLevel(Entry.levels[course] as number)}</span>
+                        <span class="cname">{$_(`songs.course.${shown.toLowerCase()}`)}</span>
+                        <span class="clevel" class:vault={Entry.vault}>{FormatLevel(Entry.levels[course] as number)}</span>
                         <span class="cmaker">{Entry.catalog?.chartMakers?.[course] ?? ''}</span>
                         {#if rank !== undefined && Entry.catalog}
                             <button type="button" class="crown" title={$_('hof.crown')} onclick={() => OnHoF?.(Entry.catalog as SoundtrackEntry, course)}>
@@ -300,6 +312,8 @@
     }
     .cname {font-weight: 700; overflow-wrap: anywhere;}
     .clevel {font-variant-numeric: tabular-nums; text-align: right;}
+    /* The game's vault level colours, as in SongRow */
+    .clevel.vault {color: light-dark(#1f5050, #5fc8c8); font-weight: 700;}
     .cmaker {opacity: 0.7; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;}
     .crown {background: none; border: 0; padding: 0; cursor: pointer; color: light-dark(#a16207, #eab308); font-size: 0.75rem; font-weight: 700;}
 

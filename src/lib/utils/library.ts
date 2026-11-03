@@ -37,6 +37,8 @@ export interface LibraryEntry {
     installed: boolean;
     /** Levels per course; a course the chart lacks is simply absent. */
     levels: Partial<Record<CourseName, number>>;
+    /** In the Secret Vault: shown as the game shows it (VaultSlots). */
+    vault: boolean;
     side: TowerSide | null;
     catalog: SoundtrackEntry | null;
     local: LocalSong | null;
@@ -227,6 +229,7 @@ export const buildLibraryTree = (input: BuildInput): LibraryFolder => {
             status,
             installed: true,
             levels: scannedLevels(song),
+            vault: false,
             side: song.side,
             catalog: entry,
             local,
@@ -252,6 +255,7 @@ export const buildLibraryTree = (input: BuildInput): LibraryFolder => {
             status: justInstalled ? 'installed' : 'available',
             installed: justInstalled,
             levels: entry.chartDifficulties,
+            vault: false,
             side: null,
             catalog: entry,
             local: installed[entry.uniqueId] ?? null,
@@ -259,9 +263,35 @@ export const buildLibraryTree = (input: BuildInput): LibraryFolder => {
         });
     }
 
+    markVault(root, false);
     tally(root);
     grantEdits(root, null, 0);
     return root;
+};
+
+/** The genre the game shows the way it shows its vault (song select's diffselect.lua). */
+const VAULT_GENRE = 'Secret Vault';
+
+const markVault = (node: LibraryFolder, inVault: boolean): void => {
+    const vault = inVault || node.label === VAULT_GENRE;
+    for (const entry of node.entries) entry.vault = vault;
+    for (const child of node.children.values()) markVault(child, vault);
+};
+
+export interface VaultChart {
+    course: CourseName;
+    level: number;
+}
+
+/**
+ * A vault chart's levels where the game puts them: its EX and EXEX charts only, under EX
+ * and EXEX, and a lone chart under EXEX whichever course it is.
+ */
+export const VaultSlots = (levels: Partial<Record<CourseName, number>>): [VaultChart | null, VaultChart | null] => {
+    const charts = (['Oni', 'Edit'] as const)
+        .filter((course) => levels[course] !== undefined)
+        .map((course) => ({ course, level: levels[course] as number }));
+    return charts.length === 2 ? [charts[0], charts[1]] : [null, charts[0] ?? null];
 };
 
 /** True when any chart under here uses a course only that collection type has. */

@@ -2,8 +2,8 @@
     // Renders the documentation shipped inside the selected OpenTaiko instance
     // (<instance>/docs/index.html) entirely locally: the page and every resource it
     // references (stylesheets, scripts, images) are read from disk and inlined into a
-    // single self-contained document handed to an iframe as a Blob URL. No requests of
-    // any kind are made — the file is read and rendered as is.
+    // single self-contained document handed to an iframe as srcdoc. No requests of any
+    // kind are made, and nothing is served: the file is read and rendered as is.
     import { exists, readTextFile, readFile, readDir } from '@tauri-apps/plugin-fs';
     import { path } from '@tauri-apps/api';
     import { untrack } from 'svelte';
@@ -13,25 +13,9 @@
     import type { Instance } from '$lib/types';
 
     let docsHtml = $state<string | null>(null);
-    let docsUrl = $state<string | null>(null);
     let notFound = $state(false);
     let loading = $state(false);
     let refreshToken = 0;
-
-    // The built page is served to the iframe through a Blob URL rather than srcdoc. A
-    // srcdoc document borrows the Hub's own URL as its base, so when the docs' router
-    // calls location.replace("#/en/...") the iframe navigates to the Hub itself. A Blob
-    // URL is the document's own base, and hash changes stay inside the docs.
-    $effect(() => {
-        if (docsHtml === null) {
-            docsUrl = null;
-            return;
-        }
-        const url = URL.createObjectURL(new Blob([docsHtml], { type: 'text/html' }));
-        docsUrl = url;
-        return () => URL.revokeObjectURL(url);
-    });
-
 
     const IMAGE_MIME: Record<string, string> = {
         png: 'image/png',
@@ -142,6 +126,24 @@
 ${SCRIPT_CLOSE}`;
         html = html.includes('</body>') ? html.replace('</body>', () => `${mediaFixer}\n</body>`) : html + mediaFixer;
 
+        // The docs move between their pages by changing the "#" (#/en/README). In the
+        // sandbox, a Blob URL refused every such change, so nothing could be clicked. A
+        // srcdoc document allows it, but resolves a "#" link against the Hub's own
+        // address, and following one loaded the Hub in the frame: the change is made in
+        // place instead. First in <head>, before the docs' own scripts run.
+        const hashLinks = `${SCRIPT_OPEN}
+(function () {
+    if (!location.hash) location.hash = '#/';
+    document.addEventListener('click', function (e) {
+        var link = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+        if (!link || e.defaultPrevented) return;
+        e.preventDefault();
+        location.hash = link.getAttribute('href');
+    });
+})();
+${SCRIPT_CLOSE}`;
+        html = /<head[^>]*>/i.test(html) ? html.replace(/<head[^>]*>/i, (head) => `${head}\n${hashLinks}`) : hashLinks + html;
+
         return html;
     };
 
@@ -189,12 +191,12 @@ ${SCRIPT_CLOSE}`;
             <p class="opacity-70">{$_('docs.not_found_hint')}</p>
         </div>
     </section>
-{:else if docsUrl !== null}
+{:else if docsHtml !== null}
     <!-- The docs come from the instance folder and run their own scripts. Without the
          sandbox they would share the Hub's origin and could call the backend through
          window.parent; with it they get an opaque origin. Popups stay allowed so
          external links still open. -->
-    <iframe src={docsUrl} title={$_('docs.title')} class="docs-frame"
+    <iframe srcdoc={docsHtml} title={$_('docs.title')} class="docs-frame"
         sandbox="allow-scripts allow-popups allow-popups-to-escape-sandbox"></iframe>
 {:else if loading}
     <div class="placeholder animate-pulse w-full h-24"></div>

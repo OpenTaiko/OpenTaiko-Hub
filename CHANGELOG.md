@@ -3,6 +3,11 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.3.2] - 2026-11-03 (Alpha)
+
+- [Fix] Nothing in the Docs tab could be clicked with OpenTaiko 0.7 builds
+- [Enhance] Secret Vault charts show their one or two difficulties under EX and EXEX, in the game's vault colour
+
 ## [0.3.1] - 2026-11-02 (Alpha)
 
 - [Fix] Downloaded official songs played their whole audio instead of the 15-second preview
