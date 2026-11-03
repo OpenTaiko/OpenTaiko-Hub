@@ -223,6 +223,28 @@ jobs:
           - name: build
             run: npm run tauri build
 
+          # Bundled into the AppImage, this system's libwayland was loaded by the user's
+          # graphics driver, which needs a newer one (Mesa 26): the page process aborted
+          # ("Could not create default EGL display") and the window stayed black. The Tauri
+          # CLI stopped bundling it in 2.12; this keeps it from coming back unnoticed.
+          - name: check the AppImage leaves libwayland to the system
+            if: matrix.platform == 'ubuntu-22.04'
+            run: |
+              status=0
+              for image in src-tauri/target/release/bundle/appimage/*.AppImage; do
+                image=$(realpath "$image")
+                work=$(mktemp -d)
+                (cd "$work" && "$image" --appimage-extract > /dev/null)
+                bundled=$(find "$work/squashfs-root" -name 'libwayland-*.so*' -printf '%P\n')
+                rm -rf "$work"
+                if [ -n "$bundled" ]; then
+                  echo "::error::$(basename "$image") bundles libwayland, which breaks the window on current Mesa:"
+                  echo "$bundled"
+                  status=1
+                fi
+              done
+              exit $status
+
           - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
             with:
               name: bundle-${{ matrix.platform }}

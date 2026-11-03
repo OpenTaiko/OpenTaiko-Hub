@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { compareVersions, isSkinCompatible, isVersionAtLeast, isVersionBelow, isVersionInSeries, parseVersion } from './versions';
+import { compareVersions, gameUpdateNeedsSkins, isSkinCompatible, isVersionAtLeast, isVersionBelow, isVersionInSeries, parseVersion, skinFit } from './versions';
 
 describe('versions', () => {
     it('parses three and four part versions', () => {
@@ -35,5 +35,29 @@ describe('versions', () => {
         expect(isSkinCompatible('v0.6.0.1', '0.6.0.1')).toBe(false);
         expect(isSkinCompatible(null, '0.6.0.1')).toBe(false);
         expect(isSkinCompatible('Unknown', 'Unknown')).toBe(false);
+    });
+
+    it('takes skins from 0.7.0.0 on to fit the latest game', () => {
+        // skin, game, latest game, the instance already has this skin version
+        expect(skinFit('0.7.2.0', '0.7.0.2', '0.7.0.2', false)).toBe('fits');
+        expect(skinFit('0.7.2.0', '0.7.0.2', '0.7.3.0', true)).toBe('fits');
+        expect(skinFit('0.7.2.0', '0.7.0.2', '0.7.3.0', false)).toBe('update_game');
+        expect(skinFit('0.7.0.0', '0.8.0.0', '0.8.0.0', false)).toBe('fits');
+        // Latest release unknown (offline): nothing to warn about
+        expect(skinFit('0.7.2.0', '0.7.0.2', null, false)).toBe('fits');
+        // Before 0.7.0.0 on either side, the first three numbers must match
+        expect(skinFit('0.7.0.1', '0.6.1.4', '0.7.0.2', false)).toBe('incompatible');
+        expect(skinFit('0.6.1.3', '0.6.1.0', '0.7.0.2', false)).toBe('fits');
+        expect(skinFit('0.6.0.9', '0.7.0.2', '0.7.0.2', true)).toBe('incompatible');
+        expect(skinFit('0.7.0.0', null, '0.7.0.2', false)).toBe('incompatible');
+    });
+
+    it('asks for new skins on a game update only before 0.7.0.0', () => {
+        expect(gameUpdateNeedsSkins('0.7.0.2', '0.7.1.0')).toBe(false);
+        expect(gameUpdateNeedsSkins('0.7.0.0', '0.8.0.0')).toBe(false);
+        expect(gameUpdateNeedsSkins('0.6.1.4', '0.7.0.2')).toBe(true);
+        expect(gameUpdateNeedsSkins('0.6.0.83', '0.6.1.0')).toBe(true);
+        expect(gameUpdateNeedsSkins('0.6.1.2', '0.6.1.4')).toBe(false);
+        expect(gameUpdateNeedsSkins(null, '0.7.0.2')).toBe(true);
     });
 });

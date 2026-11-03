@@ -49,9 +49,18 @@
         ShowTabs?: boolean;
         /** 0 Skins, 1 Characters, 2 Puchicharas. */
         currentAsset?: number;
+        /** The latest game release, when known (see VersionNumberChip). */
+        LatestGameVersion?: string | null;
     }
 
-    let { ShowTabs = true, currentAsset = $bindable(0) }: Props = $props();
+    let { ShowTabs = true, currentAsset = $bindable(0), LatestGameVersion = null }: Props = $props();
+
+    // Unknown while scanning, and nothing is flagged meanwhile
+    const HasThisVersion = (info: AssetInfo, assetType: AssetType): boolean => {
+        if (assetScanning) return true;
+        const prefix = AssetPrefix(assetType);
+        return currentAssets[assetType][Field(info, prefix, 'Folder')]?.assetVersion === Field(info, prefix, 'Version');
+    };
 
     // Rescan whenever another instance becomes active
     let scannedInstanceId: string | null = null;   // bookkeeping only, never rendered
@@ -441,7 +450,7 @@
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Name')}</td>
 				<td>
 					<!-- Characters and puchicharas do not follow the game's versions the way skins do -->
-					<VersionNumberChip LatestVersion={Field(info, AssetTabPrefix(currentAsset), 'Version')} CurrentVersion={optk_version} Strictness={AssetTabType(currentAsset) === 'Skins' ? 'Error' : 'None'} />
+					<VersionNumberChip LatestVersion={Field(info, AssetTabPrefix(currentAsset), 'Version')} CurrentVersion={optk_version} Strictness={AssetTabType(currentAsset) === 'Skins' ? 'Error' : 'None'} {LatestGameVersion} Installed={HasThisVersion(info, AssetTabType(currentAsset))} />
 				</td>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Resolution')}</td>
 				<td>{Field(info, AssetTabPrefix(currentAsset), 'Creator')}</td>

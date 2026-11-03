@@ -202,6 +202,7 @@
         <p>{$_('info.versioning.optional')}</p>
         <p>{$_('info.versioning.revision')}</p>
         <p>{$_('info.versioning.example')}</p>
+        <p>{$_('info.versioning.stable')}</p>
         <p>{$_('info.versioning.wip')}</p>
     </div>
 {/if}

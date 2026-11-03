@@ -1,6 +1,6 @@
 {
 	"name": "opentaiko-updater",
-	"version": "0.3.2",
+	"version": "0.3.3",
 	"private": true,
 	"scripts": {
 		"dev": "vite dev",
@@ -15,7 +15,7 @@
 		"@sveltejs/kit": "^2.70.3",
 		"@sveltejs/vite-plugin-svelte": "^7.3.0",
 		"@tailwindcss/vite": "^4.3.3",
-		"@tauri-apps/cli": "^2.11.4",
+		"@tauri-apps/cli": "~2.12.4",
 		"@types/sql.js": "^1.4.11",
 		"svelte": "^5.57.0",
 		"svelte-check": "^4.7.6",

@@ -49,3 +49,35 @@ export const isSkinCompatible = (a: string | null | undefined, b: string | null 
     if (!a || !b || !full.test(a) || !full.test(b)) return false;
     return a.split('.').slice(0, 3).join('.') === b.split('.').slice(0, 3).join('.');
 };
+
+/** From this version on, skins and the latest game always work together: an API call
+ *  the game deprecates stays usable. */
+export const SKIN_API_STABLE = '0.7.0.0';
+
+/**
+ * True when updating the game from `from` to `to` leaves the installed skins behind: they
+ * must then be updated too. From 0.7.0.0 to a later version they keep working. An unknown
+ * version on either side counts as needing it, as isSkinCompatible does.
+ */
+export const gameUpdateNeedsSkins = (from: string | null | undefined, to: string | null | undefined): boolean =>
+    !(isVersionAtLeast(from, SKIN_API_STABLE) && isVersionAtLeast(to, SKIN_API_STABLE)) && !isSkinCompatible(to, from);
+
+export type SkinFit = 'fits' | 'update_game' | 'incompatible';
+
+/**
+ * How a skin version fits the game of an instance. Before 0.7.0.0 they must share their
+ * first three numbers (isSkinCompatible). From 0.7.0.0 on both, they always fit; a skin
+ * version the instance does not have yet may need the latest game, so it is flagged while
+ * the game is behind the latest release (an unknown latest release flags nothing).
+ */
+export const skinFit = (
+    skin: string | null | undefined,
+    game: string | null | undefined,
+    latestGame: string | null | undefined,
+    hasThisVersion: boolean
+): SkinFit => {
+    if (isVersionAtLeast(skin, SKIN_API_STABLE) && isVersionAtLeast(game, SKIN_API_STABLE)) {
+        return !hasThisVersion && !!latestGame && isVersionBelow(game, latestGame) ? 'update_game' : 'fits';
+    }
+    return isSkinCompatible(game, skin) ? 'fits' : 'incompatible';
+};

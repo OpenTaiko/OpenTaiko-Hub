@@ -451,7 +451,8 @@
   },
   "version_chip": {
     "incompatible": "Nicht mit der aktuellen OpenTaiko-Version kompatibel",
-    "outdated": "Möglicherweise veraltet, mit Vorsicht verwenden"
+    "outdated": "Möglicherweise veraltet, mit Vorsicht verwenden",
+    "update_game": "Aktualisiere auch OpenTaiko, um Kompatibilitätsprobleme zu vermeiden"
   },
   "player": {
     "play": "abspielen",
@@ -490,6 +491,7 @@
       "optional": "Für manche Asset-Updates (Charakter/Puchichara) ist das nicht zwingend erforderlich, da sie nicht unbedingt den strengen Versionierungsmustern von Skins folgen.",
       "revision": "Die Revisionsnummer (z. B. v0.6.0.[2]) wird bei jedem Spiel-/Skin-Update erhöht, das keine zwingenden Änderungen mit sich bringt, und muss nicht übereinstimmen.",
       "example": "Beispiel: Ein Skin mit der Versionsnummer 0.6.1.3 funktioniert mit jeder OpenTaiko-Version ab 0.6.1.0 und ist ab 0.6.2.0 nicht mehr kompatibel.",
+      "stable": "Skins ab 0.7.0.0 sind immer kompatibel, solange du die neueste Spielversion hast. Veraltete API-Aufrufe werden in der Dokumentation erwähnt, sollten aber weiterhin funktionieren, auch wenn von ihrer Verwendung abgeraten wird.",
       "wip": "Dieser Abschnitt wird in zukünftigen OpenTaiko-Hub-Updates je nach gefundenen Problemen ergänzt."
     },
     "error": {

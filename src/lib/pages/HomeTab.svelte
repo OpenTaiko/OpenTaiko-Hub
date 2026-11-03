@@ -20,7 +20,7 @@
     import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { openUrl } from '@tauri-apps/plugin-opener';
     import { confirm as confirmDialog } from '@tauri-apps/plugin-dialog';
-    import { isVersionAtLeast, isSkinCompatible } from "$lib/utils/versions";
+    import { isVersionAtLeast, gameUpdateNeedsSkins } from "$lib/utils/versions";
     import {
         IndevVersion,
         INDEV_BRANCH,
@@ -389,7 +389,7 @@
     // An update that breaks the installed skins, and a reinstall of the same version,
     // used to start on a single click; the first was only flagged by red text beside it
     const UpdateStable = async () => {
-        if (isSkinCompatible(latestVersion, currentVersion) === false) {
+        if (gameUpdateNeedsSkins(currentVersion, latestVersion)) {
             const go = await confirmDialog(get(_)('home.warn.skin_update_confirm'), { title: get(_)('home.button.update'), kind: 'warning' });
             if (!go) return;
         }
@@ -695,7 +695,7 @@
                         {:else if latestVersion !== null && latestVersion !== currentVersion}
                             <button type="button" onclick={LaunchOpenTaiko} disabled={launching} class="button-blue button-main"><i class="fa-solid {launching ? 'fa-spinner fa-spin' : 'fa-rocket'}"></i> {$_('home.button.launch')}</button>
                             <button type="button" onclick={UpdateStable} class="button-green button-main"><i class="fa-solid fa-rotate"></i> {$_('home.button.update')}</button>
-                            {#if isSkinCompatible(latestVersion, currentVersion) === false}
+                            {#if gameUpdateNeedsSkins(currentVersion, latestVersion)}
                                 <span class="text-red-500">{$_('home.warn.skin_update')}</span>
                             {/if}
                         {:else}
@@ -774,7 +774,7 @@
 <div class="w-full" style:display={homeSubTab >= 1 && homeSubTab <= 3 ? null : 'none'}>
     <!-- Only sub-tabs 1..3 map to an asset type; any other value (Docs/Saves active
          while this stays mounted) must never reach AssetsTab as an out-of-range index -->
-    <AssetsTab ShowTabs={false} currentAsset={homeSubTab >= 1 && homeSubTab <= 3 ? homeSubTab - 1 : 0} />
+    <AssetsTab ShowTabs={false} currentAsset={homeSubTab >= 1 && homeSubTab <= 3 ? homeSubTab - 1 : 0} LatestGameVersion={latestVersion} />
 </div>
 {/if}
 

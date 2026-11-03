@@ -3,6 +3,12 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.3.3] - 2026-11-04 (Alpha)
+
+- [Fix] (Speculative) Linux: the AppImage opened on a black window on recent systems, Wayland especially, as its page crashed at startup
+- [Enhance] Skins for 0.7.0.0 and later are no longer marked as incompatible with a 0.7 game; a skin version you do not have yet is marked in yellow while your game is not the latest
+- [Enhance] Updating OpenTaiko from 0.7.0.0 or later no longer warns that your skins need updating too
+
 ## [0.3.2] - 2026-11-03 (Alpha)
 
 - [Fix] Nothing in the Docs tab could be clicked with OpenTaiko 0.7 builds
