@@ -658,8 +658,10 @@ mod tests {
         assert_eq!(tower_song.difficulties.iter().map(|d| (d.course.as_str(), d.level)).collect::<Vec<_>>(), vec![("Tower", 2.0)]);
         assert_eq!(tower_song.side.as_deref(), Some("Ex"));
 
-        // Neither is a genre folder
-        let genre_paths: Vec<&str> = genres.iter().map(|g| g.rel_path.as_str()).collect();
+        // Neither is a genre folder. Sorted: folders are listed in the order the file
+        // system keeps them, by name on Windows only
+        let mut genre_paths: Vec<&str> = genres.iter().map(|g| g.rel_path.as_str()).collect();
+        genre_paths.sort();
         assert_eq!(genre_paths, vec!["S1 Dan-i Dojo", "S2 Taiko Towers"]);
 
         // Migration moves them as songs too
