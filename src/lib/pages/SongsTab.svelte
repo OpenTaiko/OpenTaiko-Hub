@@ -8,13 +8,13 @@
     // Dependencies
     import { onMount, onDestroy } from 'svelte';
     import ProgressBar from '$lib/components/ProgressBar.svelte';
-    import { mkdir, exists, readFile } from '@tauri-apps/plugin-fs';
+    import { mkdir, exists, readFile, readDir } from '@tauri-apps/plugin-fs';
     import { OpenFolder, IsPlainRelPath } from '$lib/utils/path';
     import { SafeUrl } from '$lib/utils/sanitize';
     import { SOUNDTRACK_REPO, rawUrl } from '$lib/repos';
     import { confirm } from '@tauri-apps/plugin-dialog';
     import { getCurrentWebview } from '@tauri-apps/api/webview';
-    import { installFiles } from '$lib/utils/download';
+    import { installFiles, type InstallEntry } from '$lib/utils/download';
     import { startJob, isCancelled, type Job } from '$lib/stores/activity';
     import { DescribeError, ErrorText } from '$lib/utils/errors';
     import { path } from '@tauri-apps/api';
@@ -1011,6 +1011,27 @@
         }
     }
 
+    /** Every file the game reads as a chart (its CSongManager.SongFileExtensions). */
+    const CHART_FILE = /\.(tja|tci|optktci|tcm|optktcm|tct|optktct)$/i;
+
+    /**
+     * Removes the chart files in a song's folder that its new version does not have.
+     * Compared without case: never one the version has, even spelled otherwise on disk.
+     * Everything else in the folder (replays, the user's own files) stays.
+     */
+    const RemoveStaleCharts = async (base: string, relPath: string, entries: InstallEntry[]) => {
+        const kept = new Set(entries.map((entry) => entry.relPath.toLowerCase()));
+        try {
+            for (const file of await readDir(await path.join(base, relPath))) {
+                if (!file.isFile || !CHART_FILE.test(file.name) || kept.has(file.name.toLowerCase())) continue;
+                await ipc.deleteLibraryEntry(base, `${relPath}/${file.name}`);
+            }
+        } catch (error) {
+            // The update itself is done: a file left only shows as a second chart
+            console.error(`Could not remove the old charts of ${relPath}:`, error);
+        }
+    };
+
     const RunDownloadSong = async (songObj: SoundtrackEntry, currentObj: LocalSong | null, quiet: boolean, job?: string): Promise<DownloadOutcome> => {
         await EnsureRemoteIndex();
 
@@ -1045,6 +1066,11 @@
             if (!quiet) TriggerError(`${get(_)('dl.error.failed_abort')}<br>${DescribeError(error)}`, { details: ErrorText(error) });
             return 'failed';
         }
+
+        // An update rewrites the files of the new version only: a chart file it no longer
+        // has (a .tja turned .optktcm, say) stayed beside the new one, and the game lists
+        // every chart file of a folder
+        if (currentObj !== null) await RemoveStaleCharts(baseDirPath, localRelPath, entries);
 
         // Download / refresh box.def and default.png of every ancestor genre folder. A bulk
         // run does this once at the end: here, one slow box.def held up every song after it

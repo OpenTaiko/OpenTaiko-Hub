@@ -3,6 +3,11 @@
 You can update either through the OpenTaiko Hub, or directly from the releases tab:
 - https://github.com/OpenTaiko/OpenTaiko-Hub/releases
 
+## [0.3.5] - 2026-11-05 (Alpha)
+
+- [Fix] Downloaded Dan courses and Towers were offered for download again after every scan
+- [Fix] Updating a chart removes the chart files its new version no longer has, so a folder never ends up with two charts
+
 ## [0.3.4] - 2026-11-04 (Alpha)
 
 - [Fix] (Speculative) Linux: the AppImage, missing from 0.3.3 is back, with the black window fix of 0.3.3 now applied

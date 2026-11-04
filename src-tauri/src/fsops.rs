@@ -104,7 +104,8 @@ pub(crate) fn files_under(dir: &Path) -> std::collections::HashSet<std::path::Pa
     files
 }
 
-/// A song folder is a directory that directly contains at least one .tja file.
+/// A song folder is a directory that directly contains at least one chart file
+/// (scan::is_chart_file: a .tja, or a Dan course or tower of the game's own).
 /// Song folders are moved as a whole, so nested content stays intact.
 ///
 /// The starting folder itself is never reported as a song: a loose .tja dropped into a
@@ -119,7 +120,7 @@ fn collect_song_dirs_from(dir: &Path, base: &Path, out: &mut Vec<PathBuf>) {
         Err(_) => return,
     };
     let mut subdirs = Vec::new();
-    let mut has_tja = false;
+    let mut has_chart = false;
     for entry in entries.flatten() {
         let file_type = match entry.file_type() {
             Ok(t) => t,
@@ -128,12 +129,12 @@ fn collect_song_dirs_from(dir: &Path, base: &Path, out: &mut Vec<PathBuf>) {
         if file_type.is_dir() {
             subdirs.push(entry.path());
         } else if file_type.is_file()
-            && entry.file_name().to_string_lossy().to_lowercase().ends_with(".tja")
+            && crate::scan::is_chart_file(&entry.file_name().to_string_lossy().to_lowercase())
         {
-            has_tja = true;
+            has_chart = true;
         }
     }
-    if has_tja && dir != base {
+    if has_chart && dir != base {
         out.push(dir.to_path_buf());
         return;
     }

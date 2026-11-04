@@ -336,7 +336,7 @@ fn walk_dir(dir: &Path, ctx: &mut WalkCtx) {
     };
 
     let mut subdirs: Vec<PathBuf> = Vec::new();
-    let mut tja_files: Vec<PathBuf> = Vec::new();
+    let mut chart_files: Vec<PathBuf> = Vec::new();
     let mut has_box_def = false;
     let mut has_preimage = false;
 
@@ -349,8 +349,8 @@ fn walk_dir(dir: &Path, ctx: &mut WalkCtx) {
             subdirs.push(entry.path());
         } else if file_type.is_file() {
             let name = entry.file_name().to_string_lossy().to_lowercase();
-            if name.ends_with(".tja") {
-                tja_files.push(entry.path());
+            if is_chart_file(&name) {
+                chart_files.push(entry.path());
             } else if name == "box.def" {
                 has_box_def = true;
             } else if name == "default.png" {
@@ -367,16 +367,16 @@ fn walk_dir(dir: &Path, ctx: &mut WalkCtx) {
     // The library root is never a song, whatever it holds: a loose .tja dropped
     // directly into Songs/ would otherwise end the walk immediately and hide every
     // song below it.
-    if !tja_files.is_empty() && !rel_path.is_empty() {
-        // A folder holding a .tja is one song. Its subfolders (replay data, extra
+    if !chart_files.is_empty() && !rel_path.is_empty() {
+        // A folder holding a chart is one song. Its subfolders (replay data, extra
         // assets like "Adulation"'s folder) belong to the song, so treat it as a leaf
         // and do NOT descend into them, otherwise they surface as phantom genres.
-        tja_files.sort();
-        let mut stamps: Vec<Stamp> = tja_files.iter().filter_map(|tja| stamp(tja)).collect();
+        chart_files.sort();
+        let mut stamps: Vec<Stamp> = chart_files.iter().filter_map(|chart| stamp(chart)).collect();
         stamps.extend(stamp(&dir.join("uniqueID.json")));
         let song = match ctx.previous.songs.get(&rel_path).filter(|cached| cached.stamps == stamps) {
             Some(cached) => cached.song.clone(),
-            None => read_song(dir, &rel_path, &tja_files),
+            None => read_song(dir, &rel_path, &chart_files),
         };
         ctx.cache.songs.insert(rel_path, CachedSong { stamps, song: song.clone() });
         if ctx.stream_songs {
@@ -413,25 +413,55 @@ thread_local! {
     static SONGS_READ: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
+/// The chart files a song folder may hold: a .tja, or one of the game's own JSON charts,
+/// a Dan course (.optktcm) or a tower (.optktct). The soundtrack hashes each the same
+/// way. Only .tja files were looked for, so a downloaded Dan course or tower was never
+/// found: it was offered for download again after every scan. `name` is lower case.
+pub(crate) fn is_chart_file(name: &str) -> bool {
+    [".tja", ".optktcm", ".optktct"].iter().any(|extension| name.ends_with(extension))
+}
+
+/// What a Dan course (.optktcm) or tower (.optktct) says of itself. A tower has no title
+/// of its own: its song's is in the catalog.
+#[derive(Deserialize, Default)]
+struct JsonChart {
+    title: Option<String>,
+    level: Option<f64>,
+    side: Option<String>,
+}
+
+/// The title, levels and tower side of a game JSON chart, under `course` (Dan or Tower).
+fn read_json_chart(bytes: &[u8], course: &str) -> (Option<String>, Vec<ChartDifficulty>, Option<String>) {
+    let bytes = bytes.strip_prefix(b"\xEF\xBB\xBF").unwrap_or(bytes);
+    let chart: JsonChart = serde_json::from_slice(bytes).unwrap_or_default();
+    let difficulties = chart.level.map(|level| ChartDifficulty { course: course.to_string(), level }).into_iter().collect();
+    (chart.title.filter(|t| !t.trim().is_empty()), difficulties, chart.side.as_deref().map(normalize_side))
+}
+
 /// Reads a song folder: the hash of each chart, and the title, levels and tower side of
 /// the first.
-fn read_song(dir: &Path, rel_path: &str, tja_files: &[PathBuf]) -> ScannedSong {
+fn read_song(dir: &Path, rel_path: &str, chart_files: &[PathBuf]) -> ScannedSong {
     #[cfg(test)]
     SONGS_READ.with(|read| read.set(read.get() + 1));
-    let mut tja_md5s = Vec::with_capacity(tja_files.len());
+    let mut tja_md5s = Vec::with_capacity(chart_files.len());
     let mut title = None;
     let mut difficulties = Vec::new();
     let mut side = None;
-    for (index, tja) in tja_files.iter().enumerate() {
-        if let Ok(bytes) = std::fs::read(tja) {
+    for (index, chart) in chart_files.iter().enumerate() {
+        if let Ok(bytes) = std::fs::read(chart) {
             let mut hasher = Md5::new();
             hasher.update(&bytes);
             tja_md5s.push(hex::encode(hasher.finalize()));
             if index == 0 {
-                let head = &bytes[..bytes.len().min(64 * 1024)];
-                title = extract_title(&decode_text(head), "TITLE:");
-                difficulties = parse_difficulties(&bytes);
-                side = parse_side(&bytes);
+                let extension = chart.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+                (title, difficulties, side) = match extension.as_str() {
+                    "optktcm" => read_json_chart(&bytes, "Dan"),
+                    "optktct" => read_json_chart(&bytes, "Tower"),
+                    _ => {
+                        let head = &bytes[..bytes.len().min(64 * 1024)];
+                        (extract_title(&decode_text(head), "TITLE:"), parse_difficulties(&bytes), parse_side(&bytes))
+                    }
+                };
             }
         }
     }
@@ -598,6 +628,45 @@ mod tests {
         let genre_paths: Vec<&str> = genres.iter().map(|g| g.rel_path.as_str()).collect();
         assert_eq!(genre_paths, vec!["01 Pop"]);
         assert!(!genre_paths.iter().any(|p| p.contains("Adulation")));
+    }
+
+    // A downloaded Dan course or tower has no .tja: it was taken for a genre folder, and
+    // offered for download again after every scan
+    #[test]
+    fn dan_courses_and_towers_are_songs_hashed_like_the_catalog() {
+        let tmp = tempfile::tempdir().unwrap();
+        let base = tmp.path();
+        let dan = "\u{feff}{\n\t\"title\": \"初級\",\n\t\"subtitle\": \"Tenth Kyuu\",\n\t\"level\": 1,\n\t\"charts\": []\n}";
+        let tower = "{\n\t\"id\": \"abc\",\n\t\"difficulty\": \"normal\",\n\t\"level\": 2,\n\t\"life\": 9,\n\t\"side\": \"ex\"\n}";
+        write(&base.join("S1 Dan-i Dojo/01. 10th Kyuu/10thKyuu.optktcm"), dan);
+        write(&base.join("S1 Dan-i Dojo/01. 10th Kyuu/uniqueID.json"), "{\"id\":\"dan10\"}");
+        write(&base.join("S2 Taiko Towers/Next To You/tower.OPTKTCT"), tower);
+
+        let (songs, genres, _) = collect_tree(base, &ScanCache::default(), false, &mut |_| {});
+        let song = |rel: &str| songs.iter().find(|s| s.rel_path == rel).unwrap_or_else(|| panic!("{rel} not found"));
+        let md5 = |text: &str| hex::encode(Md5::digest(text.as_bytes()));
+
+        let dan_song = song("S1 Dan-i Dojo/01. 10th Kyuu");
+        assert_eq!(dan_song.unique_id.as_deref(), Some("dan10"));
+        assert_eq!(dan_song.tja_md5s, vec![md5(dan)]);
+        assert_eq!(dan_song.title.as_deref(), Some("初級"));
+        assert_eq!(dan_song.difficulties.iter().map(|d| (d.course.as_str(), d.level)).collect::<Vec<_>>(), vec![("Dan", 1.0)]);
+
+        let tower_song = song("S2 Taiko Towers/Next To You");
+        assert_eq!(tower_song.tja_md5s, vec![md5(tower)]);
+        assert_eq!(tower_song.title, None);
+        assert_eq!(tower_song.difficulties.iter().map(|d| (d.course.as_str(), d.level)).collect::<Vec<_>>(), vec![("Tower", 2.0)]);
+        assert_eq!(tower_song.side.as_deref(), Some("Ex"));
+
+        // Neither is a genre folder
+        let genre_paths: Vec<&str> = genres.iter().map(|g| g.rel_path.as_str()).collect();
+        assert_eq!(genre_paths, vec!["S1 Dan-i Dojo", "S2 Taiko Towers"]);
+
+        // Migration moves them as songs too
+        let mut dirs = Vec::new();
+        crate::fsops::collect_song_dirs(base, &mut dirs);
+        dirs.sort();
+        assert_eq!(dirs, vec![base.join("S1 Dan-i Dojo/01. 10th Kyuu"), base.join("S2 Taiko Towers/Next To You")]);
     }
 
     // Through the file on disk, as from one start to the next: the stamps must come back
